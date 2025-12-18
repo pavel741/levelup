@@ -13,6 +13,21 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const [checking, setChecking] = useState(true)
 
   useEffect(() => {
+    // Check if Firebase is configured
+    if (typeof window !== 'undefined') {
+      const hasFirebaseConfig = 
+        process.env.NEXT_PUBLIC_FIREBASE_API_KEY &&
+        process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN &&
+        process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID &&
+        process.env.NEXT_PUBLIC_FIREBASE_APP_ID
+      
+      if (!hasFirebaseConfig) {
+        console.error('❌ AuthGuard: Firebase is not configured. Please add environment variables to Vercel.')
+        setChecking(false)
+        return
+      }
+    }
+
     // Check for URL error parameters (from Google OAuth redirect)
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search)
