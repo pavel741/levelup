@@ -32,6 +32,7 @@ interface AppState {
   completeHabit: (id: string) => Promise<void>
   uncompleteHabit: (id: string) => Promise<void>
   markHabitMissed: (id: string, date: string, reason: string) => Promise<void>
+  updateMissedReasonValidity: (habitId: string, date: string, valid: boolean) => Promise<void>
   deleteHabit: (id: string) => Promise<void>
   
   // Challenges
@@ -422,6 +423,35 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
       await updateUserData(get().user!.id, {
         streak: 0, // Reset streak for invalid excuses
       })
+      await get().syncUser(get().user!.id)
+    }
+  },
+  updateMissedReasonValidity: async (habitId, date, valid) => {
+    const habit = get().habits.find((h) => h.id === habitId)
+    if (!habit || !habit.missedDates) return
+
+    // Find the current missed date to check if validity is changing
+    const currentMissed = habit.missedDates.find((m) => m.date === date)
+    const wasInvalid = currentMissed?.valid === false
+
+    // Update the validity of the missed date
+    const updatedMissedDates = habit.missedDates.map((m) =>
+      m.date === date ? { ...m, valid } : m
+    )
+
+    await updateHabitFirestore(habitId, { missedDates: updatedMissedDates })
+
+    // Recalculate streak based on new validity
+    if (get().user) {
+      if (!valid) {
+        // Changing to invalid - reset streak
+        await updateUserData(get().user!.id, {
+          streak: 0,
+        })
+      } else if (wasInvalid && valid) {
+        // Changing from invalid to valid - recalculate streak
+        // The calculateUserStreak will be called in syncUser
+      }
       await get().syncUser(get().user!.id)
     }
   },

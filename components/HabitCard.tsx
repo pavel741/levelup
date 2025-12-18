@@ -13,7 +13,7 @@ interface HabitCardProps {
 }
 
 export default function HabitCard({ habit, onEdit }: HabitCardProps) {
-  const { completeHabit, uncompleteHabit, deleteHabit, markHabitMissed, user } = useFirestoreStore()
+  const { completeHabit, uncompleteHabit, deleteHabit, markHabitMissed, updateMissedReasonValidity, user } = useFirestoreStore()
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showMissedModal, setShowMissedModal] = useState(false)
   const [missedReason, setMissedReason] = useState('')
@@ -260,14 +260,38 @@ export default function HabitCard({ habit, onEdit }: HabitCardProps) {
                 .map((missed) => {
                   const isToday = missed.date === today
                   return (
-                    <div key={missed.date} className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
+                    <div key={missed.date} className={`p-3 rounded-lg border ${
+                      missed.valid === false 
+                        ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                        : missed.valid === true
+                        ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                        : 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800'
+                    }`}>
                       <div className="flex items-start gap-2">
-                        <AlertCircle className="w-4 h-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
+                        <AlertCircle className={`w-4 h-4 mt-0.5 flex-shrink-0 ${
+                          missed.valid === false 
+                            ? 'text-red-600 dark:text-red-400'
+                            : missed.valid === true
+                            ? 'text-green-600 dark:text-green-400'
+                            : 'text-orange-600 dark:text-orange-400'
+                        }`} />
                         <div className="flex-1">
-                          <p className="text-sm font-medium text-orange-900 dark:text-orange-300">
+                          <p className={`text-sm font-medium ${
+                            missed.valid === false 
+                              ? 'text-red-900 dark:text-red-300'
+                              : missed.valid === true
+                              ? 'text-green-900 dark:text-green-300'
+                              : 'text-orange-900 dark:text-orange-300'
+                          }`}>
                             {isToday ? 'Missed Today' : `Missed on ${format(new Date(missed.date), 'MMM d, yyyy')}`}
                           </p>
-                          <p className="text-xs text-orange-700 dark:text-orange-400 mt-1">
+                          <p className={`text-xs mt-1 ${
+                            missed.valid === false 
+                              ? 'text-red-700 dark:text-red-400'
+                              : missed.valid === true
+                              ? 'text-green-700 dark:text-green-400'
+                              : 'text-orange-700 dark:text-orange-400'
+                          }`}>
                             {missed.reason}
                           </p>
                           {missed.valid === false && (
@@ -275,6 +299,35 @@ export default function HabitCard({ habit, onEdit }: HabitCardProps) {
                               ⚠️ Invalid reason - streak reset
                             </p>
                           )}
+                          {missed.valid === true && (
+                            <p className="text-xs text-green-600 dark:text-green-400 mt-1 font-medium">
+                              ✓ Valid reason - streak preserved
+                            </p>
+                          )}
+                          <div className="flex gap-2 mt-2">
+                            <button
+                              onClick={() => updateMissedReasonValidity(habit.id, missed.date, true)}
+                              className={`px-2 py-1 text-xs rounded transition-colors ${
+                                missed.valid === true
+                                  ? 'bg-green-600 text-white'
+                                  : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50'
+                              }`}
+                              title="Mark as valid reason"
+                            >
+                              ✓ Valid
+                            </button>
+                            <button
+                              onClick={() => updateMissedReasonValidity(habit.id, missed.date, false)}
+                              className={`px-2 py-1 text-xs rounded transition-colors ${
+                                missed.valid === false
+                                  ? 'bg-red-600 text-white'
+                                  : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/50'
+                              }`}
+                              title="Mark as invalid reason"
+                            >
+                              ✗ Invalid
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
