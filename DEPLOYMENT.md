@@ -121,7 +121,18 @@ service cloud.firestore {
    vercel
    ```
 
-4. When prompted, add your environment variables from `.env.local`
+4. **IMPORTANT:** When prompted, add your environment variables:
+   - Vercel will ask if you want to add environment variables
+   - Say "Yes" and add each variable:
+     - `NEXT_PUBLIC_FIREBASE_API_KEY` = `AIzaSyDEXX-OS0VyAmI-pFLqUMHcHwoO48nr2yU`
+     - `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` = `levelup-d725d.firebaseapp.com`
+     - `NEXT_PUBLIC_FIREBASE_PROJECT_ID` = `levelup-d725d`
+     - `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` = `levelup-d725d.firebasestorage.app`
+     - `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` = `778292786530`
+     - `NEXT_PUBLIC_FIREBASE_APP_ID` = `1:778292786530:web:00d9d80b74f3225449a83b`
+     - `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID` = `G-VZ1EFQ3SE9`
+
+   **OR** add them later via Vercel dashboard: Settings > Environment Variables
 
 ### Option B: Deploy via GitHub
 
@@ -137,10 +148,25 @@ service cloud.firestore {
 2. Go to [Vercel](https://vercel.com/)
 3. Click "New Project"
 4. Import your GitHub repository
-5. Add environment variables:
-   - Go to Project Settings > Environment Variables
-   - Add all variables from `.env.local`
+5. **IMPORTANT: Add environment variables BEFORE deploying:**
+   - Before clicking "Deploy", scroll down to "Environment Variables"
+   - Click "Add" and add each variable:
+     - `NEXT_PUBLIC_FIREBASE_API_KEY` = `AIzaSyDEXX-OS0VyAmI-pFLqUMHcHwoO48nr2yU`
+     - `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` = `levelup-d725d.firebaseapp.com`
+     - `NEXT_PUBLIC_FIREBASE_PROJECT_ID` = `levelup-d725d`
+     - `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` = `levelup-d725d.firebasestorage.app`
+     - `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` = `778292786530`
+     - `NEXT_PUBLIC_FIREBASE_APP_ID` = `1:778292786530:web:00d9d80b74f3225449a83b`
+     - `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID` = `G-VZ1EFQ3SE9`
+   - Make sure to select all environments (Production, Preview, Development)
 6. Click "Deploy"
+
+**OR if already deployed:**
+- Go to your project in Vercel
+- Go to **Settings** > **Environment Variables**
+- Add all the variables listed above
+- Go to **Deployments** tab
+- Click the three dots on the latest deployment → **Redeploy**
 
 ## Step 5: Configure Firebase Authorized Domains
 

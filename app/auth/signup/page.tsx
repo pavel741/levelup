@@ -1,12 +1,13 @@
 'use client'
 
-import { useState } from 'react'
-export const dynamic = 'force-dynamic'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { signUp, signInWithGoogle } from '@/lib/auth'
+import { signUp, signInWithGoogle, handleGoogleRedirect } from '@/lib/auth'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
 import { Mail, Lock, User, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
+
+export const dynamic = 'force-dynamic'
 
 export default function SignUpPage() {
   const router = useRouter()
@@ -16,6 +17,16 @@ export default function SignUpPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // Handle Google redirect callback
+  useEffect(() => {
+    handleGoogleRedirect().then((user) => {
+      if (user) {
+        setUser(user)
+        router.push('/')
+      }
+    })
+  }, [setUser, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -46,14 +57,10 @@ export default function SignUpPage() {
     setLoading(true)
 
     try {
-      const user = await signInWithGoogle()
-      if (user) {
-        setUser(user)
-        router.push('/')
-      }
+      // This will redirect to Google, so the function won't complete here
+      await signInWithGoogle()
     } catch (err: any) {
       setError(err.message || 'Failed to sign in with Google')
-    } finally {
       setLoading(false)
     }
   }

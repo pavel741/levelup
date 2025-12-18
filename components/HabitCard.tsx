@@ -24,15 +24,15 @@ export default function HabitCard({ habit }: HabitCardProps) {
   const streak = calculateStreak(habit.completedDates)
 
   return (
-    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
           <div className={`${habit.color} w-12 h-12 rounded-lg flex items-center justify-center text-2xl`}>
             {habit.icon}
           </div>
           <div>
-            <h3 className="font-semibold text-gray-900">{habit.name}</h3>
-            <p className="text-sm text-gray-500">{habit.description}</p>
+            <h3 className="font-semibold text-gray-900 dark:text-white">{habit.name}</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">{habit.description}</p>
           </div>
         </div>
         <button
@@ -53,14 +53,14 @@ export default function HabitCard({ habit }: HabitCardProps) {
 
       <div className="space-y-3">
         <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-600">Streak</span>
-          <span className="font-semibold text-orange-600">🔥 {streak} days</span>
+          <span className="text-gray-600 dark:text-gray-400">Streak</span>
+          <span className="font-semibold text-orange-600 dark:text-orange-400">🔥 {streak} days</span>
         </div>
         <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-600">XP Reward</span>
-          <span className="font-semibold text-blue-600">+{habit.xpReward} XP</span>
+          <span className="text-gray-600 dark:text-gray-400">XP Reward</span>
+          <span className="font-semibold text-blue-600 dark:text-blue-400">+{habit.xpReward} XP</span>
         </div>
-        <div className="w-full bg-gray-200 rounded-full h-2">
+        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
           <div
             className="bg-blue-500 h-2 rounded-full transition-all duration-300"
             style={{ width: `${Math.min(completionRate * 100, 100)}%` }}

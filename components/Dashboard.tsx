@@ -26,11 +26,11 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       {/* Welcome Section */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 text-white">
+      <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 text-white dark:from-blue-700 dark:to-purple-700">
         <h1 className="text-3xl font-bold mb-2">
           Welcome back, {user?.name}! 👋
         </h1>
-        <p className="text-blue-100 text-lg">
+        <p className="text-blue-100 dark:text-blue-200 text-lg">
           Ready to level up today? You're on a {user?.streak} day streak! 🔥
         </p>
       </div>
@@ -70,7 +70,7 @@ export default function Dashboard() {
       {/* Habits Section */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold text-gray-900">Your Habits</h2>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Your Habits</h2>
           <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
             + Add Habit
           </button>
@@ -92,7 +92,7 @@ export default function Dashboard() {
       {/* Challenges Section */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold text-gray-900">Active Challenges</h2>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Active Challenges</h2>
           <button className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium">
             View All
           </button>

@@ -5,7 +5,8 @@ import {
   onAuthStateChanged,
   User as FirebaseUser,
   GoogleAuthProvider,
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
 } from 'firebase/auth'
 import { auth } from './firebase'
 import { getUserData, createUserData } from './firestore'
@@ -59,16 +60,34 @@ export const signIn = async (email: string, password: string): Promise<User | nu
   }
 }
 
-export const signInWithGoogle = async (): Promise<User | null> => {
+export const signInWithGoogle = async (): Promise<void> => {
   if (!auth) {
     throw new Error('Firebase Auth is not initialized')
   }
   
   try {
     const provider = new GoogleAuthProvider()
-    const userCredential = await signInWithPopup(auth, provider)
-    const firebaseUser = userCredential.user
+    // Use redirect instead of popup to avoid COOP issues
+    await signInWithRedirect(auth, provider)
+    // Note: This will redirect the page, so the function won't return here
+  } catch (error: any) {
+    console.error('Error initiating Google sign-in:', error)
+    throw error
+  }
+}
 
+export const handleGoogleRedirect = async (): Promise<User | null> => {
+  if (!auth) {
+    return null
+  }
+  
+  try {
+    const result = await getRedirectResult(auth)
+    if (!result) {
+      return null
+    }
+
+    const firebaseUser = result.user
     let user = await getUserData(firebaseUser.uid)
     
     if (!user) {
@@ -90,8 +109,8 @@ export const signInWithGoogle = async (): Promise<User | null> => {
 
     return user
   } catch (error: any) {
-    console.error('Error signing in with Google:', error)
-    throw error
+    console.error('Error handling Google redirect:', error)
+    return null
   }
 }
 

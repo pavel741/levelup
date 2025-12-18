@@ -21,7 +21,7 @@ export default function ChallengeCard({ challenge }: ChallengeCardProps) {
   }
 
   return (
-    <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-2">
@@ -29,9 +29,9 @@ export default function ChallengeCard({ challenge }: ChallengeCardProps) {
               challenge.difficulty === 'easy' ? 'text-green-600' :
               challenge.difficulty === 'medium' ? 'text-yellow-600' : 'text-red-600'
             }`} />
-            <h3 className="font-semibold text-gray-900">{challenge.title}</h3>
+            <h3 className="font-semibold text-gray-900 dark:text-white">{challenge.title}</h3>
           </div>
-          <p className="text-sm text-gray-600 mb-3">{challenge.description}</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">{challenge.description}</p>
           <div className="flex items-center gap-2 mb-3">
             <span className={`px-2 py-1 rounded text-xs font-medium ${difficultyColors[challenge.difficulty]}`}>
               {challenge.difficulty}
@@ -45,21 +45,21 @@ export default function ChallengeCard({ challenge }: ChallengeCardProps) {
 
       <div className="space-y-3">
         <div className="flex items-center justify-between text-sm">
-          <div className="flex items-center gap-2 text-gray-600">
+          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
             <Users className="w-4 h-4" />
             <span>{challenge.participants.length} participants</span>
           </div>
-          <div className="flex items-center gap-2 text-gray-600">
+          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
             <Clock className="w-4 h-4" />
             <span>{daysRemaining} days left</span>
           </div>
         </div>
 
         <div className="space-y-2">
-          <p className="text-xs font-medium text-gray-700">Requirements:</p>
+          <p className="text-xs font-medium text-gray-700 dark:text-gray-300">Requirements:</p>
           <ul className="space-y-1">
             {challenge.requirements.map((req, idx) => (
-              <li key={idx} className="text-xs text-gray-600 flex items-center gap-2">
+              <li key={idx} className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-2">
                 <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
                 {req}
               </li>
