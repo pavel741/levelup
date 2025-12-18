@@ -134,12 +134,12 @@ export default function SignUpPage() {
     setLoading(true)
 
     try {
-      // Wait for Firebase to initialize and add a small delay for better UX
+      // Wait for Firebase to initialize and add a delay for better UX
       const { waitForFirebaseInit } = await import('@/lib/firebase')
       await waitForFirebaseInit()
       
-      // Add a 500ms delay before redirecting to Google
-      await new Promise(resolve => setTimeout(resolve, 500))
+      // Add a 1 second delay before redirecting to Google
+      await new Promise(resolve => setTimeout(resolve, 1000))
       
       // This will redirect to Google, so the function won't complete here
       await signInWithGoogle()
