@@ -7,7 +7,7 @@ import AuthGuard from '@/components/AuthGuard'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import HabitCard from '@/components/HabitCard'
-import { Plus, Target } from 'lucide-react'
+import { Plus, Target, CheckCircle2 } from 'lucide-react'
 import { Habit } from '@/types'
 import { format } from 'date-fns'
 
@@ -144,7 +144,10 @@ export default function HabitsPage() {
     setEditingHabit(null)
   }
 
+  const today = format(new Date(), 'yyyy-MM-dd')
   const activeHabits = habits.filter((h) => h.isActive)
+  const completedToday = activeHabits.filter((h) => h.completedDates.includes(today))
+  const incompleteToday = activeHabits.filter((h) => !h.completedDates.includes(today))
   const archivedHabits = habits.filter((h) => !h.isActive)
 
   return (
@@ -170,11 +173,28 @@ export default function HabitsPage() {
                 </button>
               </div>
 
-              {activeHabits.length > 0 && (
+              {incompleteToday.length > 0 && (
                 <div className="mb-8">
-                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Active Habits</h2>
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                    <Target className="w-5 h-5" />
+                    To Complete Today
+                  </h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {activeHabits.map((habit) => (
+                    {incompleteToday.map((habit) => (
+                      <HabitCard key={habit.id} habit={habit} onEdit={handleEditHabit} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {completedToday.length > 0 && (
+                <div className="mb-8">
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-green-500" />
+                    Completed Today ({completedToday.length})
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 opacity-90">
+                    {completedToday.map((habit) => (
                       <HabitCard key={habit.id} habit={habit} onEdit={handleEditHabit} />
                     ))}
                   </div>
