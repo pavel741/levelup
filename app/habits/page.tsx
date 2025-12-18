@@ -52,6 +52,9 @@ export default function HabitsPage() {
       return
     }
 
+    // Validate XP reward
+    const xpReward = newHabit.xpReward && newHabit.xpReward >= 10 ? newHabit.xpReward : 30
+
     addHabit({
       id: Date.now().toString(),
       userId: user.id,
@@ -61,7 +64,7 @@ export default function HabitsPage() {
       color: newHabit.color,
       frequency: newHabit.frequency,
       targetDays: newHabit.targetDays,
-      xpReward: newHabit.xpReward,
+      xpReward: xpReward,
       completedDates: [],
       createdAt: new Date(),
       startDate: newHabit.startDate ? new Date(newHabit.startDate) : undefined,
@@ -116,12 +119,15 @@ export default function HabitsPage() {
       return
     }
 
+    // Validate XP reward
+    const xpReward = newHabit.xpReward && newHabit.xpReward >= 10 ? newHabit.xpReward : 30
+
     updateHabit(editingHabit.id, {
       name: newHabit.name,
       description: newHabit.description,
       icon: newHabit.icon,
       color: newHabit.color,
-      xpReward: newHabit.xpReward,
+      xpReward: xpReward,
       frequency: newHabit.frequency,
       targetDays: newHabit.targetDays,
       startDate: newHabit.startDate ? new Date(newHabit.startDate) : undefined,
@@ -385,8 +391,25 @@ export default function HabitsPage() {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">XP Reward</label>
                 <input
                   type="number"
-                  value={newHabit.xpReward}
-                  onChange={(e) => setNewHabit({ ...newHabit, xpReward: parseInt(e.target.value) || 30 })}
+                  value={newHabit.xpReward === 0 ? '' : newHabit.xpReward}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    // Allow empty string, or parse the number
+                    if (value === '') {
+                      setNewHabit({ ...newHabit, xpReward: 0 })
+                    } else {
+                      const numValue = parseInt(value)
+                      if (!isNaN(numValue)) {
+                        setNewHabit({ ...newHabit, xpReward: numValue })
+                      }
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const value = parseInt(e.target.value)
+                    if (!value || value < 10) {
+                      setNewHabit({ ...newHabit, xpReward: 30 })
+                    }
+                  }}
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   min="10"
                   max="100"
@@ -597,8 +620,25 @@ export default function HabitsPage() {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">XP Reward</label>
                 <input
                   type="number"
-                  value={newHabit.xpReward}
-                  onChange={(e) => setNewHabit({ ...newHabit, xpReward: parseInt(e.target.value) || 30 })}
+                  value={newHabit.xpReward === 0 ? '' : newHabit.xpReward}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    // Allow empty string, or parse the number
+                    if (value === '') {
+                      setNewHabit({ ...newHabit, xpReward: 0 })
+                    } else {
+                      const numValue = parseInt(value)
+                      if (!isNaN(numValue)) {
+                        setNewHabit({ ...newHabit, xpReward: numValue })
+                      }
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const value = parseInt(e.target.value)
+                    if (!value || value < 10) {
+                      setNewHabit({ ...newHabit, xpReward: 30 })
+                    }
+                  }}
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   min="10"
                   max="100"
