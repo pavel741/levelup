@@ -14,7 +14,7 @@ const firebaseConfig = {
 }
 
 // Validate Firebase configuration
-const validateFirebaseConfig = () => {
+const validateFirebaseConfig = (): { valid: boolean; missing: string[] } => {
   const required = [
     'NEXT_PUBLIC_FIREBASE_API_KEY',
     'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
@@ -26,10 +26,11 @@ const validateFirebaseConfig = () => {
   
   if (missing.length > 0) {
     console.error('❌ Missing Firebase environment variables:', missing.join(', '))
-    return false
+    console.error('❌ Please add these environment variables to your Vercel project settings')
+    return { valid: false, missing }
   }
   
-  return true
+  return { valid: true, missing: [] }
 }
 
 // Initialize Firebase only in browser
@@ -40,17 +41,22 @@ let analytics: Analytics | null = null
 
 if (typeof window !== 'undefined') {
   // Validate config before initializing
-  if (!validateFirebaseConfig()) {
-    console.error('❌ Firebase configuration is incomplete. Please check your environment variables.')
+  const validation = validateFirebaseConfig()
+  if (!validation.valid) {
+    const errorMessage = `Firebase configuration is incomplete. Missing: ${validation.missing.join(', ')}. Please add these environment variables to your Vercel project settings.`
+    console.error('❌', errorMessage)
     // Store error for ErrorDisplay component
     try {
       localStorage.setItem('firebase_error', JSON.stringify({
         code: 'firebase_config_missing',
-        message: 'Firebase configuration is incomplete. Please check your environment variables.',
+        message: errorMessage,
         timestamp: new Date().toISOString(),
         source: 'firebase_init',
+        missing: validation.missing,
       }))
-    } catch (e) {}
+    } catch (e) {
+      console.error('Failed to store error:', e)
+    }
   } else {
     try {
       // Suppress console errors for firebase-init.json (harmless - Firebase SDK tries to fetch this but it's not required)

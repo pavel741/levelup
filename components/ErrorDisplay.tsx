@@ -90,14 +90,41 @@ export default function ErrorDisplay() {
 
   if (!error) return null
 
+  // Special handling for missing Firebase config
+  const isConfigMissing = errorDetails?.code === 'firebase_config_missing'
+  const missingVars = errorDetails?.missing || []
+
   return (
-    <div className="fixed top-4 right-4 z-50 max-w-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 shadow-lg">
-      <div className="flex items-start gap-3">
+    <div className={`fixed ${isConfigMissing ? 'inset-0 z-[9999]' : 'top-4 right-4 z-50 max-w-md'} bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 shadow-lg ${isConfigMissing ? 'flex items-center justify-center' : ''}`}>
+      <div className={`flex items-start gap-3 ${isConfigMissing ? 'max-w-2xl w-full' : ''}`}>
         <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
         <div className="flex-1">
-          <h3 className="font-semibold text-red-900 dark:text-red-200 mb-1">Firebase Error</h3>
+          <h3 className="font-semibold text-red-900 dark:text-red-200 mb-1">
+            {isConfigMissing ? '⚠️ Firebase Configuration Missing' : 'Firebase Error'}
+          </h3>
           <p className="text-sm text-red-700 dark:text-red-300 mb-2">{error}</p>
-          {errorDetails && (
+          
+          {isConfigMissing && (
+            <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+              <p className="text-sm font-medium text-yellow-900 dark:text-yellow-200 mb-2">
+                🔧 How to Fix:
+              </p>
+              <ol className="text-xs text-yellow-800 dark:text-yellow-300 list-decimal list-inside space-y-1 mb-3">
+                <li>Go to Vercel Dashboard → Your Project → Settings → Environment Variables</li>
+                <li>Add the missing Firebase environment variables:</li>
+              </ol>
+              <ul className="text-xs text-yellow-800 dark:text-yellow-300 list-disc list-inside space-y-1 mb-3 font-mono bg-yellow-100 dark:bg-yellow-900/40 p-2 rounded">
+                {missingVars.map((varName: string) => (
+                  <li key={varName}>{varName}</li>
+                ))}
+              </ul>
+              <p className="text-xs text-yellow-800 dark:text-yellow-300">
+                📖 See <code className="bg-yellow-200 dark:bg-yellow-900/60 px-1 rounded">VERCEL_ENV_SETUP.md</code> for detailed instructions
+              </p>
+            </div>
+          )}
+          
+          {errorDetails && !isConfigMissing && (
             <details className="text-xs text-red-600 dark:text-red-400">
               <summary className="cursor-pointer mb-1">Show Details</summary>
               <pre className="bg-red-100 dark:bg-red-900/40 p-2 rounded mt-1 overflow-auto max-h-40">
@@ -105,27 +132,32 @@ export default function ErrorDisplay() {
               </pre>
             </details>
           )}
+          
+          {!isConfigMissing && (
+            <button
+              onClick={() => {
+                setError(null)
+                setErrorDetails(null)
+                localStorage.removeItem('firebase_error')
+              }}
+              className="mt-2 text-xs text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200 underline"
+            >
+              Dismiss
+            </button>
+          )}
+        </div>
+        {!isConfigMissing && (
           <button
             onClick={() => {
               setError(null)
               setErrorDetails(null)
               localStorage.removeItem('firebase_error')
             }}
-            className="mt-2 text-xs text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200 underline"
+            className="text-red-400 hover:text-red-600 dark:hover:text-red-300"
           >
-            Dismiss
+            <X className="w-4 h-4" />
           </button>
-        </div>
-        <button
-          onClick={() => {
-            setError(null)
-            setErrorDetails(null)
-            localStorage.removeItem('firebase_error')
-          }}
-          className="text-red-400 hover:text-red-600 dark:hover:text-red-300"
-        >
-          <X className="w-4 h-4" />
-        </button>
+        )}
       </div>
     </div>
   )
