@@ -19,12 +19,35 @@ export default function LoginPage() {
 
   // Handle Google redirect callback
   useEffect(() => {
-    handleGoogleRedirect().then((user) => {
-      if (user) {
-        setUser(user)
-        router.push('/')
+    let mounted = true
+    
+    const handleRedirect = async () => {
+      try {
+        const user = await handleGoogleRedirect()
+        if (mounted && user) {
+          setUser(user)
+          router.push('/')
+        } else if (mounted) {
+          // Check if there's an error in the URL params
+          const urlParams = new URLSearchParams(window.location.search)
+          const error = urlParams.get('error')
+          if (error) {
+            setError('Google sign-in failed. Please try again.')
+          }
+        }
+      } catch (err: any) {
+        console.error('Google redirect error:', err)
+        if (mounted) {
+          setError(err.message || 'Failed to sign in with Google')
+        }
       }
-    })
+    }
+    
+    handleRedirect()
+    
+    return () => {
+      mounted = false
+    }
   }, [setUser, router])
 
   const handleSubmit = async (e: React.FormEvent) => {

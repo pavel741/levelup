@@ -13,10 +13,21 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const [checking, setChecking] = useState(true)
 
   useEffect(() => {
-    // Don't check auth on auth pages
+    // Don't check auth on auth pages - let them handle redirects
     if (pathname?.startsWith('/auth')) {
       setChecking(false)
-      return
+      // Still set up auth listener for redirect handling
+      const unsubscribe = onAuthChange(async (firebaseUser) => {
+        if (firebaseUser && pathname?.startsWith('/auth')) {
+          // User authenticated via redirect, let the auth page handle it
+          const userData = await getUserData(firebaseUser.uid)
+          if (userData) {
+            setUser(userData)
+            await syncUser(firebaseUser.uid)
+          }
+        }
+      })
+      return () => unsubscribe()
     }
 
     const unsubscribe = onAuthChange(async (firebaseUser) => {

@@ -105,20 +105,30 @@ export const signInWithGoogle = async (): Promise<void> => {
 
 export const handleGoogleRedirect = async (): Promise<User | null> => {
   if (!auth) {
+    console.error('Firebase Auth is not initialized')
     return null
   }
   
   try {
     const result = await getRedirectResult(auth)
     if (!result) {
+      // No redirect result - this is normal if user hasn't been redirected
       return null
     }
 
     const firebaseUser = result.user
+    if (!firebaseUser) {
+      console.error('No user in redirect result')
+      return null
+    }
+
+    console.log('Google redirect successful, user:', firebaseUser.uid)
+    
     let user = await getUserData(firebaseUser.uid)
     
     if (!user) {
       // Create new user if doesn't exist
+      console.log('Creating new user from Google sign-in')
       user = {
         id: firebaseUser.uid,
         name: firebaseUser.displayName || 'User',
@@ -132,12 +142,18 @@ export const handleGoogleRedirect = async (): Promise<User | null> => {
         joinedAt: new Date(),
       }
       await createUserData(user)
+      console.log('New user created:', user.id)
+    } else {
+      console.log('Existing user found:', user.id)
     }
 
     return user
   } catch (error: any) {
     console.error('Error handling Google redirect:', error)
-    return null
+    console.error('Error code:', error?.code)
+    console.error('Error message:', error?.message)
+    // Re-throw the error so the UI can handle it
+    throw new Error(getErrorMessage(error))
   }
 }
 
