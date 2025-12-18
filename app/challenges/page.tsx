@@ -9,6 +9,7 @@ import Header from '@/components/Header'
 import ChallengeCard from '@/components/ChallengeCard'
 import { Trophy, Plus, X } from 'lucide-react'
 import { Challenge } from '@/types'
+import { format } from 'date-fns'
 
 export default function ChallengesPage() {
   const { challenges, activeChallenges, addChallenge, user, habits } = useFirestoreStore()
@@ -23,6 +24,8 @@ export default function ChallengesPage() {
     duration: 7,
     requirements: [''],
     habitIds: [] as string[], // Selected habit IDs to link to challenge
+    startDate: format(new Date(), 'yyyy-MM-dd'), // Default to today
+    endDate: format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'), // Default to 7 days from today
   })
   const availableChallenges = challenges.filter(
     (c) => !activeChallenges.some((ac) => ac.id === c.id)
@@ -35,9 +38,19 @@ export default function ChallengesPage() {
     const duration = newChallenge.duration && newChallenge.duration >= 1 ? newChallenge.duration : 7
     const xpReward = newChallenge.xpReward && newChallenge.xpReward >= 10 ? newChallenge.xpReward : 100
 
-    const startDate = new Date()
-    const endDate = new Date()
-    endDate.setDate(endDate.getDate() + duration)
+    // Use provided dates or calculate from duration
+    const startDate = newChallenge.startDate ? new Date(newChallenge.startDate) : new Date()
+    const endDate = newChallenge.endDate ? new Date(newChallenge.endDate) : (() => {
+      const calculatedEnd = new Date(startDate)
+      calculatedEnd.setDate(calculatedEnd.getDate() + duration)
+      return calculatedEnd
+    })()
+    
+    // Validate that end date is after start date
+    if (endDate <= startDate) {
+      alert('End date must be after start date')
+      return
+    }
 
     const challenge: Challenge = {
       id: Date.now().toString(),
@@ -69,6 +82,8 @@ export default function ChallengesPage() {
       duration: 7,
       requirements: [''],
       habitIds: [],
+      startDate: format(new Date(), 'yyyy-MM-dd'),
+      endDate: format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
     })
     setShowAddModal(false)
   }
@@ -221,20 +236,38 @@ export default function ChallengesPage() {
                       } else {
                         const numValue = parseInt(value)
                         if (!isNaN(numValue)) {
-                          setNewChallenge({ ...newChallenge, duration: numValue })
+                          // Auto-update end date based on duration
+                          const startDate = newChallenge.startDate ? new Date(newChallenge.startDate) : new Date()
+                          const newEndDate = new Date(startDate)
+                          newEndDate.setDate(newEndDate.getDate() + numValue)
+                          setNewChallenge({ 
+                            ...newChallenge, 
+                            duration: numValue,
+                            endDate: format(newEndDate, 'yyyy-MM-dd')
+                          })
                         }
                       }
                     }}
                     onBlur={(e) => {
                       const value = parseInt(e.target.value)
                       if (!value || value < 1) {
-                        setNewChallenge({ ...newChallenge, duration: 7 })
+                        const startDate = newChallenge.startDate ? new Date(newChallenge.startDate) : new Date()
+                        const newEndDate = new Date(startDate)
+                        newEndDate.setDate(newEndDate.getDate() + 7)
+                        setNewChallenge({ 
+                          ...newChallenge, 
+                          duration: 7,
+                          endDate: format(newEndDate, 'yyyy-MM-dd')
+                        })
                       }
                     }}
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     min="1"
                     max="365"
                   />
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Duration will auto-update end date
+                  </p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">XP Reward</label>
@@ -262,6 +295,49 @@ export default function ChallengesPage() {
                     min="10"
                     max="1000"
                   />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    value={newChallenge.startDate}
+                    onChange={(e) => {
+                      setNewChallenge({ ...newChallenge, startDate: e.target.value })
+                      // Auto-update end date if it becomes invalid
+                      if (newChallenge.endDate && e.target.value >= newChallenge.endDate) {
+                        const newEndDate = new Date(e.target.value)
+                        newEndDate.setDate(newEndDate.getDate() + newChallenge.duration)
+                        setNewChallenge({ 
+                          ...newChallenge, 
+                          startDate: e.target.value,
+                          endDate: format(newEndDate, 'yyyy-MM-dd')
+                        })
+                      }
+                    }}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    min={format(new Date(), 'yyyy-MM-dd')}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    value={newChallenge.endDate}
+                    onChange={(e) => setNewChallenge({ ...newChallenge, endDate: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    min={newChallenge.startDate || format(new Date(), 'yyyy-MM-dd')}
+                  />
+                  {newChallenge.endDate && newChallenge.startDate && newChallenge.endDate <= newChallenge.startDate && (
+                    <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+                      End date must be after start date
+                    </p>
+                  )}
                 </div>
               </div>
               <div>
