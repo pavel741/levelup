@@ -176,28 +176,47 @@ export const checkAndUnlockAchievements = (
   existingAchievements: Achievement[]
 ): Achievement[] => {
   const unlocked: Achievement[] = []
-  const existingIds = new Set(existingAchievements.map((a) => a.id))
 
   for (const definition of ACHIEVEMENT_DEFINITIONS) {
-    if (existingIds.has(definition.id)) continue
-
     const { progress, target, completed } = definition.checkProgress(user, habits)
+    const existing = existingAchievements.find((a) => a.id === definition.id)
     
+    // If achievement is completed
     if (completed) {
-      unlocked.push({
-        id: definition.id,
-        name: definition.name,
-        description: definition.description,
-        icon: definition.icon,
-        rarity: definition.rarity,
-        progress: target,
-        target: target,
-        unlockedAt: new Date(),
-      })
+      // If it was already unlocked, keep it unlocked but update progress
+      if (existing && existing.unlockedAt) {
+        unlocked.push({
+          ...existing,
+          progress: target,
+          target: target,
+        })
+      } else {
+        // Unlock it now (either new or was incorrectly marked as not unlocked)
+        unlocked.push({
+          id: definition.id,
+          name: definition.name,
+          description: definition.description,
+          icon: definition.icon,
+          rarity: definition.rarity,
+          progress: target,
+          target: target,
+          unlockedAt: existing?.unlockedAt || new Date(), // Keep existing unlock date if it exists
+        })
+      }
     } else {
-      // Track progress even if not unlocked
-      const existing = existingAchievements.find((a) => a.id === definition.id)
-      if (!existing) {
+      // Achievement is NOT completed
+      // If it was incorrectly marked as unlocked, remove the unlock status
+      if (existing) {
+        // Update progress and remove unlock status if it was incorrectly unlocked
+        unlocked.push({
+          ...existing,
+          progress: progress,
+          target: target,
+          // Remove unlockAt if achievement is not actually completed
+          unlockedAt: undefined as any, // Remove unlock date - achievement was incorrectly marked
+        })
+      } else {
+        // Track progress (not unlocked, new achievement)
         unlocked.push({
           id: definition.id,
           name: definition.name,

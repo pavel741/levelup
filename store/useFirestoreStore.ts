@@ -487,15 +487,9 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
     existingAchievements.forEach((a) => achievementMap.set(a.id, a))
     
     // Update with new achievements (this will update progress and add newly unlocked)
+    // Always use the new achievement data to ensure correct unlock status
     newAchievements.forEach((a) => {
-      const existing = achievementMap.get(a.id)
-      if (existing && existing.unlockedAt) {
-        // Keep existing unlocked achievement
-        achievementMap.set(a.id, existing)
-      } else {
-        // Update or add new achievement
-        achievementMap.set(a.id, a)
-      }
+      achievementMap.set(a.id, a)
     })
     
     const updatedAchievements = Array.from(achievementMap.values())
