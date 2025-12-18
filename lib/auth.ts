@@ -188,7 +188,18 @@ export const signInWithGoogle = async (): Promise<void> => {
   
   try {
     console.log('🔵 Initiating Google sign-in redirect...')
+    console.log('Current URL:', window.location.href)
+    console.log('Auth domain:', process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN)
+    
     const provider = new GoogleAuthProvider()
+    // Add custom parameters to ensure redirect works
+    provider.addScope('profile')
+    provider.addScope('email')
+    
+    // Set the redirect URL explicitly if needed
+    // Firebase will use the current page URL as the redirect target
+    console.log('Setting up redirect to:', window.location.origin + window.location.pathname)
+    
     // Use redirect instead of popup to avoid COOP issues
     await signInWithRedirect(auth, provider)
     console.log('✅ Google sign-in redirect initiated')

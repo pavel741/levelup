@@ -15,7 +15,9 @@ export default function ErrorDisplay() {
         if (stored) {
           const errorData = JSON.parse(stored)
           setErrorDetails(errorData)
-          setError(`Firebase Error: ${errorData.code || 'Unknown'} - ${errorData.message || 'Unknown error'}`)
+          const errorMsg = errorData.message || 'Unknown error'
+          const errorCode = errorData.code || 'Unknown'
+          setError(`Firebase Error (${errorCode}): ${errorMsg}`)
         }
       } catch (e) {
         // Ignore
@@ -24,12 +26,31 @@ export default function ErrorDisplay() {
 
     checkStoredError()
     
+    // Check URL for error parameters (from Google OAuth redirect)
+    const urlParams = new URLSearchParams(window.location.search)
+    const error = urlParams.get('error')
+    const errorDescription = urlParams.get('error_description')
+    if (error) {
+      const errorData = {
+        code: error,
+        message: errorDescription || error,
+        timestamp: new Date().toISOString(),
+        source: 'url_params',
+      }
+      setErrorDetails(errorData)
+      setError(`Google Sign-In Error: ${errorDescription || error}`)
+      // Store it
+      try {
+        localStorage.setItem('firebase_error', JSON.stringify(errorData))
+      } catch (e) {}
+    }
+    
     // Also listen for console errors
     const originalError = console.error
     console.error = (...args: any[]) => {
       originalError.apply(console, args)
       const errorStr = args.join(' ')
-      if (errorStr.includes('Firebase') || errorStr.includes('Firestore') || errorStr.includes('permission')) {
+      if (errorStr.includes('Firebase') || errorStr.includes('Firestore') || errorStr.includes('permission') || errorStr.includes('auth/')) {
         setError(errorStr)
       }
     }
