@@ -57,7 +57,6 @@ Before pushing to production:
    - Complete habits
    - Join challenges
    - Block sites
-   - Check community features
 
 ### 4. Committing Changes
 

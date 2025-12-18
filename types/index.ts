@@ -10,6 +10,7 @@ export interface User {
   avatar?: string
   achievements: Achievement[]
   joinedAt: Date
+  emailSummaryEnabled?: boolean
 }
 
 export interface Habit {
@@ -25,6 +26,9 @@ export interface Habit {
   completedDates: string[]
   createdAt: Date
   isActive: boolean
+  reminderEnabled?: boolean
+  reminderTime?: string // Format: "HH:mm" (e.g., "09:00")
+  lastReminderDate?: string // Format: "yyyy-MM-dd"
 }
 
 export interface Challenge {

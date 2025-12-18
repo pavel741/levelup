@@ -12,6 +12,31 @@ import { auth } from './firebase'
 import { getUserData, createUserData } from './firestore'
 import { User } from '@/types'
 
+export const getErrorMessage = (error: any): string => {
+  const code = error?.code || ''
+  
+  switch (code) {
+    case 'auth/email-already-in-use':
+      return 'This email is already registered. Please sign in instead.'
+    case 'auth/invalid-email':
+      return 'Invalid email address. Please check and try again.'
+    case 'auth/weak-password':
+      return 'Password is too weak. Please use a stronger password.'
+    case 'auth/invalid-credential':
+      return 'Invalid email or password. Please check your credentials and try again.'
+    case 'auth/user-not-found':
+      return 'No account found with this email. Please sign up first.'
+    case 'auth/wrong-password':
+      return 'Incorrect password. Please try again.'
+    case 'auth/too-many-requests':
+      return 'Too many failed attempts. Please try again later.'
+    case 'auth/network-request-failed':
+      return 'Network error. Please check your internet connection.'
+    default:
+      return error?.message || 'An error occurred. Please try again.'
+  }
+}
+
 export const signUp = async (email: string, password: string, name: string): Promise<User | null> => {
   if (!auth) {
     throw new Error('Firebase Auth is not initialized')
@@ -38,7 +63,8 @@ export const signUp = async (email: string, password: string, name: string): Pro
     return user
   } catch (error: any) {
     console.error('Error signing up:', error)
-    throw error
+    const friendlyError = new Error(getErrorMessage(error))
+    throw friendlyError
   }
 }
 
@@ -56,7 +82,8 @@ export const signIn = async (email: string, password: string): Promise<User | nu
     return null
   } catch (error: any) {
     console.error('Error signing in:', error)
-    throw error
+    const friendlyError = new Error(getErrorMessage(error))
+    throw friendlyError
   }
 }
 

@@ -12,10 +12,11 @@ service cloud.firestore {
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
     }
     
-    // Users can read all challenges, but only update if they're participants
+    // Users can read all challenges, create their own, and update if they're participants
     match /challenges/{challengeId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && 
+      allow create: if request.auth != null && request.resource.data.participants.hasAny([request.auth.uid]);
+      allow update: if request.auth != null && 
         (request.resource.data.participants.hasAny([request.auth.uid]) ||
          !('participants' in request.resource.data.diff(resource.data).affectedKeys()));
     }

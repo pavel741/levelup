@@ -1,6 +1,6 @@
 'use client'
 
-import { Home, Target, Trophy, Shield, Users, Settings } from 'lucide-react'
+import { Home, Target, Trophy, Shield, Settings, BarChart3, Award } from 'lucide-react'
 import Link from 'next/link'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
 
@@ -12,7 +12,8 @@ export default function Sidebar() {
     { icon: Target, label: 'Habits', href: '/habits' },
     { icon: Trophy, label: 'Challenges', href: '/challenges' },
     { icon: Shield, label: 'Focus Mode', href: '/focus' },
-    { icon: Users, label: 'Community', href: '/community' },
+    { icon: BarChart3, label: 'Statistics', href: '/statistics' },
+    { icon: Award, label: 'Achievements', href: '/achievements' },
     { icon: Settings, label: 'Settings', href: '/settings' },
   ]
 

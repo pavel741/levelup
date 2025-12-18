@@ -1,16 +1,56 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
 export const dynamic = 'force-dynamic'
 import AuthGuard from '@/components/AuthGuard'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { User, Bell, Shield, Moon } from 'lucide-react'
+import { User, Bell, Shield, Moon, CheckCircle2 } from 'lucide-react'
 import { useTheme } from '@/components/ThemeProvider'
+import { requestNotificationPermission } from '@/lib/notifications'
 
 export default function SettingsPage() {
-  const { user } = useFirestoreStore()
+  const { user, updateUserPreference } = useFirestoreStore()
   const { theme, toggleTheme } = useTheme()
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default')
+  const [emailSummaryEnabled, setEmailSummaryEnabled] = useState(user?.emailSummaryEnabled || false)
+  const [isUpdatingEmail, setIsUpdatingEmail] = useState(false)
+
+  useEffect(() => {
+    if ('Notification' in window) {
+      setNotificationPermission(Notification.permission)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (user) {
+      setEmailSummaryEnabled(user.emailSummaryEnabled || false)
+    }
+  }, [user])
+
+  const handleToggleEmailSummary = async () => {
+    if (!user) return
+    
+    setIsUpdatingEmail(true)
+    try {
+      const newValue = !emailSummaryEnabled
+      setEmailSummaryEnabled(newValue)
+      await updateUserPreference('emailSummaryEnabled', newValue)
+    } catch (error) {
+      console.error('Error updating email preference:', error)
+      setEmailSummaryEnabled(!emailSummaryEnabled) // Revert on error
+    } finally {
+      setIsUpdatingEmail(false)
+    }
+  }
+
+  const handleRequestNotificationPermission = async () => {
+    const granted = await requestNotificationPermission()
+    if ('Notification' in window) {
+      setNotificationPermission(Notification.permission)
+    }
+  }
 
   return (
     <AuthGuard>
@@ -61,38 +101,98 @@ export default function SettingsPage() {
               <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
                 <div className="p-6 border-b border-gray-200 dark:border-gray-700">
                   <div className="flex items-center gap-3">
-                    <Bell className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                    <Bell className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                     <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Notifications</h2>
                   </div>
                 </div>
                 <div className="p-6 space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium text-gray-900 dark:text-white">Daily Reminders</p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Get reminded to complete your habits</p>
+                      <h3 className="font-semibold text-gray-900 dark:text-white">Browser Notifications</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        {notificationPermission === 'granted'
+                          ? 'Notifications are enabled'
+                          : notificationPermission === 'denied'
+                          ? 'Notifications are blocked. Please enable them in your browser settings.'
+                          : 'Enable browser notifications for habit reminders'}
+                      </p>
                     </div>
-                    <button className="relative w-12 h-6 bg-blue-500 rounded-full">
-                      <span className="absolute top-1 right-1 w-4 h-4 bg-white rounded-full"></span>
-                    </button>
+                    {notificationPermission === 'granted' ? (
+                      <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                        <CheckCircle2 className="w-5 h-5" />
+                        <span className="text-sm font-medium">Enabled</span>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={handleRequestNotificationPermission}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                        disabled={notificationPermission === 'denied'}
+                      >
+                        {notificationPermission === 'denied' ? 'Blocked' : 'Enable'}
+                      </button>
+                    )}
                   </div>
+
+                  <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Notification Types</h3>
+                    <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                        <span>Daily habit reminders (set per habit)</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                        <span>Streak reminders at 8 PM if no habits completed</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                        <span>Weekly progress summary (coming soon)</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Email Summary */}
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+                <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center gap-3">
+                    <Bell className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Email Summary</h2>
+                  </div>
+                </div>
+                <div className="p-6 space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium text-gray-900 dark:text-white">Challenge Updates</p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Notifications about challenges</p>
+                      <h3 className="font-semibold text-gray-900 dark:text-white">Weekly Progress Summary</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                        Receive a weekly email every Monday with your progress summary
+                      </p>
                     </div>
-                    <button className="relative w-12 h-6 bg-blue-500 rounded-full">
-                      <span className="absolute top-1 right-1 w-4 h-4 bg-white rounded-full"></span>
+                    <button
+                      onClick={handleToggleEmailSummary}
+                      disabled={isUpdatingEmail || !user}
+                      className={`relative w-12 h-6 rounded-full transition-colors ${
+                        emailSummaryEnabled ? 'bg-purple-600' : 'bg-gray-300 dark:bg-gray-600'
+                      } ${isUpdatingEmail ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
+                      <span
+                        className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                          emailSummaryEnabled ? 'right-1' : 'left-1'
+                        }`}
+                      ></span>
                     </button>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-white">Achievement Unlocks</p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Celebrate when you unlock achievements</p>
+                  {emailSummaryEnabled ? (
+                    <div className="flex items-center gap-2 text-green-600 dark:text-green-400 text-sm">
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Weekly emails enabled. Next email will be sent on Monday.</span>
                     </div>
-                    <button className="relative w-12 h-6 bg-blue-500 rounded-full">
-                      <span className="absolute top-1 right-1 w-4 h-4 bg-white rounded-full"></span>
-                    </button>
-                  </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Enable to receive weekly progress summaries via email
+                    </p>
+                  )}
                 </div>
               </div>
 
