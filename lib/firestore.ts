@@ -148,12 +148,23 @@ export const saveHabit = async (habit: Habit): Promise<void> => {
   }
   
   try {
-    await setDoc(doc(db, 'habits', habit.id), {
+    // Remove undefined values - Firestore doesn't accept undefined
+    const habitData: any = {
       ...habit,
       createdAt: Timestamp.fromDate(habit.createdAt),
+    }
+    
+    // Remove undefined fields
+    Object.keys(habitData).forEach(key => {
+      if (habitData[key] === undefined) {
+        delete habitData[key]
+      }
     })
+    
+    await setDoc(doc(db, 'habits', habit.id), habitData)
   } catch (error) {
     console.error('Error saving habit:', error)
+    throw error
   }
 }
 
@@ -163,10 +174,21 @@ export const updateHabit = async (habitId: string, updates: Partial<Habit>): Pro
   }
   
   try {
+    // Remove undefined values - Firestore doesn't accept undefined
+    const cleanUpdates: any = { ...updates }
+    
+    // Remove undefined fields
+    Object.keys(cleanUpdates).forEach(key => {
+      if (cleanUpdates[key] === undefined) {
+        delete cleanUpdates[key]
+      }
+    })
+    
     const habitRef = doc(db, 'habits', habitId)
-    await updateDoc(habitRef, updates as any)
+    await updateDoc(habitRef, cleanUpdates)
   } catch (error) {
     console.error('Error updating habit:', error)
+    throw error
   }
 }
 
