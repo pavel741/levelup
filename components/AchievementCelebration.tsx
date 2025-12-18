@@ -33,7 +33,7 @@ export default function AchievementCelebration({ achievement, onClose }: Achieve
   return (
     <div className="fixed inset-0 bg-black/60 dark:bg-black/80 flex items-center justify-center z-50 p-4">
       <div
-        className={`bg-gradient-to-br ${rarityColors[achievement.rarity]} rounded-2xl p-8 max-w-md w-full shadow-2xl transform transition-all duration-500 ${
+        className={`bg-gradient-to-br ${rarityColors[achievement.rarity]} rounded-2xl p-4 sm:p-6 md:p-8 max-w-md w-full shadow-2xl transform transition-all duration-500 ${
           showAnimation ? 'scale-100 opacity-100' : 'scale-95 opacity-0'
         }`}
       >
@@ -56,21 +56,21 @@ export default function AchievementCelebration({ achievement, onClose }: Achieve
 
           {/* Achievement Icon */}
           <div className="mb-4 transform animate-bounce">
-            <div className="text-8xl">{achievement.icon}</div>
+            <div className="text-6xl sm:text-8xl">{achievement.icon}</div>
           </div>
 
           {/* Badge */}
           <div className="mb-4">
-            <span className="inline-block px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full text-white text-sm font-semibold">
+            <span className="inline-block px-3 sm:px-4 py-1.5 sm:py-2 bg-white/20 backdrop-blur-sm rounded-full text-white text-xs sm:text-sm font-semibold">
               {rarityLabels[achievement.rarity]} Achievement Unlocked!
             </span>
           </div>
 
           {/* Achievement Name */}
-          <h2 className="text-3xl font-bold text-white mb-2">{achievement.name}</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2 px-2">{achievement.name}</h2>
 
           {/* Description */}
-          <p className="text-white/90 mb-6">{achievement.description}</p>
+          <p className="text-white/90 mb-6 text-sm sm:text-base px-2">{achievement.description}</p>
 
           {/* Trophy Icon */}
           <div className="flex justify-center mb-4">
