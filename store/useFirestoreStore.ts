@@ -358,6 +358,15 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
       const newLevel = Math.floor(newXP / 100) + 1
       const xpToNextLevel = calculateXPForNextLevel(newLevel) - newXP
 
+      // Update daily stats - decrement habits completed and XP earned
+      const todayStats = get().dailyStats.find((s) => s.date === today)
+      const currentHabitsCompleted = todayStats?.habitsCompleted || 0
+      const currentXpEarned = todayStats?.xpEarned || 0
+      await get().updateDailyStats({
+        habitsCompleted: Math.max(0, currentHabitsCompleted - 1),
+        xpEarned: Math.max(0, currentXpEarned - habit.xpReward),
+      })
+
       // Recalculate streak after uncompleting
       const allHabits = get().habits.map(h => h.id === id ? { ...h, completedDates: updatedDates } : h)
       const newStreak = calculateUserStreak(allHabits)
@@ -368,6 +377,10 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
         xpToNextLevel: Math.max(0, xpToNextLevel),
         streak: newStreak,
       })
+
+      // Update local user state immediately for better UX
+      set({ user: { ...user, xp: newXP, level: newLevel, xpToNextLevel: Math.max(0, xpToNextLevel), streak: newStreak } })
+
       await get().syncUser(user.id)
     }
   },
