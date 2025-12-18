@@ -83,6 +83,17 @@ export default function HabitCard({ habit, onEdit }: HabitCardProps) {
 
         <div className="space-y-3">
           <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-600 dark:text-gray-400">Frequency</span>
+            <span className="font-semibold text-gray-700 dark:text-gray-300">
+              {habit.frequency === 'daily' ? 'Daily' : habit.frequency === 'weekly' ? 'Weekly' : 'Custom'}
+              {habit.frequency !== 'daily' && habit.targetDays && (
+                <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                  ({habit.targetDays.length} day{habit.targetDays.length !== 1 ? 's' : ''}/week)
+                </span>
+              )}
+            </span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
             <span className="text-gray-600 dark:text-gray-400">Streak</span>
             <span className="font-semibold text-orange-600 dark:text-orange-400">🔥 {streak} days</span>
           </div>

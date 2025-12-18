@@ -34,12 +34,20 @@ export default function HabitsPage() {
     icon: '🎯',
     color: 'bg-blue-500',
     xpReward: 30,
+    frequency: 'daily' as 'daily' | 'weekly' | 'custom',
+    targetDays: [1, 2, 3, 4, 5, 6, 7], // 1 = Monday, 7 = Sunday
     reminderEnabled: false,
     reminderTime: '09:00',
   })
 
   const handleAddHabit = () => {
     if (!newHabit.name.trim() || !user) return
+    
+    // Validate that weekly/custom habits have at least one day selected
+    if ((newHabit.frequency === 'weekly' || newHabit.frequency === 'custom') && (!newHabit.targetDays || newHabit.targetDays.length === 0)) {
+      alert('Please select at least one day for weekly or custom habits')
+      return
+    }
 
     addHabit({
       id: Date.now().toString(),
@@ -48,8 +56,8 @@ export default function HabitsPage() {
       description: newHabit.description,
       icon: newHabit.icon,
       color: newHabit.color,
-      frequency: 'daily',
-      targetDays: [1, 2, 3, 4, 5, 6, 7],
+      frequency: newHabit.frequency,
+      targetDays: newHabit.targetDays,
       xpReward: newHabit.xpReward,
       completedDates: [],
       createdAt: new Date(),
@@ -78,6 +86,8 @@ export default function HabitsPage() {
       icon: habit.icon,
       color: habit.color,
       xpReward: habit.xpReward,
+      frequency: habit.frequency || 'daily',
+      targetDays: habit.targetDays || [1, 2, 3, 4, 5, 6, 7],
       reminderEnabled: habit.reminderEnabled || false,
       reminderTime: habit.reminderTime || '09:00',
     })
@@ -86,6 +96,12 @@ export default function HabitsPage() {
 
   const handleUpdateHabit = () => {
     if (!editingHabit || !newHabit.name.trim()) return
+    
+    // Validate that weekly/custom habits have at least one day selected
+    if ((newHabit.frequency === 'weekly' || newHabit.frequency === 'custom') && (!newHabit.targetDays || newHabit.targetDays.length === 0)) {
+      alert('Please select at least one day for weekly or custom habits')
+      return
+    }
 
     updateHabit(editingHabit.id, {
       name: newHabit.name,
@@ -93,6 +109,8 @@ export default function HabitsPage() {
       icon: newHabit.icon,
       color: newHabit.color,
       xpReward: newHabit.xpReward,
+      frequency: newHabit.frequency,
+      targetDays: newHabit.targetDays,
       reminderEnabled: newHabit.reminderEnabled,
       reminderTime: newHabit.reminderEnabled ? newHabit.reminderTime : undefined,
     })
@@ -103,6 +121,8 @@ export default function HabitsPage() {
       icon: '🎯',
       color: 'bg-blue-500',
       xpReward: 30,
+      frequency: 'daily',
+      targetDays: [1, 2, 3, 4, 5, 6, 7],
       reminderEnabled: false,
       reminderTime: '09:00',
     })
@@ -204,13 +224,126 @@ export default function HabitsPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Icon</label>
+                <div className="mb-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 flex items-center justify-center">
+                  <span className="text-4xl">{newHabit.icon || '🎯'}</span>
+                </div>
+                <div className="grid grid-cols-8 gap-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 max-h-48 overflow-y-auto">
+                  {[
+                    '🎯', '💪', '🏃', '🧘', '📚', '💧', '🍎', '😴',
+                    '🧠', '📝', '🎨', '🎵', '🌱', '☀️', '🌙', '⭐',
+                    '🔥', '💎', '🏆', '🎪', '🚀', '💼', '📱', '💻',
+                    '🏋️', '🚴', '🧗', '🏊', '⚽', '🏀', '🎾', '🏓',
+                    '🧹', '🍳', '🛁', '🛏️', '👕', '👔', '💇', '💅',
+                    '📖', '✍️', '🎭', '🎬', '🎮', '🧩', '🎲', '🃏',
+                    '🌍', '🗺️', '🏔️', '🌊', '🌳', '🌸', '🌻', '🌺',
+                    '🐕', '🐈', '🐦', '🐠', '🦋', '🐝', '🦄', '🐉'
+                  ].map((icon) => (
+                    <button
+                      key={icon}
+                      type="button"
+                      onClick={() => setNewHabit({ ...newHabit, icon })}
+                      className={`text-2xl p-2 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors ${
+                        newHabit.icon === icon ? 'bg-blue-200 dark:bg-blue-800 ring-2 ring-blue-500' : ''
+                      }`}
+                      title={`Select ${icon}`}
+                    >
+                      {icon}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">Click an icon above to select it, or type a custom emoji below</p>
                 <input
                   type="text"
                   value={newHabit.icon}
                   onChange={(e) => setNewHabit({ ...newHabit, icon: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                  placeholder="🎯"
+                  className="mt-2 w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                  placeholder="Or type a custom emoji"
+                  maxLength={2}
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Frequency</label>
+                <div className="grid grid-cols-3 gap-2 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const targetDays = newHabit.frequency === 'daily' ? [1, 2, 3, 4, 5, 6, 7] : newHabit.targetDays
+                      setNewHabit({ ...newHabit, frequency: 'daily', targetDays: [1, 2, 3, 4, 5, 6, 7] })
+                    }}
+                    className={`px-4 py-2 rounded-lg border transition-colors ${
+                      newHabit.frequency === 'daily'
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    Daily
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewHabit({ ...newHabit, frequency: 'weekly', targetDays: [1] })
+                    }}
+                    className={`px-4 py-2 rounded-lg border transition-colors ${
+                      newHabit.frequency === 'weekly'
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    Weekly
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewHabit({ ...newHabit, frequency: 'custom' })
+                    }}
+                    className={`px-4 py-2 rounded-lg border transition-colors ${
+                      newHabit.frequency === 'custom'
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    Custom
+                  </button>
+                </div>
+                {(newHabit.frequency === 'weekly' || newHabit.frequency === 'custom') && (
+                  <div>
+                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-2">Select Days</label>
+                    <div className="grid grid-cols-7 gap-2">
+                      {[
+                        { day: 'Mon', value: 1, full: 'Monday' },
+                        { day: 'Tue', value: 2, full: 'Tuesday' },
+                        { day: 'Wed', value: 3, full: 'Wednesday' },
+                        { day: 'Thu', value: 4, full: 'Thursday' },
+                        { day: 'Fri', value: 5, full: 'Friday' },
+                        { day: 'Sat', value: 6, full: 'Saturday' },
+                        { day: 'Sun', value: 7, full: 'Sunday' },
+                      ].map(({ day, value, full }) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => {
+                            const currentDays = newHabit.targetDays || []
+                            const newDays = currentDays.includes(value)
+                              ? currentDays.filter(d => d !== value)
+                              : [...currentDays, value].sort()
+                            setNewHabit({ ...newHabit, targetDays: newDays })
+                          }}
+                          className={`px-2 py-2 rounded-lg border text-xs font-medium transition-colors ${
+                            newHabit.targetDays?.includes(value)
+                              ? 'bg-blue-600 text-white border-blue-600'
+                              : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                          }`}
+                          title={full}
+                        >
+                          {day}
+                        </button>
+                      ))}
+                    </div>
+                    {newHabit.frequency === 'weekly' && newHabit.targetDays.length === 0 && (
+                      <p className="mt-2 text-xs text-red-500 dark:text-red-400">Please select at least one day</p>
+                    )}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">XP Reward</label>
@@ -289,13 +422,126 @@ export default function HabitsPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Icon</label>
+                <div className="mb-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 flex items-center justify-center">
+                  <span className="text-4xl">{newHabit.icon || '🎯'}</span>
+                </div>
+                <div className="grid grid-cols-8 gap-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 max-h-48 overflow-y-auto">
+                  {[
+                    '🎯', '💪', '🏃', '🧘', '📚', '💧', '🍎', '😴',
+                    '🧠', '📝', '🎨', '🎵', '🌱', '☀️', '🌙', '⭐',
+                    '🔥', '💎', '🏆', '🎪', '🚀', '💼', '📱', '💻',
+                    '🏋️', '🚴', '🧗', '🏊', '⚽', '🏀', '🎾', '🏓',
+                    '🧹', '🍳', '🛁', '🛏️', '👕', '👔', '💇', '💅',
+                    '📖', '✍️', '🎭', '🎬', '🎮', '🧩', '🎲', '🃏',
+                    '🌍', '🗺️', '🏔️', '🌊', '🌳', '🌸', '🌻', '🌺',
+                    '🐕', '🐈', '🐦', '🐠', '🦋', '🐝', '🦄', '🐉'
+                  ].map((icon) => (
+                    <button
+                      key={icon}
+                      type="button"
+                      onClick={() => setNewHabit({ ...newHabit, icon })}
+                      className={`text-2xl p-2 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors ${
+                        newHabit.icon === icon ? 'bg-blue-200 dark:bg-blue-800 ring-2 ring-blue-500' : ''
+                      }`}
+                      title={`Select ${icon}`}
+                    >
+                      {icon}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">Click an icon above to select it, or type a custom emoji below</p>
                 <input
                   type="text"
                   value={newHabit.icon}
                   onChange={(e) => setNewHabit({ ...newHabit, icon: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                  placeholder="🎯"
+                  className="mt-2 w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                  placeholder="Or type a custom emoji"
+                  maxLength={2}
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Frequency</label>
+                <div className="grid grid-cols-3 gap-2 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const targetDays = newHabit.frequency === 'daily' ? [1, 2, 3, 4, 5, 6, 7] : newHabit.targetDays
+                      setNewHabit({ ...newHabit, frequency: 'daily', targetDays: [1, 2, 3, 4, 5, 6, 7] })
+                    }}
+                    className={`px-4 py-2 rounded-lg border transition-colors ${
+                      newHabit.frequency === 'daily'
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    Daily
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewHabit({ ...newHabit, frequency: 'weekly', targetDays: [1] })
+                    }}
+                    className={`px-4 py-2 rounded-lg border transition-colors ${
+                      newHabit.frequency === 'weekly'
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    Weekly
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewHabit({ ...newHabit, frequency: 'custom' })
+                    }}
+                    className={`px-4 py-2 rounded-lg border transition-colors ${
+                      newHabit.frequency === 'custom'
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    Custom
+                  </button>
+                </div>
+                {(newHabit.frequency === 'weekly' || newHabit.frequency === 'custom') && (
+                  <div>
+                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-2">Select Days</label>
+                    <div className="grid grid-cols-7 gap-2">
+                      {[
+                        { day: 'Mon', value: 1, full: 'Monday' },
+                        { day: 'Tue', value: 2, full: 'Tuesday' },
+                        { day: 'Wed', value: 3, full: 'Wednesday' },
+                        { day: 'Thu', value: 4, full: 'Thursday' },
+                        { day: 'Fri', value: 5, full: 'Friday' },
+                        { day: 'Sat', value: 6, full: 'Saturday' },
+                        { day: 'Sun', value: 7, full: 'Sunday' },
+                      ].map(({ day, value, full }) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => {
+                            const currentDays = newHabit.targetDays || []
+                            const newDays = currentDays.includes(value)
+                              ? currentDays.filter(d => d !== value)
+                              : [...currentDays, value].sort()
+                            setNewHabit({ ...newHabit, targetDays: newDays })
+                          }}
+                          className={`px-2 py-2 rounded-lg border text-xs font-medium transition-colors ${
+                            newHabit.targetDays?.includes(value)
+                              ? 'bg-blue-600 text-white border-blue-600'
+                              : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                          }`}
+                          title={full}
+                        >
+                          {day}
+                        </button>
+                      ))}
+                    </div>
+                    {newHabit.frequency === 'weekly' && newHabit.targetDays.length === 0 && (
+                      <p className="mt-2 text-xs text-red-500 dark:text-red-400">Please select at least one day</p>
+                    )}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">XP Reward</label>
