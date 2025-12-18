@@ -44,6 +44,15 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       setChecking(false)
       // Still set up auth listener for redirect handling
       const unsubscribe = onAuthChange(async (firebaseUser) => {
+        // Wait for Firestore to be initialized before proceeding
+        try {
+          const { waitForFirebaseInit } = await import('@/lib/firebase')
+          await waitForFirebaseInit()
+        } catch (error) {
+          console.error('AuthGuard (auth page): Failed to wait for Firebase initialization:', error)
+          return
+        }
+        
         if (firebaseUser && pathname?.startsWith('/auth')) {
           console.log('🔵 AuthGuard: User authenticated on auth page:', firebaseUser.uid)
           // User authenticated via redirect, ensure Firestore document exists
@@ -102,6 +111,16 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     const unsubscribe = onAuthChange(async (firebaseUser) => {
       authChecked = true
       
+      // Wait for Firestore to be initialized before proceeding
+      try {
+        const { waitForFirebaseInit } = await import('@/lib/firebase')
+        await waitForFirebaseInit()
+      } catch (error) {
+        console.error('AuthGuard: Failed to wait for Firebase initialization:', error)
+        setChecking(false)
+        return
+      }
+      
       if (firebaseUser) {
         console.log('✅ AuthGuard: User authenticated:', firebaseUser.uid)
         let userData = await getUserData(firebaseUser.uid)
@@ -142,8 +161,18 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
     // Wait a bit for auth state to restore, then check if still no user
     // This gives Firebase time to restore the session from localStorage
-    setTimeout(() => {
+    setTimeout(async () => {
       if (!authChecked) {
+        // Wait for Firestore to be initialized before checking
+        try {
+          const { waitForFirebaseInit } = await import('@/lib/firebase')
+          await waitForFirebaseInit()
+        } catch (error) {
+          console.error('AuthGuard (timeout): Failed to wait for Firebase initialization:', error)
+          setChecking(false)
+          return
+        }
+        
         const currentUser = getCurrentUser()
         if (!currentUser && !pathname?.startsWith('/auth')) {
           console.log('AuthGuard: Timeout - no user found, redirecting to login')

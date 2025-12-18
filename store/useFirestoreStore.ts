@@ -86,6 +86,16 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
 
   syncUser: async (userId: string) => {
     console.log('syncUser called with userId:', userId)
+    
+    // Wait for Firestore to be initialized before proceeding
+    try {
+      const { waitForFirebaseInit } = await import('@/lib/firebase')
+      await waitForFirebaseInit()
+    } catch (error) {
+      console.error('Failed to wait for Firebase initialization:', error)
+      // Continue anyway - getUserData will throw if db is not initialized
+    }
+    
     const userData = await getUserData(userId)
     if (userData) {
       console.log('User data loaded:', userData.id, userData.email)
@@ -379,6 +389,15 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
 // Initialize auth listener (only in browser, after store is created)
 if (typeof window !== 'undefined') {
   unsubscribeAuth = onAuthChange(async (firebaseUser) => {
+    // Wait for Firestore to be initialized before proceeding
+    try {
+      const { waitForFirebaseInit } = await import('@/lib/firebase')
+      await waitForFirebaseInit()
+    } catch (error) {
+      console.error('Auth listener: Failed to wait for Firebase initialization:', error)
+      return
+    }
+    
     const store = useFirestoreStore.getState()
     if (firebaseUser) {
       await store.syncUser(firebaseUser.uid)
