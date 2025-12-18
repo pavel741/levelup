@@ -121,7 +121,7 @@ export default function HabitCard({ habit, onEdit }: HabitCardProps) {
                   : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
               }`}
               title={
-                !hasStarted 
+                !hasStarted && habit.startDate
                   ? `Habit starts on ${habit.startDate instanceof Date ? format(habit.startDate, 'MMM d, yyyy') : format(new Date(habit.startDate), 'MMM d, yyyy')}`
                   : isCompleted 
                   ? 'Completed' 
@@ -165,7 +165,11 @@ export default function HabitCard({ habit, onEdit }: HabitCardProps) {
                 <div className="flex-1">
                   <p className="text-sm font-medium text-blue-900 dark:text-blue-300">Starts Soon</p>
                   <p className="text-xs text-blue-700 dark:text-blue-400 mt-1">
-                    This habit will begin on {habit.startDate instanceof Date ? format(habit.startDate, 'MMM d, yyyy') : format(new Date(habit.startDate), 'MMM d, yyyy')}
+                    This habit will begin on {habit.startDate instanceof Date 
+                      ? format(habit.startDate, 'MMM d, yyyy') 
+                      : habit.startDate 
+                        ? format(new Date(habit.startDate), 'MMM d, yyyy')
+                        : ''}
                   </p>
                 </div>
               </div>
