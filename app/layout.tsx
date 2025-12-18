@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 import { ThemeProvider } from '@/components/ThemeProvider'
 import ClientNotificationManager from '@/components/ClientNotificationManager'
+import ErrorDisplay from '@/components/ErrorDisplay'
 
 export const metadata: Metadata = {
   title: 'LevelUp - Level Up Life',
@@ -22,6 +23,7 @@ export default function RootLayout({
         <ThemeProvider>
           {children}
           <ClientNotificationManager />
+          <ErrorDisplay />
         </ThemeProvider>
       </body>
     </html>

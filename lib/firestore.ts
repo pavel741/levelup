@@ -107,7 +107,7 @@ export const subscribeToHabits = (
   return onSnapshot(
     q,
     (snapshot) => {
-      console.log(`Habits snapshot received: ${snapshot.docs.length} habits for userId: ${userId}`)
+      console.log(`✅ Habits snapshot received: ${snapshot.docs.length} habits for userId: ${userId}`)
       const habits = snapshot.docs.map((doc) => {
         const data = doc.data()
         console.log('Habit document:', doc.id, 'userId:', data.userId, 'name:', data.name)
@@ -121,9 +121,21 @@ export const subscribeToHabits = (
       callback(habits)
     },
     (error) => {
-      console.error('Error in habits subscription:', error)
+      console.error('❌ ERROR in habits subscription:', error)
       console.error('Error code:', error.code)
       console.error('Error message:', error.message)
+      console.error('Error details:', JSON.stringify(error, null, 2))
+      // Store error in localStorage so it persists
+      try {
+        localStorage.setItem('firebase_error', JSON.stringify({
+          code: error.code,
+          message: error.message,
+          timestamp: new Date().toISOString(),
+          userId: userId,
+        }))
+      } catch (e) {
+        // Ignore localStorage errors
+      }
       // Still call callback with empty array on error
       callback([])
     }

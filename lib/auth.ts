@@ -181,43 +181,82 @@ export const signIn = async (email: string, password: string): Promise<User | nu
 
 export const signInWithGoogle = async (): Promise<void> => {
   if (!auth) {
-    throw new Error('Firebase Auth is not initialized')
+    const error = new Error('Firebase Auth is not initialized')
+    console.error('❌ signInWithGoogle error:', error)
+    throw error
   }
   
   try {
+    console.log('🔵 Initiating Google sign-in redirect...')
     const provider = new GoogleAuthProvider()
     // Use redirect instead of popup to avoid COOP issues
     await signInWithRedirect(auth, provider)
+    console.log('✅ Google sign-in redirect initiated')
     // Note: This will redirect the page, so the function won't return here
   } catch (error: any) {
-    console.error('Error initiating Google sign-in:', error)
+    console.error('❌ Error initiating Google sign-in:', error)
+    console.error('Error code:', error.code)
+    console.error('Error message:', error.message)
+    console.error('Full error:', JSON.stringify(error, null, 2))
+    
+    // Store error for ErrorDisplay component
+    try {
+      localStorage.setItem('firebase_error', JSON.stringify({
+        code: error.code || 'unknown',
+        message: error.message || 'Failed to initiate Google sign-in',
+        timestamp: new Date().toISOString(),
+        source: 'google_signin_init',
+        fullError: error,
+      }))
+    } catch (e) {}
+    
     throw error
   }
 }
 
 export const handleGoogleRedirect = async (): Promise<User | null> => {
   if (!auth) {
-    console.error('Firebase Auth is not initialized')
+    const error = 'Firebase Auth is not initialized'
+    console.error('❌', error)
+    // Store error
+    try {
+      localStorage.setItem('firebase_error', JSON.stringify({
+        code: 'auth_not_initialized',
+        message: error,
+        timestamp: new Date().toISOString(),
+        source: 'handleGoogleRedirect',
+      }))
+    } catch (e) {}
     return null
   }
   
   try {
-    console.log('Checking for Google redirect result...')
+    console.log('🔵 Checking for Google redirect result...')
     const result = await getRedirectResult(auth)
     
     if (!result) {
       // No redirect result - this is normal if user hasn't been redirected
-      console.log('No redirect result found (user may not have been redirected yet)')
+      console.log('ℹ️ No redirect result found (user may not have been redirected yet)')
       return null
     }
 
     const firebaseUser = result.user
     if (!firebaseUser) {
-      console.error('No user in redirect result')
+      const error = 'No user in redirect result'
+      console.error('❌', error)
+      // Store error
+      try {
+        localStorage.setItem('firebase_error', JSON.stringify({
+          code: 'no_user_in_result',
+          message: error,
+          timestamp: new Date().toISOString(),
+          source: 'handleGoogleRedirect',
+        }))
+      } catch (e) {}
       return null
     }
 
-    console.log('Google redirect successful, Firebase user:', firebaseUser.uid, firebaseUser.email)
+    console.log('✅ Google redirect successful, Firebase user:', firebaseUser.uid, firebaseUser.email)
     
     // Check if user exists in Firestore
     let user = await getUserData(firebaseUser.uid)
@@ -244,6 +283,20 @@ export const handleGoogleRedirect = async (): Promise<User | null> => {
         console.log('✅ Successfully created new user in Firestore:', user.id)
       } catch (createError: any) {
         console.error('❌ Failed to create user data in Firestore:', createError)
+        console.error('Create error code:', createError.code)
+        console.error('Create error message:', createError.message)
+        
+        // Store error
+        try {
+          localStorage.setItem('firebase_error', JSON.stringify({
+            code: createError.code || 'firestore_create_failed',
+            message: createError.message || 'Failed to create user in Firestore',
+            timestamp: new Date().toISOString(),
+            source: 'handleGoogleRedirect_createUser',
+            fullError: createError,
+          }))
+        } catch (e) {}
+        
         // Still return the user object even if Firestore creation fails
         // The AuthGuard will try to create it again
         console.log('Returning user object anyway, AuthGuard will handle Firestore creation')
@@ -257,7 +310,25 @@ export const handleGoogleRedirect = async (): Promise<User | null> => {
     console.error('❌ Error handling Google redirect:', error)
     console.error('Error code:', error?.code)
     console.error('Error message:', error?.message)
-    console.error('Full error:', error)
+    console.error('Error name:', error?.name)
+    console.error('Full error object:', error)
+    console.error('Full error JSON:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2))
+    
+    // Store error for ErrorDisplay component
+    try {
+      localStorage.setItem('firebase_error', JSON.stringify({
+        code: error?.code || 'unknown',
+        message: error?.message || 'Unknown error',
+        name: error?.name,
+        timestamp: new Date().toISOString(),
+        source: 'handleGoogleRedirect',
+        fullError: error,
+        stack: error?.stack,
+      }))
+    } catch (e) {
+      console.error('Failed to store error in localStorage:', e)
+    }
+    
     // Re-throw the error so the UI can handle it
     throw new Error(getErrorMessage(error))
   }

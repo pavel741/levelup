@@ -111,9 +111,17 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
 
     console.log('Setting up habits subscription for userId:', userId)
     unsubscribeHabits = subscribeToHabits(userId, (habits) => {
-      console.log('Habits callback received:', habits.length, 'habits')
+      console.log('✅ Habits callback received:', habits.length, 'habits')
       console.log('Habit IDs:', habits.map(h => h.id))
       console.log('Habit userIds:', habits.map(h => h.userId))
+      console.log('Habit names:', habits.map(h => h.name))
+      
+      // Check for userId mismatches
+      const mismatched = habits.filter(h => h.userId !== userId)
+      if (mismatched.length > 0) {
+        console.warn('⚠️ Found habits with mismatched userId:', mismatched.map(h => ({ id: h.id, name: h.name, userId: h.userId, expectedUserId: userId })))
+      }
+      
       set({ habits })
     })
 

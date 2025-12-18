@@ -28,30 +28,58 @@ export default function SignUpPage() {
       if (redirectHandled) return
       
       try {
-        console.log('Signup page: Checking for Google redirect...')
+        console.log('🔵 Signup page: Checking for Google redirect...')
         const user = await handleGoogleRedirect()
         
         if (mounted && user) {
           redirectHandled = true
-          console.log('Signup page: Google redirect successful, user:', user.id)
+          console.log('✅ Signup page: Google redirect successful, user:', user.id)
           setUser(user)
           // Small delay to ensure state is set
           setTimeout(() => {
             router.push('/')
           }, 100)
         } else if (mounted) {
-          console.log('Signup page: No redirect result')
+          console.log('ℹ️ Signup page: No redirect result (user may not have been redirected yet)')
           // Check if there's an error in the URL params
           const urlParams = new URLSearchParams(window.location.search)
           const error = urlParams.get('error')
+          const errorDescription = urlParams.get('error_description')
           if (error) {
-            setError('Google sign-in failed. Please try again.')
+            const errorMsg = errorDescription || error || 'Google sign-in failed'
+            console.error('❌ Signup page: Error in URL params:', error, errorDescription)
+            setError(`Google sign-in failed: ${errorMsg}. Please try again.`)
+            // Store error for ErrorDisplay component
+            try {
+              localStorage.setItem('firebase_error', JSON.stringify({
+                code: error,
+                message: errorDescription || error,
+                timestamp: new Date().toISOString(),
+                source: 'google_signup_redirect',
+              }))
+            } catch (e) {}
           }
         }
       } catch (err: any) {
-        console.error('Signup page: Google redirect error:', err)
+        console.error('❌ Signup page: Google redirect error:', err)
+        console.error('Error code:', err.code)
+        console.error('Error message:', err.message)
+        console.error('Full error:', JSON.stringify(err, null, 2))
+        
+        // Store error for ErrorDisplay component
+        try {
+          localStorage.setItem('firebase_error', JSON.stringify({
+            code: err.code || 'unknown',
+            message: err.message || 'Unknown error',
+            timestamp: new Date().toISOString(),
+            source: 'google_signup_redirect',
+            fullError: err,
+          }))
+        } catch (e) {}
+        
         if (mounted) {
-          setError(err.message || 'Failed to sign in with Google')
+          const errorMessage = err.message || 'Failed to sign in with Google'
+          setError(errorMessage)
         }
       }
     }
