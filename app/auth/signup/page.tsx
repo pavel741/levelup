@@ -72,9 +72,13 @@ export default function SignUpPage() {
       console.error('Sign up error:', err)
       const errorMessage = err.message || 'Failed to create account'
       setError(errorMessage)
-      // If email already in use, suggest signing in
+      // If email already in use, provide helpful guidance
       if (err.message?.includes('already registered') || err.code === 'auth/email-already-in-use') {
-        setError(`${errorMessage} Click "Sign in" below to access your account.`)
+        if (err.message?.includes('Google') || err.message?.includes('sign up with Google')) {
+          setError(`${errorMessage} Use the "Sign up with Google" button above.`)
+        } else {
+          setError(`${errorMessage} Click "Sign in" below to access your account.`)
+        }
       }
     } finally {
       setLoading(false)

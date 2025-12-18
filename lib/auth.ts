@@ -65,9 +65,9 @@ export const signUp = async (email: string, password: string, name: string): Pro
   } catch (error: any) {
     console.error('Error signing up:', error)
     
-    // If email already in use, try to sign them in and create Firestore doc if missing
+    // If email already in use, check if it's a Google account
     if (error.code === 'auth/email-already-in-use') {
-      console.log('Email already in use, attempting to sign in and create missing Firestore document')
+      console.log('Email already in use, checking if it\'s a Google account')
       try {
         // Try to sign in with the provided credentials
         await signInWithEmailAndPassword(auth, email, password)
@@ -99,11 +99,37 @@ export const signUp = async (email: string, password: string, name: string): Pro
           throw new Error('This email is already registered. Please sign in instead.')
         }
       } catch (signInError: any) {
-        // If sign-in fails (wrong password), throw original error
+        // If sign-in fails, it's likely a Google account (no password) or wrong password
         if (signInError.code === 'auth/wrong-password' || signInError.code === 'auth/invalid-credential') {
-          throw new Error('This email is already registered. Please sign in with your password.')
+          // Check if there's a current user (might be signed in via Google)
+          const currentUser = auth.currentUser
+          if (currentUser && currentUser.email === email) {
+            // User is signed in via Google, create Firestore doc
+            let user = await getUserData(currentUser.uid)
+            if (!user) {
+              console.log('Creating missing Firestore document for Google-authenticated user')
+              user = {
+                id: currentUser.uid,
+                name: currentUser.displayName || name,
+                email: currentUser.email || email,
+                level: 1,
+                xp: 0,
+                xpToNextLevel: 100,
+                streak: 0,
+                longestStreak: 0,
+                achievements: [],
+                joinedAt: new Date(),
+              }
+              await createUserData(user)
+              return user
+            }
+            return user
+          }
+          // Password is wrong or account was created with Google
+          // Since sign-in with password failed, it's likely a Google account (no password)
+          throw new Error('This email is already registered with Google. Please use "Sign in with Google" or "Sign up with Google" instead.')
         }
-        // Otherwise, re-throw the original error
+        // Other errors - re-throw original
         throw new Error(getErrorMessage(error))
       }
     }
