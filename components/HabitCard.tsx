@@ -102,10 +102,11 @@ export default function HabitCard({ habit, onEdit }: HabitCardProps) {
             {!isCompleted && !isMissed && hasStarted && (
               <button
                 onClick={() => setShowMissedModal(true)}
-                className="p-2 rounded-lg text-orange-400 dark:text-orange-500 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
-                title="Mark as missed"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors text-sm font-medium"
+                title="Mark as missed with explanation"
               >
-                <AlertCircle className="w-5 h-5" />
+                <AlertCircle className="w-4 h-4" />
+                <span>Missed</span>
               </button>
             )}
             <button
