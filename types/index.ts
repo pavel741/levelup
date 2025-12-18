@@ -13,6 +13,12 @@ export interface User {
   emailSummaryEnabled?: boolean
 }
 
+export interface MissedDate {
+  date: string // Format: "yyyy-MM-dd"
+  reason: string
+  valid: boolean // true for valid excuses (sick, emergency), false for invalid (hangover, lazy)
+}
+
 export interface Habit {
   id: string
   userId: string
@@ -24,6 +30,7 @@ export interface Habit {
   targetDays: number[]
   xpReward: number
   completedDates: string[]
+  missedDates?: MissedDate[] // Dates when habit was missed with explanations
   createdAt: Date
   isActive: boolean
   reminderEnabled?: boolean

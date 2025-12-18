@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { User, Habit, Challenge, Achievement, DistractionBlock, DailyStats } from '@/types'
 import { format } from 'date-fns'
 import { checkAndUnlockAchievements } from '@/lib/achievements'
+import { validateMissedReason } from '@/lib/missedHabitValidation'
 import {
   subscribeToHabits,
   saveHabit,
@@ -32,6 +33,7 @@ interface AppState {
   updateHabit: (id: string, updates: Partial<Habit>) => Promise<void>
   completeHabit: (id: string) => Promise<void>
   uncompleteHabit: (id: string) => Promise<void>
+  markHabitMissed: (id: string, date: string, reason: string) => Promise<void>
   deleteHabit: (id: string) => Promise<void>
   
   // Challenges
@@ -207,6 +209,34 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
         xpToNextLevel: Math.max(0, xpToNextLevel),
       })
       await get().syncUser(user.id)
+    }
+  },
+  markHabitMissed: async (id, date, reason) => {
+    const habit = get().habits.find((h) => h.id === id)
+    if (!habit) return
+
+    // Validate reason using validation function
+    const validation = validateMissedReason(reason)
+
+    const missedDate = {
+      date,
+      reason,
+      valid: validation.valid,
+    }
+
+    const existingMissedDates = habit.missedDates || []
+    // Remove if already exists for this date
+    const filteredMissedDates = existingMissedDates.filter((m) => m.date !== date)
+    const updatedMissedDates = [...filteredMissedDates, missedDate]
+
+    await updateHabitFirestore(id, { missedDates: updatedMissedDates })
+
+    // If invalid reason, break streak
+    if (!validation.valid && get().user) {
+      await updateUserData(get().user!.id, {
+        streak: 0, // Reset streak for invalid excuses
+      })
+      await get().syncUser(get().user!.id)
     }
   },
   deleteHabit: async (id) => {

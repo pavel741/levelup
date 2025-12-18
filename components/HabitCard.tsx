@@ -3,8 +3,9 @@
 import { useState } from 'react'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
 import { format } from 'date-fns'
-import { CheckCircle2, Circle, Trash2, X, Edit2 } from 'lucide-react'
+import { CheckCircle2, Circle, Trash2, X, Edit2, AlertCircle } from 'lucide-react'
 import { Habit } from '@/types'
+import { validateMissedReason } from '@/lib/missedHabitValidation'
 
 interface HabitCardProps {
   habit: Habit
@@ -12,16 +13,56 @@ interface HabitCardProps {
 }
 
 export default function HabitCard({ habit, onEdit }: HabitCardProps) {
-  const { completeHabit, uncompleteHabit, deleteHabit } = useFirestoreStore()
+  const { completeHabit, uncompleteHabit, deleteHabit, markHabitMissed } = useFirestoreStore()
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showMissedModal, setShowMissedModal] = useState(false)
+  const [missedReason, setMissedReason] = useState('')
+  const [validationResult, setValidationResult] = useState<{ valid: boolean; message?: string } | null>(null)
   const today = format(new Date(), 'yyyy-MM-dd')
   const isCompleted = habit.completedDates.includes(today)
+  const isMissed = habit.missedDates?.some((m) => m.date === today)
 
   const handleToggle = () => {
     if (isCompleted) {
       uncompleteHabit(habit.id)
     } else {
       completeHabit(habit.id)
+    }
+  }
+
+  const handleMarkMissed = async () => {
+    if (!missedReason.trim()) {
+      alert('Please provide a reason for missing this habit')
+      return
+    }
+
+    const validation = validateMissedReason(missedReason)
+    setValidationResult(validation)
+
+    // Show validation result
+    if (validation.message) {
+      // Small delay to show message, then proceed
+      setTimeout(async () => {
+        await markHabitMissed(habit.id, today, missedReason)
+        setShowMissedModal(false)
+        setMissedReason('')
+        setValidationResult(null)
+      }, 1500)
+    } else {
+      await markHabitMissed(habit.id, today, missedReason)
+      setShowMissedModal(false)
+      setMissedReason('')
+      setValidationResult(null)
+    }
+  }
+
+  const handleReasonChange = (reason: string) => {
+    setMissedReason(reason)
+    if (reason.trim().length > 5) {
+      const validation = validateMissedReason(reason)
+      setValidationResult(validation)
+    } else {
+      setValidationResult(null)
     }
   }
 
@@ -47,17 +88,30 @@ export default function HabitCard({ habit, onEdit }: HabitCardProps) {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {!isCompleted && !isMissed && (
+              <button
+                onClick={() => setShowMissedModal(true)}
+                className="p-2 rounded-lg text-orange-400 dark:text-orange-500 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
+                title="Mark as missed"
+              >
+                <AlertCircle className="w-5 h-5" />
+              </button>
+            )}
             <button
               onClick={handleToggle}
               className={`p-2 rounded-lg transition-colors ${
                 isCompleted
                   ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20'
+                  : isMissed
+                  ? 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20'
                   : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
               }`}
-              title={isCompleted ? 'Completed' : 'Mark as complete'}
+              title={isCompleted ? 'Completed' : isMissed ? 'Missed' : 'Mark as complete'}
             >
               {isCompleted ? (
                 <CheckCircle2 className="w-6 h-6" />
+              ) : isMissed ? (
+                <AlertCircle className="w-6 h-6" />
               ) : (
                 <Circle className="w-6 h-6" />
               )}
@@ -82,6 +136,24 @@ export default function HabitCard({ habit, onEdit }: HabitCardProps) {
         </div>
 
         <div className="space-y-3">
+          {isMissed && habit.missedDates && (
+            <div className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-orange-900 dark:text-orange-300">Missed Today</p>
+                  <p className="text-xs text-orange-700 dark:text-orange-400 mt-1">
+                    {habit.missedDates.find((m) => m.date === today)?.reason}
+                  </p>
+                  {habit.missedDates.find((m) => m.date === today)?.valid === false && (
+                    <p className="text-xs text-red-600 dark:text-red-400 mt-1 font-medium">
+                      ⚠️ Invalid reason - streak reset
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
           <div className="flex items-center justify-between text-sm">
             <span className="text-gray-600 dark:text-gray-400">Frequency</span>
             <span className="font-semibold text-gray-700 dark:text-gray-300">
@@ -109,6 +181,77 @@ export default function HabitCard({ habit, onEdit }: HabitCardProps) {
           </div>
         </div>
       </div>
+
+      {/* Mark as Missed Modal */}
+      {showMissedModal && (
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Mark as Missed</h3>
+              <button
+                onClick={() => {
+                  setShowMissedModal(false)
+                  setMissedReason('')
+                  setValidationResult(null)
+                }}
+                className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              Why did you miss <span className="font-semibold text-gray-900 dark:text-white">"{habit.name}"</span> today?
+            </p>
+            <div className="mb-4">
+              <textarea
+                value={missedReason}
+                onChange={(e) => handleReasonChange(e.target.value)}
+                placeholder="e.g., I was sick with the flu..."
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 min-h-[100px] resize-none"
+              />
+              {validationResult && (
+                <div className={`mt-2 p-3 rounded-lg text-sm ${
+                  validationResult.valid
+                    ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+                    : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
+                }`}>
+                  <div className="flex items-start gap-2">
+                    {validationResult.valid ? (
+                      <CheckCircle2 className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    )}
+                    <span>{validationResult.message}</span>
+                  </div>
+                </div>
+              )}
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                <strong>Valid reasons:</strong> Sickness, emergencies, medical issues, accidents, weather, etc.<br />
+                <strong>Invalid reasons:</strong> Hangover, laziness, forgot, didn't feel like it, etc.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowMissedModal(false)
+                  setMissedReason('')
+                  setValidationResult(null)
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleMarkMissed}
+                disabled={!missedReason.trim()}
+                className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Mark as Missed
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
