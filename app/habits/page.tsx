@@ -9,6 +9,7 @@ import Header from '@/components/Header'
 import HabitCard from '@/components/HabitCard'
 import { Plus, Target } from 'lucide-react'
 import { Habit } from '@/types'
+import { format } from 'date-fns'
 
 export default function HabitsPage() {
   const { habits, addHabit, updateHabit, user } = useFirestoreStore()
@@ -38,6 +39,7 @@ export default function HabitsPage() {
     targetDays: [1, 2, 3, 4, 5, 6, 7], // 1 = Monday, 7 = Sunday
     reminderEnabled: false,
     reminderTime: '09:00',
+    startDate: '', // Format: "yyyy-MM-dd"
   })
 
   const handleAddHabit = () => {
@@ -61,6 +63,7 @@ export default function HabitsPage() {
       xpReward: newHabit.xpReward,
       completedDates: [],
       createdAt: new Date(),
+      startDate: newHabit.startDate ? new Date(newHabit.startDate) : undefined,
       isActive: true,
       reminderEnabled: newHabit.reminderEnabled,
       reminderTime: newHabit.reminderEnabled ? newHabit.reminderTime : undefined,
@@ -76,12 +79,18 @@ export default function HabitsPage() {
       targetDays: [1, 2, 3, 4, 5, 6, 7],
       reminderEnabled: false,
       reminderTime: '09:00',
+      startDate: '',
     })
     setShowAddModal(false)
   }
 
   const handleEditHabit = (habit: Habit) => {
     setEditingHabit(habit)
+    const startDate = habit.startDate 
+      ? (habit.startDate instanceof Date 
+          ? format(habit.startDate, 'yyyy-MM-dd')
+          : format(new Date(habit.startDate), 'yyyy-MM-dd'))
+      : ''
     setNewHabit({
       name: habit.name,
       description: habit.description,
@@ -92,6 +101,7 @@ export default function HabitsPage() {
       targetDays: habit.targetDays || [1, 2, 3, 4, 5, 6, 7],
       reminderEnabled: habit.reminderEnabled || false,
       reminderTime: habit.reminderTime || '09:00',
+      startDate: startDate,
     })
     setShowEditModal(true)
   }
@@ -113,6 +123,7 @@ export default function HabitsPage() {
       xpReward: newHabit.xpReward,
       frequency: newHabit.frequency,
       targetDays: newHabit.targetDays,
+      startDate: newHabit.startDate ? new Date(newHabit.startDate) : undefined,
       reminderEnabled: newHabit.reminderEnabled,
       reminderTime: newHabit.reminderEnabled ? newHabit.reminderTime : undefined,
     })
@@ -127,6 +138,7 @@ export default function HabitsPage() {
       targetDays: [1, 2, 3, 4, 5, 6, 7],
       reminderEnabled: false,
       reminderTime: '09:00',
+      startDate: '',
     })
     setShowEditModal(false)
     setEditingHabit(null)
@@ -359,6 +371,21 @@ export default function HabitsPage() {
                 />
               </div>
               <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Start Date <span className="text-xs text-gray-500 dark:text-gray-400">(optional)</span>
+                </label>
+                <input
+                  type="date"
+                  value={newHabit.startDate}
+                  onChange={(e) => setNewHabit({ ...newHabit, startDate: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  max={format(new Date(), 'yyyy-MM-dd')}
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Habit tracking will begin on this date. Leave empty to start today.
+                </p>
+              </div>
+              <div>
                 <label className="flex items-center gap-2 mb-2">
                   <input
                     type="checkbox"
@@ -557,6 +584,21 @@ export default function HabitsPage() {
                 />
               </div>
               <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Start Date <span className="text-xs text-gray-500 dark:text-gray-400">(optional)</span>
+                </label>
+                <input
+                  type="date"
+                  value={newHabit.startDate}
+                  onChange={(e) => setNewHabit({ ...newHabit, startDate: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  max={format(new Date(), 'yyyy-MM-dd')}
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Habit tracking will begin on this date. Leave empty to start today.
+                </p>
+              </div>
+              <div>
                 <label className="flex items-center gap-2 mb-2">
                   <input
                     type="checkbox"
@@ -590,6 +632,7 @@ export default function HabitsPage() {
                       targetDays: [1, 2, 3, 4, 5, 6, 7],
                       reminderEnabled: false,
                       reminderTime: '09:00',
+                      startDate: '',
                     })
                   }}
                   className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium"

@@ -81,11 +81,15 @@ export const getUserHabits = async (userId: string): Promise<Habit[]> => {
     const q = query(habitsRef, where('userId', '==', userId))
     const querySnapshot = await getDocs(q)
     
-    return querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-      createdAt: doc.data().createdAt?.toDate() || new Date(),
-    })) as Habit[]
+    return querySnapshot.docs.map((doc) => {
+      const data = doc.data()
+      return {
+        id: doc.id,
+        ...data,
+        createdAt: data.createdAt?.toDate() || new Date(),
+        startDate: data.startDate?.toDate() || undefined,
+      }
+    }) as Habit[]
   } catch (error) {
     console.error('Error getting habits:', error)
     return []
@@ -115,6 +119,7 @@ export const subscribeToHabits = (
           id: doc.id,
           ...data,
           createdAt: data.createdAt?.toDate() || new Date(),
+          startDate: data.startDate?.toDate() || undefined,
         }
       }) as Habit[]
       console.log('Parsed habits:', habits.length, habits.map(h => ({ id: h.id, name: h.name, userId: h.userId })))
@@ -154,6 +159,14 @@ export const saveHabit = async (habit: Habit): Promise<void> => {
       createdAt: Timestamp.fromDate(habit.createdAt),
     }
     
+    // Convert startDate to Timestamp if it exists
+    if (habit.startDate) {
+      const startDate = habit.startDate instanceof Date 
+        ? habit.startDate 
+        : new Date(habit.startDate)
+      habitData.startDate = Timestamp.fromDate(startDate)
+    }
+    
     // Remove undefined fields
     Object.keys(habitData).forEach(key => {
       if (habitData[key] === undefined) {
@@ -176,6 +189,19 @@ export const updateHabit = async (habitId: string, updates: Partial<Habit>): Pro
   try {
     // Remove undefined values - Firestore doesn't accept undefined
     const cleanUpdates: any = { ...updates }
+    
+    // Convert startDate to Timestamp if it exists
+    if (cleanUpdates.startDate !== undefined) {
+      if (cleanUpdates.startDate === null) {
+        // If explicitly set to null, remove it
+        delete cleanUpdates.startDate
+      } else {
+        const startDate = cleanUpdates.startDate instanceof Date 
+          ? cleanUpdates.startDate 
+          : new Date(cleanUpdates.startDate)
+        cleanUpdates.startDate = Timestamp.fromDate(startDate)
+      }
+    }
     
     // Remove undefined fields
     Object.keys(cleanUpdates).forEach(key => {

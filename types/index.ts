@@ -32,6 +32,7 @@ export interface Habit {
   completedDates: string[]
   missedDates?: MissedDate[] // Dates when habit was missed with explanations
   createdAt: Date
+  startDate?: Date | string // When the habit tracking should start (defaults to createdAt)
   isActive: boolean
   reminderEnabled?: boolean
   reminderTime?: string // Format: "HH:mm" (e.g., "09:00")

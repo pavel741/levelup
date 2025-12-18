@@ -154,6 +154,18 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
     const habit = get().habits.find((h) => h.id === id)
     if (!habit) return
 
+    // Check if habit has started (respect startDate if set)
+    if (habit.startDate) {
+      const startDate = habit.startDate instanceof Date 
+        ? habit.startDate 
+        : new Date(habit.startDate)
+      const startDateStr = format(startDate, 'yyyy-MM-dd')
+      if (today < startDateStr) {
+        console.log(`Cannot complete habit "${habit.name}" before start date: ${startDateStr}`)
+        return
+      }
+    }
+
     const alreadyCompleted = habit.completedDates.includes(today)
     if (alreadyCompleted) return
 
@@ -210,6 +222,18 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
   markHabitMissed: async (id, date, reason) => {
     const habit = get().habits.find((h) => h.id === id)
     if (!habit) return
+
+    // Check if habit has started (respect startDate if set)
+    if (habit.startDate) {
+      const startDate = habit.startDate instanceof Date 
+        ? habit.startDate 
+        : new Date(habit.startDate)
+      const startDateStr = format(startDate, 'yyyy-MM-dd')
+      if (date < startDateStr) {
+        console.log(`Cannot mark habit "${habit.name}" as missed before start date: ${startDateStr}`)
+        return
+      }
+    }
 
     // Validate reason using validation function
     const validation = validateMissedReason(reason)

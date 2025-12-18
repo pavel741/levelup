@@ -21,6 +21,17 @@ export default function HabitCard({ habit, onEdit }: HabitCardProps) {
   const today = format(new Date(), 'yyyy-MM-dd')
   const isCompleted = habit.completedDates.includes(today)
   const isMissed = habit.missedDates?.some((m) => m.date === today)
+  
+  // Check if habit has started
+  const hasStarted = habit.startDate 
+    ? (() => {
+        const startDate = habit.startDate instanceof Date 
+          ? habit.startDate 
+          : new Date(habit.startDate)
+        const startDateStr = format(startDate, 'yyyy-MM-dd')
+        return today >= startDateStr
+      })()
+    : true // If no startDate, habit has started
 
   const handleToggle = () => {
     if (isCompleted) {
@@ -88,7 +99,7 @@ export default function HabitCard({ habit, onEdit }: HabitCardProps) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {!isCompleted && !isMissed && (
+            {!isCompleted && !isMissed && hasStarted && (
               <button
                 onClick={() => setShowMissedModal(true)}
                 className="p-2 rounded-lg text-orange-400 dark:text-orange-500 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
@@ -99,14 +110,25 @@ export default function HabitCard({ habit, onEdit }: HabitCardProps) {
             )}
             <button
               onClick={handleToggle}
+              disabled={!hasStarted}
               className={`p-2 rounded-lg transition-colors ${
-                isCompleted
+                !hasStarted
+                  ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed opacity-50'
+                  : isCompleted
                   ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20'
                   : isMissed
                   ? 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20'
                   : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
               }`}
-              title={isCompleted ? 'Completed' : isMissed ? 'Missed' : 'Mark as complete'}
+              title={
+                !hasStarted 
+                  ? `Habit starts on ${habit.startDate instanceof Date ? format(habit.startDate, 'MMM d, yyyy') : format(new Date(habit.startDate), 'MMM d, yyyy')}`
+                  : isCompleted 
+                  ? 'Completed' 
+                  : isMissed 
+                  ? 'Missed' 
+                  : 'Mark as complete'
+              }
             >
               {isCompleted ? (
                 <CheckCircle2 className="w-6 h-6" />
@@ -136,6 +158,19 @@ export default function HabitCard({ habit, onEdit }: HabitCardProps) {
         </div>
 
         <div className="space-y-3">
+          {!hasStarted && habit.startDate && (
+            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="flex items-start gap-2">
+                <Circle className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-blue-900 dark:text-blue-300">Starts Soon</p>
+                  <p className="text-xs text-blue-700 dark:text-blue-400 mt-1">
+                    This habit will begin on {habit.startDate instanceof Date ? format(habit.startDate, 'MMM d, yyyy') : format(new Date(habit.startDate), 'MMM d, yyyy')}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
           {isMissed && habit.missedDates && (
             <div className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
               <div className="flex items-start gap-2">
