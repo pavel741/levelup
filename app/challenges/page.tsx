@@ -12,8 +12,10 @@ import { Challenge } from '@/types'
 import { format } from 'date-fns'
 
 export default function ChallengesPage() {
-  const { challenges, activeChallenges, addChallenge, user, habits } = useFirestoreStore()
+  const { challenges, activeChallenges, addChallenge, updateChallenge, user, habits } = useFirestoreStore()
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editingChallenge, setEditingChallenge] = useState<Challenge | null>(null)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [newChallenge, setNewChallenge] = useState({
     title: '',
@@ -88,6 +90,81 @@ export default function ChallengesPage() {
     setShowAddModal(false)
   }
 
+  const handleEditChallenge = (challenge: Challenge) => {
+    setEditingChallenge(challenge)
+    const startDate = challenge.startDate instanceof Date 
+      ? format(challenge.startDate, 'yyyy-MM-dd')
+      : format(new Date(challenge.startDate), 'yyyy-MM-dd')
+    const endDate = challenge.endDate instanceof Date 
+      ? format(challenge.endDate, 'yyyy-MM-dd')
+      : format(new Date(challenge.endDate), 'yyyy-MM-dd')
+    
+    setNewChallenge({
+      title: challenge.title,
+      description: challenge.description,
+      type: challenge.type,
+      difficulty: challenge.difficulty,
+      xpReward: challenge.xpReward,
+      duration: challenge.duration,
+      requirements: challenge.requirements.length > 0 ? challenge.requirements : [''],
+      habitIds: challenge.habitIds || [],
+      startDate: startDate,
+      endDate: endDate,
+    })
+    setShowEditModal(true)
+  }
+
+  const handleUpdateChallenge = () => {
+    if (!editingChallenge || !newChallenge.title.trim() || !user) return
+
+    // Validate duration and XP reward
+    const duration = newChallenge.duration && newChallenge.duration >= 1 ? newChallenge.duration : 7
+    const xpReward = newChallenge.xpReward && newChallenge.xpReward >= 10 ? newChallenge.xpReward : 100
+
+    // Use provided dates or calculate from duration
+    const startDate = newChallenge.startDate ? new Date(newChallenge.startDate) : new Date()
+    const endDate = newChallenge.endDate ? new Date(newChallenge.endDate) : (() => {
+      const calculatedEnd = new Date(startDate)
+      calculatedEnd.setDate(calculatedEnd.getDate() + duration)
+      return calculatedEnd
+    })()
+    
+    // Validate that end date is after start date
+    if (endDate <= startDate) {
+      alert('End date must be after start date')
+      return
+    }
+
+    updateChallenge(editingChallenge.id, {
+      title: newChallenge.title,
+      description: newChallenge.description,
+      type: newChallenge.type,
+      difficulty: newChallenge.difficulty,
+      xpReward: xpReward,
+      duration: duration,
+      requirements: newChallenge.requirements.filter((r) => r.trim() !== ''),
+      habitIds: newChallenge.habitIds.length > 0 ? newChallenge.habitIds : undefined,
+      startDate,
+      endDate,
+    })
+
+    // Reset form
+    setNewChallenge({
+      title: '',
+      description: '',
+      type: 'habit',
+      difficulty: 'medium',
+      xpReward: 100,
+      duration: 7,
+      requirements: [''],
+      habitIds: [],
+      startDate: format(new Date(), 'yyyy-MM-dd'),
+      endDate: format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
+    })
+    setShowEditModal(false)
+    setEditingChallenge(null)
+  }
+
   const addRequirement = () => {
     setNewChallenge({
       ...newChallenge,
@@ -134,7 +211,7 @@ export default function ChallengesPage() {
                   <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">My Active Challenges</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {activeChallenges.map((challenge) => (
-                      <ChallengeCard key={challenge.id} challenge={challenge} />
+                      <ChallengeCard key={challenge.id} challenge={challenge} onEdit={handleEditChallenge} />
                     ))}
                   </div>
                 </div>
@@ -145,7 +222,7 @@ export default function ChallengesPage() {
                 {availableChallenges.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {availableChallenges.map((challenge) => (
-                      <ChallengeCard key={challenge.id} challenge={challenge} />
+                      <ChallengeCard key={challenge.id} challenge={challenge} onEdit={handleEditChallenge} />
                     ))}
                   </div>
                 ) : (
@@ -427,6 +504,305 @@ export default function ChallengesPage() {
                   Create Challenge
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Challenge Modal */}
+      {showEditModal && editingChallenge && (
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 max-w-2xl w-full shadow-xl my-auto max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between mb-4 flex-shrink-0">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Edit Challenge</h2>
+              <button
+                onClick={() => {
+                  setShowEditModal(false)
+                  setEditingChallenge(null)
+                  setNewChallenge({
+                    title: '',
+                    description: '',
+                    type: 'habit',
+                    difficulty: 'medium',
+                    xpReward: 100,
+                    duration: 7,
+                    requirements: [''],
+                    habitIds: [],
+                    startDate: format(new Date(), 'yyyy-MM-dd'),
+                    endDate: format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
+                  })
+                }}
+                className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-4 overflow-y-auto flex-1 min-h-0 pr-2 -mr-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Challenge Title</label>
+                <input
+                  type="text"
+                  value={newChallenge.title}
+                  onChange={(e) => setNewChallenge({ ...newChallenge, title: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                  placeholder="e.g., 30-Day Fitness Challenge"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</label>
+                <textarea
+                  value={newChallenge.description}
+                  onChange={(e) => setNewChallenge({ ...newChallenge, description: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                  placeholder="Describe your challenge..."
+                  rows={3}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Type</label>
+                  <select
+                    value={newChallenge.type}
+                    onChange={(e) => setNewChallenge({ ...newChallenge, type: e.target.value as any })}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="habit">Habit</option>
+                    <option value="distraction">Distraction</option>
+                    <option value="goal">Goal</option>
+                    <option value="community">Community</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Difficulty</label>
+                  <select
+                    value={newChallenge.difficulty}
+                    onChange={(e) => setNewChallenge({ ...newChallenge, difficulty: e.target.value as any })}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="easy">Easy</option>
+                    <option value="medium">Medium</option>
+                    <option value="hard">Hard</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Duration (days)</label>
+                  <input
+                    type="number"
+                    value={newChallenge.duration === 0 ? '' : newChallenge.duration}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      if (value === '') {
+                        setNewChallenge({ ...newChallenge, duration: 0 })
+                      } else {
+                        const numValue = parseInt(value)
+                        if (!isNaN(numValue)) {
+                          // Auto-update end date based on duration
+                          const startDate = newChallenge.startDate ? new Date(newChallenge.startDate) : new Date()
+                          const newEndDate = new Date(startDate)
+                          newEndDate.setDate(newEndDate.getDate() + numValue)
+                          setNewChallenge({ 
+                            ...newChallenge, 
+                            duration: numValue,
+                            endDate: format(newEndDate, 'yyyy-MM-dd')
+                          })
+                        }
+                      }
+                    }}
+                    onBlur={(e) => {
+                      const value = parseInt(e.target.value)
+                      if (!value || value < 1) {
+                        const startDate = newChallenge.startDate ? new Date(newChallenge.startDate) : new Date()
+                        const newEndDate = new Date(startDate)
+                        newEndDate.setDate(newEndDate.getDate() + 7)
+                        setNewChallenge({ 
+                          ...newChallenge, 
+                          duration: 7,
+                          endDate: format(newEndDate, 'yyyy-MM-dd')
+                        })
+                      }
+                    }}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    min="1"
+                    max="365"
+                  />
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                    Duration will auto-update end date
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">XP Reward</label>
+                  <input
+                    type="number"
+                    value={newChallenge.xpReward === 0 ? '' : newChallenge.xpReward}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      if (value === '') {
+                        setNewChallenge({ ...newChallenge, xpReward: 0 })
+                      } else {
+                        const numValue = parseInt(value)
+                        if (!isNaN(numValue)) {
+                          setNewChallenge({ ...newChallenge, xpReward: numValue })
+                        }
+                      }
+                    }}
+                    onBlur={(e) => {
+                      const value = parseInt(e.target.value)
+                      if (!value || value < 10) {
+                        setNewChallenge({ ...newChallenge, xpReward: 100 })
+                      }
+                    }}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    min="10"
+                    max="1000"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    value={newChallenge.startDate}
+                    onChange={(e) => {
+                      setNewChallenge({ ...newChallenge, startDate: e.target.value })
+                      // Auto-update end date if it becomes invalid
+                      if (newChallenge.endDate && e.target.value >= newChallenge.endDate) {
+                        const newEndDate = new Date(e.target.value)
+                        newEndDate.setDate(newEndDate.getDate() + newChallenge.duration)
+                        setNewChallenge({ 
+                          ...newChallenge, 
+                          startDate: e.target.value,
+                          endDate: format(newEndDate, 'yyyy-MM-dd')
+                        })
+                      }
+                    }}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    value={newChallenge.endDate}
+                    onChange={(e) => setNewChallenge({ ...newChallenge, endDate: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    min={newChallenge.startDate || format(new Date(), 'yyyy-MM-dd')}
+                  />
+                  {newChallenge.endDate && newChallenge.startDate && newChallenge.endDate <= newChallenge.startDate && (
+                    <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+                      End date must be after start date
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Requirements</label>
+                <div className="space-y-2">
+                  {newChallenge.requirements.map((req, index) => (
+                    <div key={index} className="flex gap-2">
+                      <input
+                        type="text"
+                        value={req}
+                        onChange={(e) => updateRequirement(index, e.target.value)}
+                        className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                        placeholder={`Requirement ${index + 1}`}
+                      />
+                      {newChallenge.requirements.length > 1 && (
+                        <button
+                          onClick={() => removeRequirement(index)}
+                          className="px-3 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <button
+                    onClick={addRequirement}
+                    className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    + Add Requirement
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Link Habits <span className="text-xs text-gray-500 dark:text-gray-400">(optional)</span>
+                </label>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                  Select habits that will automatically count towards this challenge when completed
+                </p>
+                {habits.filter(h => h.isActive).length > 0 ? (
+                  <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-gray-50 dark:bg-gray-900">
+                    {habits.filter(h => h.isActive).map((habit) => (
+                      <label
+                        key={habit.id}
+                        className="flex items-center gap-2 p-2 hover:bg-white dark:hover:bg-gray-800 rounded-lg cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={newChallenge.habitIds.includes(habit.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setNewChallenge({
+                                ...newChallenge,
+                                habitIds: [...newChallenge.habitIds, habit.id],
+                              })
+                            } else {
+                              setNewChallenge({
+                                ...newChallenge,
+                                habitIds: newChallenge.habitIds.filter(id => id !== habit.id),
+                              })
+                            }
+                          }}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-2xl">{habit.icon}</span>
+                        <span className="text-sm text-gray-700 dark:text-gray-300">{habit.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                    No active habits available. Create habits first to link them to challenges.
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-3 pt-4 mt-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
+              <button
+                onClick={() => {
+                  setShowEditModal(false)
+                  setEditingChallenge(null)
+                  setNewChallenge({
+                    title: '',
+                    description: '',
+                    type: 'habit',
+                    difficulty: 'medium',
+                    xpReward: 100,
+                    duration: 7,
+                    requirements: [''],
+                    habitIds: [],
+                    startDate: format(new Date(), 'yyyy-MM-dd'),
+                    endDate: format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
+                  })
+                }}
+                className="flex-1 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium text-sm sm:text-base"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUpdateChallenge}
+                className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm sm:text-base"
+              >
+                Save Changes
+              </button>
             </div>
           </div>
         </div>

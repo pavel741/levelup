@@ -1,15 +1,16 @@
 'use client'
 
 import { useFirestoreStore } from '@/store/useFirestoreStore'
-import { Trophy, Users, Clock } from 'lucide-react'
+import { Trophy, Users, Clock, Edit2 } from 'lucide-react'
 import { Challenge } from '@/types'
 import { format, differenceInDays } from 'date-fns'
 
 interface ChallengeCardProps {
   challenge: Challenge
+  onEdit?: (challenge: Challenge) => void
 }
 
-export default function ChallengeCard({ challenge }: ChallengeCardProps) {
+export default function ChallengeCard({ challenge, onEdit }: ChallengeCardProps) {
   const { user, joinChallenge, habits } = useFirestoreStore()
   const isParticipating = challenge.participants.includes(user?.id || '')
   const daysRemaining = differenceInDays(challenge.endDate, new Date())
@@ -33,6 +34,15 @@ export default function ChallengeCard({ challenge }: ChallengeCardProps) {
               challenge.difficulty === 'medium' ? 'text-yellow-600' : 'text-red-600'
             }`} />
             <h3 className="font-semibold text-gray-900 dark:text-white">{challenge.title}</h3>
+            {onEdit && (
+              <button
+                onClick={() => onEdit(challenge)}
+                className="ml-auto p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                title="Edit challenge"
+              >
+                <Edit2 className="w-4 h-4" />
+              </button>
+            )}
           </div>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">{challenge.description}</p>
           <div className="flex items-center gap-2 mb-3">

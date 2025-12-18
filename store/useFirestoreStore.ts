@@ -38,6 +38,7 @@ interface AppState {
   challenges: Challenge[]
   activeChallenges: Challenge[]
   addChallenge: (challenge: Challenge) => Promise<void>
+  updateChallenge: (id: string, updates: Partial<Challenge>) => Promise<void>
   joinChallenge: (challengeId: string) => Promise<void>
   completeChallenge: (challengeId: string) => Promise<void>
   
@@ -433,6 +434,10 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
   activeChallenges: [],
   addChallenge: async (challenge) => {
     await saveChallenge(challenge)
+    // Firestore subscription will update the state
+  },
+  updateChallenge: async (id, updates) => {
+    await updateChallenge(id, updates)
     // Firestore subscription will update the state
   },
   joinChallenge: async (challengeId) => {
