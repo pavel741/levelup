@@ -1,13 +1,17 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { AlertCircle, X } from 'lucide-react'
 
 export default function ErrorDisplay() {
   const [error, setError] = useState<string | null>(null)
   const [errorDetails, setErrorDetails] = useState<any>(null)
+  const isHandlingError = useRef(false)
 
   useEffect(() => {
+    // Only run on client side
+    if (typeof window === 'undefined') return
+
     // Check for stored errors
     const checkStoredError = () => {
       try {
@@ -27,31 +31,55 @@ export default function ErrorDisplay() {
     checkStoredError()
     
     // Check URL for error parameters (from Google OAuth redirect)
-    const urlParams = new URLSearchParams(window.location.search)
-    const error = urlParams.get('error')
-    const errorDescription = urlParams.get('error_description')
-    if (error) {
-      const errorData = {
-        code: error,
-        message: errorDescription || error,
-        timestamp: new Date().toISOString(),
-        source: 'url_params',
+    try {
+      const urlParams = new URLSearchParams(window.location.search)
+      const error = urlParams.get('error')
+      const errorDescription = urlParams.get('error_description')
+      if (error) {
+        const errorData = {
+          code: error,
+          message: errorDescription || error,
+          timestamp: new Date().toISOString(),
+          source: 'url_params',
+        }
+        try {
+          setErrorDetails(errorData)
+          setError(`Google Sign-In Error: ${errorDescription || error}`)
+        } catch (e) {
+          console.warn('Failed to set error state:', e)
+        }
+        // Store it
+        try {
+          localStorage.setItem('firebase_error', JSON.stringify(errorData))
+        } catch (e) {
+          console.warn('Failed to store error in localStorage:', e)
+        }
       }
-      setErrorDetails(errorData)
-      setError(`Google Sign-In Error: ${errorDescription || error}`)
-      // Store it
-      try {
-        localStorage.setItem('firebase_error', JSON.stringify(errorData))
-      } catch (e) {}
+    } catch (e) {
+      console.warn('Failed to check URL params:', e)
     }
     
-    // Also listen for console errors
+    // Also listen for console errors (with guard to prevent infinite loops)
     const originalError = console.error
     console.error = (...args: any[]) => {
       originalError.apply(console, args)
-      const errorStr = args.join(' ')
-      if (errorStr.includes('Firebase') || errorStr.includes('Firestore') || errorStr.includes('permission') || errorStr.includes('auth/')) {
-        setError(errorStr)
+      
+      // Prevent infinite loops
+      if (isHandlingError.current) return
+      
+      try {
+        const errorStr = args.join(' ')
+        if (errorStr.includes('Firebase') || errorStr.includes('Firestore') || errorStr.includes('permission') || errorStr.includes('auth/')) {
+          isHandlingError.current = true
+          setError(errorStr)
+          // Reset flag after a short delay
+          setTimeout(() => {
+            isHandlingError.current = false
+          }, 100)
+        }
+      } catch (e) {
+        // If setting error fails, restore original and don't try again
+        console.error = originalError
       }
     }
 

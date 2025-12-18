@@ -16,13 +16,21 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
+    // Only run on client side
+    if (typeof window === 'undefined') return
+    
     setMounted(true)
-    // Check localStorage for saved theme preference
-    const savedTheme = localStorage.getItem('theme') as Theme | null
-    if (savedTheme) {
-      setTheme(savedTheme)
-    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      setTheme('dark')
+    
+    try {
+      // Check localStorage for saved theme preference
+      const savedTheme = localStorage.getItem('theme') as Theme | null
+      if (savedTheme) {
+        setTheme(savedTheme)
+      } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        setTheme('dark')
+      }
+    } catch (e) {
+      console.warn('Failed to load theme preference:', e)
     }
   }, [])
 
