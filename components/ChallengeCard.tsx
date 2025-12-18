@@ -10,9 +10,12 @@ interface ChallengeCardProps {
 }
 
 export default function ChallengeCard({ challenge }: ChallengeCardProps) {
-  const { user, joinChallenge } = useFirestoreStore()
+  const { user, joinChallenge, habits } = useFirestoreStore()
   const isParticipating = challenge.participants.includes(user?.id || '')
   const daysRemaining = differenceInDays(challenge.endDate, new Date())
+  const userProgress = user ? (challenge.progress?.[user.id] || 0) : 0
+  const progressPercentage = Math.min((userProgress / challenge.duration) * 100, 100)
+  const isCompleted = userProgress >= challenge.duration
 
   const difficultyColors = {
     easy: 'bg-green-100 text-green-700',
@@ -44,6 +47,27 @@ export default function ChallengeCard({ challenge }: ChallengeCardProps) {
       </div>
 
       <div className="space-y-3">
+        {isParticipating && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-600 dark:text-gray-400">Progress</span>
+              <span className="font-semibold text-gray-700 dark:text-gray-300">
+                {userProgress} / {challenge.duration} days
+                {isCompleted && <span className="ml-2 text-green-600 dark:text-green-400">✓ Completed!</span>}
+              </span>
+            </div>
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+              <div
+                className={`h-2 rounded-full transition-all duration-300 ${
+                  isCompleted 
+                    ? 'bg-green-500' 
+                    : 'bg-blue-500'
+                }`}
+                style={{ width: `${progressPercentage}%` }}
+              />
+            </div>
+          </div>
+        )}
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
             <Users className="w-4 h-4" />
@@ -54,6 +78,20 @@ export default function ChallengeCard({ challenge }: ChallengeCardProps) {
             <span>{daysRemaining} days left</span>
           </div>
         </div>
+        {challenge.habitIds && challenge.habitIds.length > 0 && (
+          <div className="text-xs text-gray-600 dark:text-gray-400">
+            <span className="font-medium">Linked habits: </span>
+            {challenge.habitIds.map((habitId, idx) => {
+              const habit = habits.find(h => h.id === habitId)
+              return habit ? (
+                <span key={habitId}>
+                  {habit.icon} {habit.name}
+                  {idx < challenge.habitIds!.length - 1 && ', '}
+                </span>
+              ) : null
+            })}
+          </div>
+        )}
 
         <div className="space-y-2">
           <p className="text-xs font-medium text-gray-700 dark:text-gray-300">Requirements:</p>

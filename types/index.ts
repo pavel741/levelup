@@ -49,6 +49,9 @@ export interface Challenge {
   duration: number // days
   requirements: string[]
   participants: string[]
+  habitIds?: string[] // Habit IDs linked to this challenge - when these habits are completed, challenge progress updates
+  progress?: { [userId: string]: number } // Track progress per user (days completed)
+  completedDates?: { [userId: string]: string[] } // Track which dates each user completed
   startDate: Date
   endDate: Date
   isActive: boolean

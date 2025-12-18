@@ -191,6 +191,57 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
       
       await get().syncUser(user.id)
     }
+
+    // Update linked challenges
+    if (user) {
+      const activeChallenges = get().activeChallenges.filter(
+        (challenge) => 
+          challenge.participants.includes(user.id) && 
+          challenge.habitIds?.includes(id) &&
+          challenge.isActive
+      )
+
+      for (const challenge of activeChallenges) {
+        // Check if user already completed this challenge today
+        const userCompletedDates = challenge.completedDates?.[user.id] || []
+        if (userCompletedDates.includes(today)) {
+          continue // Already counted for today
+        }
+
+        // Update progress
+        const currentProgress = challenge.progress?.[user.id] || 0
+        const newProgress = currentProgress + 1
+        const updatedProgress = {
+          ...(challenge.progress || {}),
+          [user.id]: newProgress,
+        }
+        const updatedCompletedDates = {
+          ...(challenge.completedDates || {}),
+          [user.id]: [...userCompletedDates, today],
+        }
+
+        // Check if challenge is completed
+        if (newProgress >= challenge.duration) {
+          // Challenge completed! Award XP
+          await get().addXP(challenge.xpReward)
+        }
+        
+        // Update progress (whether completed or not)
+        const cleanUpdates: any = {
+          progress: updatedProgress,
+          completedDates: updatedCompletedDates,
+        }
+        
+        // Remove undefined fields
+        Object.keys(cleanUpdates).forEach(key => {
+          if (cleanUpdates[key] === undefined) {
+            delete cleanUpdates[key]
+          }
+        })
+        
+        await updateChallenge(challenge.id, cleanUpdates)
+      }
+    }
   },
   uncompleteHabit: async (id) => {
     const today = format(new Date(), 'yyyy-MM-dd')

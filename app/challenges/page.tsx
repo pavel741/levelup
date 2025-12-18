@@ -11,7 +11,7 @@ import { Trophy, Plus, X } from 'lucide-react'
 import { Challenge } from '@/types'
 
 export default function ChallengesPage() {
-  const { challenges, activeChallenges, addChallenge, user } = useFirestoreStore()
+  const { challenges, activeChallenges, addChallenge, user, habits } = useFirestoreStore()
   const [showAddModal, setShowAddModal] = useState(false)
   const [newChallenge, setNewChallenge] = useState({
     title: '',
@@ -21,6 +21,7 @@ export default function ChallengesPage() {
     xpReward: 100,
     duration: 7,
     requirements: [''],
+    habitIds: [] as string[], // Selected habit IDs to link to challenge
   })
   const availableChallenges = challenges.filter(
     (c) => !activeChallenges.some((ac) => ac.id === c.id)
@@ -43,6 +44,9 @@ export default function ChallengesPage() {
       duration: newChallenge.duration,
       requirements: newChallenge.requirements.filter((r) => r.trim() !== ''),
       participants: [user.id], // Automatically join the challenge you create
+      habitIds: newChallenge.habitIds.length > 0 ? newChallenge.habitIds : undefined,
+      progress: { [user.id]: 0 }, // Initialize progress
+      completedDates: { [user.id]: [] }, // Initialize completed dates
       startDate,
       endDate,
       isActive: true,
@@ -59,6 +63,7 @@ export default function ChallengesPage() {
       xpReward: 100,
       duration: 7,
       requirements: [''],
+      habitIds: [],
     })
     setShowAddModal(false)
   }
@@ -251,6 +256,49 @@ export default function ChallengesPage() {
                     + Add Requirement
                   </button>
                 </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Link Habits <span className="text-xs text-gray-500 dark:text-gray-400">(optional)</span>
+                </label>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                  Select habits that will automatically count towards this challenge when completed
+                </p>
+                {habits.filter(h => h.isActive).length > 0 ? (
+                  <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-lg p-3 bg-gray-50 dark:bg-gray-900">
+                    {habits.filter(h => h.isActive).map((habit) => (
+                      <label
+                        key={habit.id}
+                        className="flex items-center gap-2 p-2 hover:bg-white dark:hover:bg-gray-800 rounded-lg cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={newChallenge.habitIds.includes(habit.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setNewChallenge({
+                                ...newChallenge,
+                                habitIds: [...newChallenge.habitIds, habit.id],
+                              })
+                            } else {
+                              setNewChallenge({
+                                ...newChallenge,
+                                habitIds: newChallenge.habitIds.filter(id => id !== habit.id),
+                              })
+                            }
+                          }}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                        <span className="text-2xl">{habit.icon}</span>
+                        <span className="text-sm text-gray-700 dark:text-gray-300">{habit.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                    No active habits available. Create habits first to link them to challenges.
+                  </p>
+                )}
               </div>
               <div className="flex gap-3 pt-4">
                 <button
