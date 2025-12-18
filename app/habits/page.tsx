@@ -234,10 +234,10 @@ export default function HabitsPage() {
 
       {/* Add Habit Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full shadow-xl">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Create New Habit</h2>
-            <div className="space-y-4">
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 max-w-md w-full shadow-xl my-auto max-h-[90vh] flex flex-col">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-4 flex-shrink-0">Create New Habit</h2>
+            <div className="space-y-4 overflow-y-auto flex-1 min-h-0 pr-2 -mr-2">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Habit Name</label>
                 <input
@@ -263,7 +263,7 @@ export default function HabitsPage() {
                 <div className="mb-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 flex items-center justify-center">
                   <span className="text-4xl">{newHabit.icon || '🎯'}</span>
                 </div>
-                <div className="grid grid-cols-8 gap-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 max-h-48 overflow-y-auto">
+                <div className="grid grid-cols-8 gap-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 max-h-48 overflow-y-auto overscroll-contain">
                   {[
                     '🎯', '💪', '🏃', '🧘', '📚', '💧', '🍎', '😴',
                     '🧠', '📝', '🎨', '🎵', '🌱', '☀️', '🌙', '⭐',
@@ -425,20 +425,20 @@ export default function HabitsPage() {
                   />
                 )}
               </div>
-              <div className="flex gap-3 pt-4">
-                <button
-                  onClick={() => setShowAddModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleAddHabit}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                >
-                  Create
-                </button>
-              </div>
+            </div>
+            <div className="flex gap-3 pt-4 mt-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="flex-1 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium text-sm sm:text-base"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddHabit}
+                className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm sm:text-base"
+              >
+                Create
+              </button>
             </div>
           </div>
         </div>
@@ -446,10 +446,10 @@ export default function HabitsPage() {
 
       {/* Edit Habit Modal */}
       {showEditModal && editingHabit && (
-        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full shadow-xl">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Edit Habit</h2>
-            <div className="space-y-4">
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 max-w-md w-full shadow-xl my-auto max-h-[90vh] flex flex-col">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-4 flex-shrink-0">Edit Habit</h2>
+            <div className="space-y-4 overflow-y-auto flex-1 min-h-0 pr-2 -mr-2">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Habit Name</label>
                 <input
@@ -475,7 +475,7 @@ export default function HabitsPage() {
                 <div className="mb-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 flex items-center justify-center">
                   <span className="text-4xl">{newHabit.icon || '🎯'}</span>
                 </div>
-                <div className="grid grid-cols-8 gap-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 max-h-48 overflow-y-auto">
+                <div className="grid grid-cols-8 gap-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 max-h-48 overflow-y-auto overscroll-contain">
                   {[
                     '🎯', '💪', '🏃', '🧘', '📚', '💧', '🍎', '😴',
                     '🧠', '📝', '🎨', '🎵', '🌱', '☀️', '🌙', '⭐',
@@ -637,35 +637,35 @@ export default function HabitsPage() {
                   />
                 )}
               </div>
-              <div className="flex gap-3 pt-4">
-                <button
-                  onClick={() => {
-                    setShowEditModal(false)
-                    setEditingHabit(null)
-                    setNewHabit({
-                      name: '',
-                      description: '',
-                      icon: '🎯',
-                      color: 'bg-blue-500',
-                      xpReward: 30,
-                      frequency: 'daily',
-                      targetDays: [1, 2, 3, 4, 5, 6, 7],
-                      reminderEnabled: false,
-                      reminderTime: '09:00',
-                      startDate: '',
-                    })
-                  }}
-                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleUpdateHabit}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                >
-                  Save Changes
-                </button>
-              </div>
+            </div>
+            <div className="flex gap-3 pt-4 mt-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
+              <button
+                onClick={() => {
+                  setShowEditModal(false)
+                  setEditingHabit(null)
+                  setNewHabit({
+                    name: '',
+                    description: '',
+                    icon: '🎯',
+                    color: 'bg-blue-500',
+                    xpReward: 30,
+                    frequency: 'daily',
+                    targetDays: [1, 2, 3, 4, 5, 6, 7],
+                    reminderEnabled: false,
+                    reminderTime: '09:00',
+                    startDate: '',
+                  })
+                }}
+                className="flex-1 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium text-sm sm:text-base"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUpdateHabit}
+                className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm sm:text-base"
+              >
+                Save Changes
+              </button>
             </div>
           </div>
         </div>
