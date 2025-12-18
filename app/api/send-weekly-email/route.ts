@@ -5,7 +5,14 @@ import { db } from '@/lib/firebase'
 import { format, startOfWeek, endOfWeek } from 'date-fns'
 import { getUserData } from '@/lib/firestore'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+// Initialize Resend lazily to avoid build-time errors
+function getResend() {
+  const apiKey = process.env.RESEND_API_KEY
+  if (!apiKey) {
+    throw new Error('RESEND_API_KEY is not configured')
+  }
+  return new Resend(apiKey)
+}
 
 interface WeeklyStats {
   totalHabitsCompleted: number
@@ -236,6 +243,9 @@ export async function POST(request: NextRequest) {
     if (!process.env.RESEND_API_KEY) {
       return NextResponse.json({ error: 'Resend API key not configured' }, { status: 500 })
     }
+
+    // Initialize Resend here (lazy initialization)
+    const resend = getResend()
 
     // Get all users with email summaries enabled
     const usersRef = collection(db, 'users')
