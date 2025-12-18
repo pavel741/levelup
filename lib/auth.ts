@@ -226,9 +226,18 @@ export const signInWithGoogle = async (): Promise<void> => {
 }
 
 export const handleGoogleRedirect = async (): Promise<User | null> => {
+  // Wait for Firebase to initialize if it hasn't yet
+  try {
+    const { waitForFirebaseInit } = await import('./firebase')
+    await waitForFirebaseInit()
+  } catch (error) {
+    console.error('❌ Failed to wait for Firebase initialization:', error)
+  }
+  
   if (!auth) {
     const error = 'Firebase Auth is not initialized'
     console.error('❌', error)
+    console.error('❌ Firebase config present but auth not initialized. This may be a timing issue.')
     // Store error
     try {
       localStorage.setItem('firebase_error', JSON.stringify({
