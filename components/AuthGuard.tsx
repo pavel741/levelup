@@ -97,8 +97,13 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       return () => unsubscribe()
     }
 
+    let authChecked = false
+    
     const unsubscribe = onAuthChange(async (firebaseUser) => {
+      authChecked = true
+      
       if (firebaseUser) {
+        console.log('✅ AuthGuard: User authenticated:', firebaseUser.uid)
         let userData = await getUserData(firebaseUser.uid)
         
         // If user exists in Auth but not in Firestore, create Firestore document
@@ -126,45 +131,58 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
           await syncUser(firebaseUser.uid)
         }
       } else {
-        router.push('/auth/login')
+        // Only redirect to login if we're not already on an auth page
+        if (!pathname?.startsWith('/auth')) {
+          console.log('AuthGuard: No user found, redirecting to login')
+          router.push('/auth/login')
+        }
       }
       setChecking(false)
     })
 
-    // Check current user immediately
-    const currentUser = getCurrentUser()
-    if (!currentUser && !pathname?.startsWith('/auth')) {
-      router.push('/auth/login')
-      setChecking(false)
-    } else if (currentUser) {
-      getUserData(currentUser.uid).then(async (userData) => {
-        // If user exists in Auth but not in Firestore, create Firestore document
-        if (!userData) {
-          console.log('User exists in Auth but not in Firestore, creating document')
-          const { createUserData } = await import('@/lib/firestore')
-          userData = {
-            id: currentUser.uid,
-            name: currentUser.displayName || currentUser.email?.split('@')[0] || 'User',
-            email: currentUser.email || '',
-            level: 1,
-            xp: 0,
-            xpToNextLevel: 100,
-            streak: 0,
-            longestStreak: 0,
-            achievements: [],
-            joinedAt: new Date(),
-          }
-          await createUserData(userData)
-          console.log('Created missing Firestore document:', userData.id)
+    // Wait a bit for auth state to restore, then check if still no user
+    // This gives Firebase time to restore the session from localStorage
+    setTimeout(() => {
+      if (!authChecked) {
+        const currentUser = getCurrentUser()
+        if (!currentUser && !pathname?.startsWith('/auth')) {
+          console.log('AuthGuard: Timeout - no user found, redirecting to login')
+          router.push('/auth/login')
+          setChecking(false)
+        } else if (currentUser) {
+          // User found, but listener hasn't fired yet - load user data
+          getUserData(currentUser.uid).then(async (userData) => {
+            // If user exists in Auth but not in Firestore, create Firestore document
+            if (!userData) {
+              console.log('User exists in Auth but not in Firestore, creating document')
+              const { createUserData } = await import('@/lib/firestore')
+              userData = {
+                id: currentUser.uid,
+                name: currentUser.displayName || currentUser.email?.split('@')[0] || 'User',
+                email: currentUser.email || '',
+                level: 1,
+                xp: 0,
+                xpToNextLevel: 100,
+                streak: 0,
+                longestStreak: 0,
+                achievements: [],
+                joinedAt: new Date(),
+              }
+              await createUserData(userData)
+              console.log('Created missing Firestore document:', userData.id)
+            }
+            
+            if (userData) {
+              setUser(userData)
+              syncUser(currentUser.uid)
+            }
+            setChecking(false)
+          })
+        } else {
+          setChecking(false)
         }
-        
-        if (userData) {
-          setUser(userData)
-          syncUser(currentUser.uid)
-        }
-        setChecking(false)
-      })
-    }
+      }
+    }, 1000) // Wait 1 second for auth state to restore
 
     return () => unsubscribe()
   }, [router, setUser, syncUser, pathname])

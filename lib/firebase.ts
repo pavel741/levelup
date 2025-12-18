@@ -1,5 +1,5 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app'
-import { getAuth, Auth } from 'firebase/auth'
+import { getAuth, Auth, setPersistence, browserLocalPersistence } from 'firebase/auth'
 import { getFirestore, Firestore } from 'firebase/firestore'
 import { getAnalytics, Analytics } from 'firebase/analytics'
 
@@ -90,6 +90,16 @@ The variables must be present BEFORE the build runs.`
       try {
         app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]
         auth = getAuth(app)
+        
+        // Explicitly set persistence to local storage (persists across browser sessions)
+        // This ensures users stay logged in after page refresh
+        try {
+          await setPersistence(auth, browserLocalPersistence)
+          console.log('✅ Auth persistence set to local storage')
+        } catch (persistenceError) {
+          console.warn('⚠️ Could not set auth persistence (may already be set):', persistenceError)
+        }
+        
         db = getFirestore(app)
         
         console.log('✅ Firebase initialized successfully')
