@@ -14,32 +14,7 @@ interface Notification {
 
 export default function NotificationsDropdown() {
   const [isOpen, setIsOpen] = useState(false)
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: '1',
-      type: 'level',
-      title: 'Level Up!',
-      message: 'Congratulations! You reached Level 2',
-      time: '2 hours ago',
-      read: false,
-    },
-    {
-      id: '2',
-      type: 'achievement',
-      title: 'Achievement Unlocked',
-      message: 'You completed 7 days in a row!',
-      time: '1 day ago',
-      read: false,
-    },
-    {
-      id: '3',
-      type: 'challenge',
-      title: 'New Challenge Available',
-      message: '7-Day Focus Challenge is now available',
-      time: '2 days ago',
-      read: true,
-    },
-  ])
+  const [notifications, setNotifications] = useState<Notification[]>([])
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
