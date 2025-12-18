@@ -13,6 +13,19 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 }
 
+// Debug: Log what we have (only in development or if explicitly enabled)
+if (typeof window !== 'undefined' && (process.env.NODE_ENV === 'development' || window.location.search.includes('debug=firebase'))) {
+  console.log('🔍 Firebase Config Debug:', {
+    hasApiKey: !!firebaseConfig.apiKey,
+    hasAuthDomain: !!firebaseConfig.authDomain,
+    hasProjectId: !!firebaseConfig.projectId,
+    hasAppId: !!firebaseConfig.appId,
+    apiKeyLength: firebaseConfig.apiKey?.length || 0,
+    authDomain: firebaseConfig.authDomain,
+    projectId: firebaseConfig.projectId,
+  })
+}
+
 // Validate Firebase configuration
 const validateFirebaseConfig = (): { valid: boolean; missing: string[] } => {
   const required = [
@@ -43,7 +56,17 @@ if (typeof window !== 'undefined') {
   // Validate config before initializing
   const validation = validateFirebaseConfig()
   if (!validation.valid) {
-    const errorMessage = `Firebase configuration is incomplete. Missing: ${validation.missing.join(', ')}. Please add these environment variables to your Vercel project settings.`
+    const errorMessage = `Firebase configuration is incomplete. Missing: ${validation.missing.join(', ')}. 
+
+⚠️ IMPORTANT: Environment variables are baked into the build at BUILD TIME.
+If you just added these variables to Vercel, you MUST redeploy for them to take effect.
+
+Steps:
+1. Go to Vercel Dashboard → Your Project → Deployments
+2. Click ⋯ on latest deployment → Redeploy
+3. Or push a new commit to trigger a new build
+
+The variables must be present BEFORE the build runs.`
     console.error('❌', errorMessage)
     // Store error for ErrorDisplay component
     try {
@@ -53,6 +76,7 @@ if (typeof window !== 'undefined') {
         timestamp: new Date().toISOString(),
         source: 'firebase_init',
         missing: validation.missing,
+        requiresRedeploy: true,
       }))
     } catch (e) {
       console.error('Failed to store error:', e)

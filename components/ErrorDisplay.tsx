@@ -109,18 +109,28 @@ export default function ErrorDisplay() {
               <p className="text-sm font-medium text-yellow-900 dark:text-yellow-200 mb-2">
                 🔧 How to Fix:
               </p>
+              <div className="mb-3 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded">
+                <p className="text-xs font-semibold text-red-900 dark:text-red-200 mb-1">
+                  ⚠️ IMPORTANT: You MUST Redeploy!
+                </p>
+                <p className="text-xs text-red-800 dark:text-red-300">
+                  Environment variables are baked into the build at BUILD TIME. If you just added them to Vercel, you must trigger a new deployment for them to take effect.
+                </p>
+              </div>
               <ol className="text-xs text-yellow-800 dark:text-yellow-300 list-decimal list-inside space-y-1 mb-3">
-                <li>Go to Vercel Dashboard → Your Project → Settings → Environment Variables</li>
-                <li>Add the missing Firebase environment variables:</li>
+                <li>Verify variables are in Vercel: Settings → Environment Variables</li>
+                <li>Go to Deployments tab</li>
+                <li>Click ⋯ on latest deployment → Redeploy</li>
+                <li>Or push a new commit to trigger a new build</li>
               </ol>
+              <p className="text-xs text-yellow-800 dark:text-yellow-300 mb-2">
+                Missing variables:
+              </p>
               <ul className="text-xs text-yellow-800 dark:text-yellow-300 list-disc list-inside space-y-1 mb-3 font-mono bg-yellow-100 dark:bg-yellow-900/40 p-2 rounded">
                 {missingVars.map((varName: string) => (
                   <li key={varName}>{varName}</li>
                 ))}
               </ul>
-              <p className="text-xs text-yellow-800 dark:text-yellow-300">
-                📖 See <code className="bg-yellow-200 dark:bg-yellow-900/60 px-1 rounded">VERCEL_ENV_SETUP.md</code> for detailed instructions
-              </p>
             </div>
           )}
           
