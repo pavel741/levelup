@@ -12,6 +12,7 @@ import {
   saveChallenge,
   updateChallenge,
   saveDailyStats,
+  getUserDailyStats,
   getUserData,
   updateUserData,
 } from '@/lib/firestore'
@@ -151,6 +152,23 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
       }
       
       set({ user: userData })
+      
+      // Load today's daily stats
+      const today = format(new Date(), 'yyyy-MM-dd')
+      const todayStats = await getUserDailyStats(userId, today)
+      if (todayStats) {
+        set((state) => {
+          const existing = state.dailyStats.find((s) => s.date === today)
+          if (existing) {
+            return {
+              dailyStats: state.dailyStats.map((s) =>
+                s.date === today ? todayStats : s
+              ),
+            }
+          }
+          return { dailyStats: [...state.dailyStats, todayStats] }
+        })
+      }
     } else {
       console.warn('No user data found for userId:', userId)
     }
@@ -243,6 +261,13 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
     const user = get().user
     if (user) {
       await get().addXP(habit.xpReward)
+      
+      // Update daily stats - track habits completed
+      const todayStats = get().dailyStats.find((s) => s.date === today)
+      const currentHabitsCompleted = todayStats?.habitsCompleted || 0
+      await get().updateDailyStats({
+        habitsCompleted: currentHabitsCompleted + 1,
+      })
     }
 
     // Update streak based on actual consecutive days
@@ -462,6 +487,17 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
       level: newLevel,
       xpToNextLevel: Math.max(0, xpToNextLevel),
     })
+
+    // Update daily stats with XP earned
+    const today = format(new Date(), 'yyyy-MM-dd')
+    const existingStats = get().dailyStats.find((s) => s.date === today)
+    const currentXpEarned = existingStats?.xpEarned || 0
+    await get().updateDailyStats({
+      xpEarned: currentXpEarned + amount,
+    })
+
+    // Update local user state immediately for better UX
+    set({ user: { ...user, xp: newXP, level: newLevel, xpToNextLevel: Math.max(0, xpToNextLevel) } })
 
     // Check for achievements after XP update
     await get().checkAchievements()

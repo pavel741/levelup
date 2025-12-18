@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
 import { format } from 'date-fns'
-import { CheckCircle2, Circle, Trash2, X, Edit2, AlertCircle } from 'lucide-react'
+import { CheckCircle2, Circle, Trash2, X, Edit2, AlertCircle, TrendingUp } from 'lucide-react'
 import { Habit } from '@/types'
 import { validateMissedReason } from '@/lib/missedHabitValidation'
 
@@ -13,15 +13,34 @@ interface HabitCardProps {
 }
 
 export default function HabitCard({ habit, onEdit }: HabitCardProps) {
-  const { completeHabit, uncompleteHabit, deleteHabit, markHabitMissed } = useFirestoreStore()
+  const { completeHabit, uncompleteHabit, deleteHabit, markHabitMissed, user } = useFirestoreStore()
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showMissedModal, setShowMissedModal] = useState(false)
   const [missedReason, setMissedReason] = useState('')
   const [missedDate, setMissedDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [validationResult, setValidationResult] = useState<{ valid: boolean; message?: string } | null>(null)
+  const [showXPGain, setShowXPGain] = useState(false)
+  const [xpGained, setXpGained] = useState(0)
+  const [prevCompleted, setPrevCompleted] = useState(habit.completedDates.includes(format(new Date(), 'yyyy-MM-dd')))
   const today = format(new Date(), 'yyyy-MM-dd')
   const isCompleted = habit.completedDates.includes(today)
   const isMissed = habit.missedDates?.some((m) => m.date === today)
+  
+  // Track XP changes to show notification when habit becomes completed
+  useEffect(() => {
+    if (user && isCompleted && !prevCompleted) {
+      // Show XP notification when habit is just completed
+      setShowXPGain(true)
+      setXpGained(habit.xpReward)
+      const timer = setTimeout(() => {
+        setShowXPGain(false)
+      }, 3000)
+      setPrevCompleted(true)
+      return () => clearTimeout(timer)
+    } else if (!isCompleted) {
+      setPrevCompleted(false)
+    }
+  }, [isCompleted, habit.xpReward, user, prevCompleted])
   
   // Check if habit has started
   const hasStarted = habit.startDate 
@@ -124,6 +143,16 @@ export default function HabitCard({ habit, onEdit }: HabitCardProps) {
 
   return (
     <>
+      {/* XP Gain Notification */}
+      {showXPGain && (
+        <div className="fixed top-20 right-6 z-50 animate-bounce">
+          <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-2">
+            <TrendingUp className="w-5 h-5" />
+            <span className="font-bold text-lg">+{xpGained} XP</span>
+          </div>
+        </div>
+      )}
+      
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow relative">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3 flex-1">
