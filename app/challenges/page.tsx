@@ -31,9 +31,13 @@ export default function ChallengesPage() {
   const handleAddChallenge = () => {
     if (!newChallenge.title.trim() || !user) return
 
+    // Validate duration and XP reward
+    const duration = newChallenge.duration && newChallenge.duration >= 1 ? newChallenge.duration : 7
+    const xpReward = newChallenge.xpReward && newChallenge.xpReward >= 10 ? newChallenge.xpReward : 100
+
     const startDate = new Date()
     const endDate = new Date()
-    endDate.setDate(endDate.getDate() + newChallenge.duration)
+    endDate.setDate(endDate.getDate() + duration)
 
     const challenge: Challenge = {
       id: Date.now().toString(),
@@ -41,8 +45,8 @@ export default function ChallengesPage() {
       description: newChallenge.description,
       type: newChallenge.type,
       difficulty: newChallenge.difficulty,
-      xpReward: newChallenge.xpReward,
-      duration: newChallenge.duration,
+      xpReward: xpReward,
+      duration: duration,
       requirements: newChallenge.requirements.filter((r) => r.trim() !== ''),
       participants: [user.id], // Automatically join the challenge you create
       habitIds: newChallenge.habitIds.length > 0 ? newChallenge.habitIds : undefined,
@@ -209,8 +213,24 @@ export default function ChallengesPage() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Duration (days)</label>
                   <input
                     type="number"
-                    value={newChallenge.duration}
-                    onChange={(e) => setNewChallenge({ ...newChallenge, duration: parseInt(e.target.value) || 7 })}
+                    value={newChallenge.duration === 0 ? '' : newChallenge.duration}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      if (value === '') {
+                        setNewChallenge({ ...newChallenge, duration: 0 })
+                      } else {
+                        const numValue = parseInt(value)
+                        if (!isNaN(numValue)) {
+                          setNewChallenge({ ...newChallenge, duration: numValue })
+                        }
+                      }
+                    }}
+                    onBlur={(e) => {
+                      const value = parseInt(e.target.value)
+                      if (!value || value < 1) {
+                        setNewChallenge({ ...newChallenge, duration: 7 })
+                      }
+                    }}
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     min="1"
                     max="365"
@@ -220,8 +240,24 @@ export default function ChallengesPage() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">XP Reward</label>
                   <input
                     type="number"
-                    value={newChallenge.xpReward}
-                    onChange={(e) => setNewChallenge({ ...newChallenge, xpReward: parseInt(e.target.value) || 100 })}
+                    value={newChallenge.xpReward === 0 ? '' : newChallenge.xpReward}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      if (value === '') {
+                        setNewChallenge({ ...newChallenge, xpReward: 0 })
+                      } else {
+                        const numValue = parseInt(value)
+                        if (!isNaN(numValue)) {
+                          setNewChallenge({ ...newChallenge, xpReward: numValue })
+                        }
+                      }
+                    }}
+                    onBlur={(e) => {
+                      const value = parseInt(e.target.value)
+                      if (!value || value < 10) {
+                        setNewChallenge({ ...newChallenge, xpReward: 100 })
+                      }
+                    }}
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     min="10"
                     max="1000"
