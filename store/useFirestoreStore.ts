@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { User, Habit, Challenge, Achievement, DailyStats } from '@/types'
-import { format } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { checkAndUnlockAchievements } from '@/lib/achievements'
 import { validateMissedReason } from '@/lib/missedHabitValidation'
 import {
@@ -64,6 +64,41 @@ const calculateXPForNextLevel = (level: number): number => {
   return Math.floor(100 * Math.pow(1.5, level))
 }
 
+// Calculate streak based on consecutive days of habit completion
+const calculateUserStreak = (habits: Habit[]): number => {
+  if (habits.length === 0) return 0
+
+  // Get all unique completed dates from all habits
+  const allCompletedDates = new Set<string>()
+  habits.forEach(habit => {
+    habit.completedDates.forEach(date => allCompletedDates.add(date))
+  })
+
+  if (allCompletedDates.size === 0) return 0
+
+  // Sort dates descending (most recent first)
+  const sortedDates = Array.from(allCompletedDates).sort().reverse()
+  
+  let streak = 0
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  // Check consecutive days starting from today
+  for (let i = 0; i < sortedDates.length; i++) {
+    const expectedDate = new Date(today)
+    expectedDate.setDate(expectedDate.getDate() - i)
+    const expectedDateStr = format(expectedDate, 'yyyy-MM-dd')
+
+    if (sortedDates.includes(expectedDateStr)) {
+      streak++
+    } else {
+      break // Streak broken
+    }
+  }
+
+  return streak
+}
+
 let unsubscribeHabits: (() => void) | null = null
 let unsubscribeChallenges: (() => void) | null = null
 let unsubscribeAuth: (() => void) | null = null
@@ -99,6 +134,22 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
     const userData = await getUserData(userId)
     if (userData) {
       console.log('User data loaded:', userData.id, userData.email)
+      
+      // Recalculate streak based on current habits to fix any incorrect values
+      const currentHabits = get().habits
+      if (currentHabits.length > 0) {
+        const calculatedStreak = calculateUserStreak(currentHabits)
+        if (calculatedStreak !== userData.streak) {
+          console.log(`Recalculating streak: ${userData.streak} -> ${calculatedStreak}`)
+          await updateUserData(userId, {
+            streak: calculatedStreak,
+            longestStreak: Math.max(userData.longestStreak || 0, calculatedStreak),
+          })
+          userData.streak = calculatedStreak
+          userData.longestStreak = Math.max(userData.longestStreak || 0, calculatedStreak)
+        }
+      }
+      
       set({ user: userData })
     } else {
       console.warn('No user data found for userId:', userId)
@@ -125,6 +176,22 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
       }
       
       set({ habits })
+      
+      // Recalculate streak when habits are loaded/updated
+      const user = get().user
+      if (user && habits.length > 0) {
+        const calculatedStreak = calculateUserStreak(habits)
+        if (calculatedStreak !== user.streak) {
+          console.log(`Recalculating streak from habits: ${user.streak} -> ${calculatedStreak}`)
+          updateUserData(user.id, {
+            streak: calculatedStreak,
+            longestStreak: Math.max(user.longestStreak || 0, calculatedStreak),
+          }).then(() => {
+            // Update local state
+            get().syncUser(user.id)
+          })
+        }
+      }
     })
 
     unsubscribeChallenges = subscribeToChallenges((challenges) => {
@@ -178,12 +245,16 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
       await get().addXP(habit.xpReward)
     }
 
-    // Update streak
+    // Update streak based on actual consecutive days
     if (user) {
-      const newStreak = user.streak + 1
+      // Recalculate streak from all habits
+      const allHabits = get().habits
+      const newStreak = calculateUserStreak(allHabits)
+      const currentLongestStreak = user.longestStreak || 0
+      
       await updateUserData(user.id, {
         streak: newStreak,
-        longestStreak: Math.max(user.longestStreak, newStreak),
+        longestStreak: Math.max(currentLongestStreak, newStreak),
       })
       
       // Check for achievements after streak update
@@ -262,10 +333,15 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
       const newLevel = Math.floor(newXP / 100) + 1
       const xpToNextLevel = calculateXPForNextLevel(newLevel) - newXP
 
+      // Recalculate streak after uncompleting
+      const allHabits = get().habits.map(h => h.id === id ? { ...h, completedDates: updatedDates } : h)
+      const newStreak = calculateUserStreak(allHabits)
+
       await updateUserData(user.id, {
         xp: newXP,
         level: newLevel,
         xpToNextLevel: Math.max(0, xpToNextLevel),
+        streak: newStreak,
       })
       await get().syncUser(user.id)
     }
