@@ -19,8 +19,33 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       // Still set up auth listener for redirect handling
       const unsubscribe = onAuthChange(async (firebaseUser) => {
         if (firebaseUser && pathname?.startsWith('/auth')) {
-          // User authenticated via redirect, let the auth page handle it
-          const userData = await getUserData(firebaseUser.uid)
+          // User authenticated via redirect, ensure Firestore document exists
+          let userData = await getUserData(firebaseUser.uid)
+          
+          // If user doesn't exist in Firestore, create it (backup in case handleGoogleRedirect failed)
+          if (!userData) {
+            console.log('AuthGuard: Creating missing Firestore document for authenticated user')
+            const { createUserData } = await import('@/lib/firestore')
+            userData = {
+              id: firebaseUser.uid,
+              name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+              email: firebaseUser.email || '',
+              level: 1,
+              xp: 0,
+              xpToNextLevel: 100,
+              streak: 0,
+              longestStreak: 0,
+              achievements: [],
+              joinedAt: new Date(),
+            }
+            try {
+              await createUserData(userData)
+              console.log('AuthGuard: Created missing Firestore document:', userData.id)
+            } catch (error) {
+              console.error('AuthGuard: Failed to create Firestore document:', error)
+            }
+          }
+          
           if (userData) {
             setUser(userData)
             await syncUser(firebaseUser.uid)

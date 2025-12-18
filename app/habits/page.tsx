@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 export const dynamic = 'force-dynamic'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
 import AuthGuard from '@/components/AuthGuard'
@@ -13,6 +13,19 @@ import { Habit } from '@/types'
 export default function HabitsPage() {
   const { habits, addHabit, updateHabit, user } = useFirestoreStore()
   const [showAddModal, setShowAddModal] = useState(false)
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('HabitsPage - User ID:', user?.id)
+    console.log('HabitsPage - Total habits:', habits.length)
+    console.log('HabitsPage - All habits:', habits.map(h => ({ 
+      id: h.id, 
+      name: h.name, 
+      userId: h.userId, 
+      isActive: h.isActive,
+      matchesCurrentUser: h.userId === user?.id
+    })))
+  }, [user, habits])
   const [showEditModal, setShowEditModal] = useState(false)
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null)
   const [newHabit, setNewHabit] = useState({

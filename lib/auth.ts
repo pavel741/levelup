@@ -202,9 +202,12 @@ export const handleGoogleRedirect = async (): Promise<User | null> => {
   }
   
   try {
+    console.log('Checking for Google redirect result...')
     const result = await getRedirectResult(auth)
+    
     if (!result) {
       // No redirect result - this is normal if user hasn't been redirected
+      console.log('No redirect result found (user may not have been redirected yet)')
       return null
     }
 
@@ -214,16 +217,18 @@ export const handleGoogleRedirect = async (): Promise<User | null> => {
       return null
     }
 
-    console.log('Google redirect successful, user:', firebaseUser.uid)
+    console.log('Google redirect successful, Firebase user:', firebaseUser.uid, firebaseUser.email)
     
+    // Check if user exists in Firestore
     let user = await getUserData(firebaseUser.uid)
+    console.log('User data from Firestore:', user ? 'Found' : 'Not found')
     
     if (!user) {
       // Create new user if doesn't exist
       console.log('Creating new user from Google sign-in')
       user = {
         id: firebaseUser.uid,
-        name: firebaseUser.displayName || 'User',
+        name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
         email: firebaseUser.email || '',
         level: 1,
         xp: 0,
@@ -233,17 +238,26 @@ export const handleGoogleRedirect = async (): Promise<User | null> => {
         achievements: [],
         joinedAt: new Date(),
       }
-      await createUserData(user)
-      console.log('New user created:', user.id)
+      
+      try {
+        await createUserData(user)
+        console.log('✅ Successfully created new user in Firestore:', user.id)
+      } catch (createError: any) {
+        console.error('❌ Failed to create user data in Firestore:', createError)
+        // Still return the user object even if Firestore creation fails
+        // The AuthGuard will try to create it again
+        console.log('Returning user object anyway, AuthGuard will handle Firestore creation')
+      }
     } else {
-      console.log('Existing user found:', user.id)
+      console.log('✅ Existing user found in Firestore:', user.id)
     }
 
     return user
   } catch (error: any) {
-    console.error('Error handling Google redirect:', error)
+    console.error('❌ Error handling Google redirect:', error)
     console.error('Error code:', error?.code)
     console.error('Error message:', error?.message)
+    console.error('Full error:', error)
     // Re-throw the error so the UI can handle it
     throw new Error(getErrorMessage(error))
   }

@@ -21,14 +21,26 @@ export default function SignUpPage() {
   // Handle Google redirect callback
   useEffect(() => {
     let mounted = true
+    let redirectHandled = false
     
     const handleRedirect = async () => {
+      // Only handle redirect once
+      if (redirectHandled) return
+      
       try {
+        console.log('Signup page: Checking for Google redirect...')
         const user = await handleGoogleRedirect()
+        
         if (mounted && user) {
+          redirectHandled = true
+          console.log('Signup page: Google redirect successful, user:', user.id)
           setUser(user)
-          router.push('/')
+          // Small delay to ensure state is set
+          setTimeout(() => {
+            router.push('/')
+          }, 100)
         } else if (mounted) {
+          console.log('Signup page: No redirect result')
           // Check if there's an error in the URL params
           const urlParams = new URLSearchParams(window.location.search)
           const error = urlParams.get('error')
@@ -37,17 +49,21 @@ export default function SignUpPage() {
           }
         }
       } catch (err: any) {
-        console.error('Google redirect error:', err)
+        console.error('Signup page: Google redirect error:', err)
         if (mounted) {
           setError(err.message || 'Failed to sign in with Google')
         }
       }
     }
     
-    handleRedirect()
+    // Small delay to ensure Firebase is initialized
+    const timeoutId = setTimeout(() => {
+      handleRedirect()
+    }, 100)
     
     return () => {
       mounted = false
+      clearTimeout(timeoutId)
     }
   }, [setUser, router])
 

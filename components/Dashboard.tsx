@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
 import { format } from 'date-fns'
 import { useRouter } from 'next/navigation'
@@ -20,7 +21,15 @@ export default function Dashboard() {
     distractionsBlocked: 0,
   }
 
+  // Debug logging
+  useEffect(() => {
+    console.log('Dashboard - User ID:', user?.id)
+    console.log('Dashboard - Total habits:', habits.length)
+    console.log('Dashboard - Habits:', habits.map(h => ({ id: h.id, name: h.name, userId: h.userId, isActive: h.isActive })))
+  }, [user, habits])
+
   const activeHabits = habits.filter((h) => h.isActive)
+  console.log('Dashboard - Active habits:', activeHabits.length)
   const completedToday = activeHabits.filter((h) =>
     h.completedDates.includes(today)
   ).length

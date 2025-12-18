@@ -92,17 +92,28 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
   },
 
   syncUser: async (userId: string) => {
+    console.log('syncUser called with userId:', userId)
     const userData = await getUserData(userId)
     if (userData) {
+      console.log('User data loaded:', userData.id, userData.email)
       set({ user: userData })
+    } else {
+      console.warn('No user data found for userId:', userId)
     }
 
     // Subscribe to real-time updates
-    if (unsubscribeHabits) unsubscribeHabits()
+    if (unsubscribeHabits) {
+      console.log('Unsubscribing from previous habits subscription')
+      unsubscribeHabits()
+    }
     if (unsubscribeChallenges) unsubscribeChallenges()
     if (unsubscribeBlockedSites) unsubscribeBlockedSites()
 
+    console.log('Setting up habits subscription for userId:', userId)
     unsubscribeHabits = subscribeToHabits(userId, (habits) => {
+      console.log('Habits callback received:', habits.length, 'habits')
+      console.log('Habit IDs:', habits.map(h => h.id))
+      console.log('Habit userIds:', habits.map(h => h.userId))
       set({ habits })
     })
 

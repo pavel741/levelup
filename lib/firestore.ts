@@ -47,8 +47,13 @@ export const createUserData = async (user: User): Promise<void> => {
       ...user,
       joinedAt: Timestamp.fromDate(user.joinedAt),
     })
-  } catch (error) {
+    console.log('Successfully created user data in Firestore:', user.id)
+  } catch (error: any) {
     console.error('Error creating user data:', error)
+    console.error('Error code:', error?.code)
+    console.error('Error message:', error?.message)
+    // Re-throw the error so callers know it failed
+    throw new Error(`Failed to create user data: ${error?.message || 'Unknown error'}`)
   }
 }
 
@@ -95,17 +100,34 @@ export const subscribeToHabits = (
     throw new Error('Firestore is not initialized')
   }
   
+  console.log('Subscribing to habits for userId:', userId)
   const habitsRef = collection(db, 'habits')
   const q = query(habitsRef, where('userId', '==', userId))
   
-  return onSnapshot(q, (snapshot) => {
-    const habits = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-      createdAt: doc.data().createdAt?.toDate() || new Date(),
-    })) as Habit[]
-    callback(habits)
-  })
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      console.log(`Habits snapshot received: ${snapshot.docs.length} habits for userId: ${userId}`)
+      const habits = snapshot.docs.map((doc) => {
+        const data = doc.data()
+        console.log('Habit document:', doc.id, 'userId:', data.userId, 'name:', data.name)
+        return {
+          id: doc.id,
+          ...data,
+          createdAt: data.createdAt?.toDate() || new Date(),
+        }
+      }) as Habit[]
+      console.log('Parsed habits:', habits.length, habits.map(h => ({ id: h.id, name: h.name, userId: h.userId })))
+      callback(habits)
+    },
+    (error) => {
+      console.error('Error in habits subscription:', error)
+      console.error('Error code:', error.code)
+      console.error('Error message:', error.message)
+      // Still call callback with empty array on error
+      callback([])
+    }
+  )
 }
 
 export const saveHabit = async (habit: Habit): Promise<void> => {
