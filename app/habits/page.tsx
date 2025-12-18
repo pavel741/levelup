@@ -72,6 +72,8 @@ export default function HabitsPage() {
       icon: '🎯',
       color: 'bg-blue-500',
       xpReward: 30,
+      frequency: 'daily',
+      targetDays: [1, 2, 3, 4, 5, 6, 7],
       reminderEnabled: false,
       reminderTime: '09:00',
     })
@@ -584,6 +586,8 @@ export default function HabitsPage() {
                       icon: '🎯',
                       color: 'bg-blue-500',
                       xpReward: 30,
+                      frequency: 'daily',
+                      targetDays: [1, 2, 3, 4, 5, 6, 7],
                       reminderEnabled: false,
                       reminderTime: '09:00',
                     })
