@@ -379,10 +379,9 @@ export default function HabitsPage() {
                   value={newHabit.startDate}
                   onChange={(e) => setNewHabit({ ...newHabit, startDate: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  max={format(new Date(), 'yyyy-MM-dd')}
                 />
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Habit tracking will begin on this date. Leave empty to start today.
+                  Habit tracking will begin on this date. Leave empty to start today. You can set a future date.
                 </p>
               </div>
               <div>
@@ -592,10 +591,9 @@ export default function HabitsPage() {
                   value={newHabit.startDate}
                   onChange={(e) => setNewHabit({ ...newHabit, startDate: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                  max={format(new Date(), 'yyyy-MM-dd')}
                 />
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  Habit tracking will begin on this date. Leave empty to start today.
+                  Habit tracking will begin on this date. Leave empty to start today. You can set a future date.
                 </p>
               </div>
               <div>
