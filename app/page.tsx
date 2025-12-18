@@ -15,6 +15,7 @@ export default function Home() {
   const initialized = useRef(false)
   const [showCelebration, setShowCelebration] = useState(false)
   const [celebratingAchievement, setCelebratingAchievement] = useState<Achievement | null>(null)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   useEffect(() => {
     if (newAchievements.length > 0) {
@@ -44,10 +45,10 @@ export default function Home() {
       <AuthGuard>
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
           <div className="flex h-screen overflow-hidden">
-            <Sidebar />
-            <div className="flex-1 flex flex-col overflow-hidden">
-              <Header />
-              <main className="flex-1 overflow-y-auto p-6">
+            <Sidebar isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
+            <div className="flex-1 flex flex-col overflow-hidden lg:ml-0">
+              <Header onMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)} isMenuOpen={isMobileMenuOpen} />
+              <main className="flex-1 overflow-y-auto p-4 sm:p-6">
                 <Dashboard />
               </main>
             </div>

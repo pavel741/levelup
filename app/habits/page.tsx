@@ -14,6 +14,7 @@ import { format } from 'date-fns'
 export default function HabitsPage() {
   const { habits, addHabit, updateHabit, user } = useFirestoreStore()
   const [showAddModal, setShowAddModal] = useState(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   
   // Debug logging
   useEffect(() => {
@@ -154,22 +155,23 @@ export default function HabitsPage() {
     <AuthGuard>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       <div className="flex h-screen overflow-hidden">
-        <Sidebar />
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <Header />
-          <main className="flex-1 overflow-y-auto p-6">
+        <Sidebar isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
+        <div className="flex-1 flex flex-col overflow-hidden lg:ml-0">
+          <Header onMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)} isMenuOpen={isMobileMenuOpen} />
+          <main className="flex-1 overflow-y-auto p-4 sm:p-6">
             <div className="max-w-7xl mx-auto">
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                 <div>
-                  <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">My Habits</h1>
-                  <p className="text-gray-600 dark:text-gray-400">Track your daily habits and build consistency</p>
+                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">My Habits</h1>
+                  <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">Track your daily habits and build consistency</p>
                 </div>
                 <button
                   onClick={() => setShowAddModal(true)}
-                  className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all font-medium shadow-lg"
+                  className="flex items-center justify-center gap-2 px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all font-medium shadow-lg text-sm sm:text-base"
                 >
-                  <Plus className="w-5 h-5" />
-                  Add Habit
+                  <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <span className="hidden sm:inline">Add Habit</span>
+                  <span className="sm:hidden">Add</span>
                 </button>
               </div>
 

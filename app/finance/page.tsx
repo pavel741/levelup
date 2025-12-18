@@ -11,15 +11,16 @@ import { Wallet, ExternalLink } from 'lucide-react'
 export default function FinancePage() {
   const { user } = useFirestoreStore()
   const [iframeError, setIframeError] = useState(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   return (
     <AuthGuard>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
         <div className="flex h-screen overflow-hidden">
-          <Sidebar />
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <Header />
-            <main className="flex-1 overflow-y-auto p-6">
+          <Sidebar isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
+          <div className="flex-1 flex flex-col overflow-hidden lg:ml-0">
+            <Header onMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)} isMenuOpen={isMobileMenuOpen} />
+            <main className="flex-1 overflow-y-auto p-4 sm:p-6">
               <div className="max-w-7xl mx-auto">
                 <div className="mb-6 flex items-center justify-between">
                   <div>
