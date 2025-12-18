@@ -12,7 +12,7 @@ import {
   Timestamp
 } from 'firebase/firestore'
 import { db } from './firebase'
-import { User, Habit, Challenge, DistractionBlock, DailyStats } from '@/types'
+import { User, Habit, Challenge, DailyStats } from '@/types'
 import { format } from 'date-fns'
 
 // User operations
@@ -279,79 +279,6 @@ export const updateChallenge = async (challengeId: string, updates: Partial<Chal
     await updateDoc(challengeRef, updateData)
   } catch (error) {
     console.error('Error updating challenge:', error)
-  }
-}
-
-// Distraction blocks
-export const getUserBlockedSites = async (userId: string): Promise<DistractionBlock[]> => {
-  if (!db) {
-    throw new Error('Firestore is not initialized')
-  }
-  
-  try {
-    const blocksRef = collection(db, 'blockedSites')
-    const q = query(blocksRef, where('userId', '==', userId))
-    const querySnapshot = await getDocs(q)
-    
-    return querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-      createdAt: doc.data().createdAt?.toDate() || new Date(),
-      blockedUntil: doc.data().blockedUntil?.toDate(),
-    })) as DistractionBlock[]
-  } catch (error) {
-    console.error('Error getting blocked sites:', error)
-    return []
-  }
-}
-
-export const subscribeToBlockedSites = (
-  userId: string,
-  callback: (blocks: DistractionBlock[]) => void
-): (() => void) => {
-  if (!db) {
-    throw new Error('Firestore is not initialized')
-  }
-  
-  const blocksRef = collection(db, 'blockedSites')
-  const q = query(blocksRef, where('userId', '==', userId))
-  
-  return onSnapshot(q, (snapshot) => {
-    const blocks = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-      createdAt: doc.data().createdAt?.toDate() || new Date(),
-      blockedUntil: doc.data().blockedUntil?.toDate(),
-    })) as DistractionBlock[]
-    callback(blocks)
-  })
-}
-
-export const saveBlockedSite = async (block: DistractionBlock): Promise<void> => {
-  if (!db) {
-    throw new Error('Firestore is not initialized')
-  }
-  
-  try {
-    await setDoc(doc(db, 'blockedSites', block.id), {
-      ...block,
-      createdAt: Timestamp.fromDate(block.createdAt),
-      blockedUntil: block.blockedUntil ? Timestamp.fromDate(block.blockedUntil) : null,
-    })
-  } catch (error) {
-    console.error('Error saving blocked site:', error)
-  }
-}
-
-export const deleteBlockedSite = async (blockId: string): Promise<void> => {
-  if (!db) {
-    throw new Error('Firestore is not initialized')
-  }
-  
-  try {
-    await deleteDoc(doc(db, 'blockedSites', blockId))
-  } catch (error) {
-    console.error('Error deleting blocked site:', error)
   }
 }
 

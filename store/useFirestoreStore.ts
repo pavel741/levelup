@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { User, Habit, Challenge, Achievement, DistractionBlock, DailyStats } from '@/types'
+import { User, Habit, Challenge, Achievement, DailyStats } from '@/types'
 import { format } from 'date-fns'
 import { checkAndUnlockAchievements } from '@/lib/achievements'
 import { validateMissedReason } from '@/lib/missedHabitValidation'
@@ -11,9 +11,6 @@ import {
   subscribeToChallenges,
   saveChallenge,
   updateChallenge,
-  subscribeToBlockedSites,
-  saveBlockedSite,
-  deleteBlockedSite as deleteBlockedSiteFirestore,
   saveDailyStats,
   getUserData,
   updateUserData,
@@ -43,11 +40,6 @@ interface AppState {
   joinChallenge: (challengeId: string) => Promise<void>
   completeChallenge: (challengeId: string) => Promise<void>
   
-  // Distractions
-  blockedSites: DistractionBlock[]
-  blockSite: (site: string) => Promise<void>
-  unblockSite: (id: string) => Promise<void>
-  
   // Stats
   dailyStats: DailyStats[]
   updateDailyStats: (stats: Partial<DailyStats>) => Promise<void>
@@ -74,7 +66,6 @@ const calculateXPForNextLevel = (level: number): number => {
 
 let unsubscribeHabits: (() => void) | null = null
 let unsubscribeChallenges: (() => void) | null = null
-let unsubscribeBlockedSites: (() => void) | null = null
 let unsubscribeAuth: (() => void) | null = null
 
 export const useFirestoreStore = create<AppState>((set, get) => ({
@@ -109,7 +100,6 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
       unsubscribeHabits()
     }
     if (unsubscribeChallenges) unsubscribeChallenges()
-    if (unsubscribeBlockedSites) unsubscribeBlockedSites()
 
     console.log('Setting up habits subscription for userId:', userId)
     unsubscribeHabits = subscribeToHabits(userId, (habits) => {
@@ -133,10 +123,6 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
 
       const active = challenges.filter((c) => c.participants.includes(user.id))
       set({ challenges, activeChallenges: active })
-    })
-
-    unsubscribeBlockedSites = subscribeToBlockedSites(userId, (blockedSites) => {
-      set({ blockedSites })
     })
   },
 
@@ -271,26 +257,6 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
     }))
   },
 
-  blockedSites: [],
-  blockSite: async (site) => {
-    const user = get().user
-    if (!user) return
-
-    const block: DistractionBlock = {
-      id: Date.now().toString(),
-      userId: user.id,
-      site,
-      isBlocked: true,
-      createdAt: new Date(),
-    }
-    await saveBlockedSite(block)
-    // Firestore subscription will update the state
-  },
-  unblockSite: async (id) => {
-    await deleteBlockedSiteFirestore(id)
-    // Firestore subscription will update the state
-  },
-
   dailyStats: [],
   updateDailyStats: async (stats) => {
     const user = get().user
@@ -406,7 +372,6 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
   unsubscribe: () => {
     if (unsubscribeHabits) unsubscribeHabits()
     if (unsubscribeChallenges) unsubscribeChallenges()
-    if (unsubscribeBlockedSites) unsubscribeBlockedSites()
     if (unsubscribeAuth) unsubscribeAuth()
   },
 }))

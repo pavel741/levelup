@@ -64,15 +64,6 @@ export interface Achievement {
   target: number
 }
 
-export interface DistractionBlock {
-  id: string
-  userId: string
-  site: string
-  isBlocked: boolean
-  blockedUntil?: Date
-  createdAt: Date
-}
-
 export interface LeaderboardEntry {
   userId: string
   userName: string
