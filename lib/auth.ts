@@ -367,7 +367,10 @@ export const getCurrentUser = (): FirebaseUser | null => {
 
 export const onAuthChange = (callback: (user: FirebaseUser | null) => void): (() => void) => {
   if (!auth) {
-    throw new Error('Firebase Auth is not initialized')
+    console.error('❌ Firebase Auth is not initialized. Please check your environment variables.')
+    // Return a no-op unsubscribe function instead of throwing
+    // This prevents crashes when Firebase isn't configured
+    return () => {}
   }
   return onAuthStateChanged(auth, callback)
 }

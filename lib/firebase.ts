@@ -59,24 +59,6 @@ if (typeof window !== 'undefined') {
     }
   } else {
     try {
-      // Suppress console errors for firebase-init.json (harmless - Firebase SDK tries to fetch this but it's not required)
-      const originalError = console.error
-      const suppressedErrors: string[] = []
-      
-      console.error = function(...args: any[]) {
-        const errorStr = args.join(' ')
-        // Suppress firebase-init.json errors (these are harmless)
-        if (errorStr.includes('firebase-init.json') || errorStr.includes('404') && errorStr.includes('firebase')) {
-          suppressedErrors.push(errorStr)
-          // Only log once to avoid spam
-          if (suppressedErrors.length === 1) {
-            console.info('ℹ️ Note: firebase-init.json 404 errors are harmless and can be ignored')
-          }
-          return
-        }
-        originalError.apply(console, args)
-      }
-      
       app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]
       auth = getAuth(app)
       db = getFirestore(app)
@@ -95,10 +77,29 @@ if (typeof window !== 'undefined') {
         }
       }
       
-      // Restore original console.error after initialization
+      // Suppress firebase-init.json 404 errors (harmless - Firebase SDK tries to fetch this but it's not required)
+      // Do this after initialization to avoid interfering with the init process
+      const originalFetch = window.fetch
+      let firebaseInitWarningShown = false
+      
+      window.fetch = function(...args) {
+        const url = args[0]?.toString() || ''
+        // Suppress firebase-init.json 404 errors
+        if (url.includes('firebase-init.json')) {
+          if (!firebaseInitWarningShown) {
+            console.info('ℹ️ Note: firebase-init.json 404 errors are harmless and can be ignored')
+            firebaseInitWarningShown = true
+          }
+          // Return a rejected promise to suppress the error
+          return Promise.reject(new Error('firebase-init.json not found (this is normal)'))
+        }
+        return originalFetch.apply(this, args)
+      }
+      
+      // Restore original fetch after a delay
       setTimeout(() => {
-        console.error = originalError
-      }, 2000)
+        window.fetch = originalFetch
+      }, 5000)
     } catch (error: any) {
       console.error('❌ Firebase initialization failed:', error)
       console.error('Error code:', error.code)
