@@ -1,0 +1,82 @@
+export interface User {
+  id: string
+  name: string
+  email: string
+  level: number
+  xp: number
+  xpToNextLevel: number
+  streak: number
+  longestStreak: number
+  avatar?: string
+  achievements: Achievement[]
+  joinedAt: Date
+}
+
+export interface Habit {
+  id: string
+  userId: string
+  name: string
+  description: string
+  icon: string
+  color: string
+  frequency: 'daily' | 'weekly' | 'custom'
+  targetDays: number[]
+  xpReward: number
+  completedDates: string[]
+  createdAt: Date
+  isActive: boolean
+}
+
+export interface Challenge {
+  id: string
+  title: string
+  description: string
+  type: 'habit' | 'distraction' | 'goal' | 'community'
+  difficulty: 'easy' | 'medium' | 'hard'
+  xpReward: number
+  duration: number // days
+  requirements: string[]
+  participants: string[]
+  startDate: Date
+  endDate: Date
+  isActive: boolean
+}
+
+export interface Achievement {
+  id: string
+  name: string
+  description: string
+  icon: string
+  rarity: 'common' | 'rare' | 'epic' | 'legendary'
+  unlockedAt?: Date
+  progress: number
+  target: number
+}
+
+export interface DistractionBlock {
+  id: string
+  userId: string
+  site: string
+  isBlocked: boolean
+  blockedUntil?: Date
+  createdAt: Date
+}
+
+export interface LeaderboardEntry {
+  userId: string
+  userName: string
+  avatar?: string
+  level: number
+  xp: number
+  streak: number
+  rank: number
+}
+
+export interface DailyStats {
+  date: string
+  habitsCompleted: number
+  xpEarned: number
+  challengesCompleted: number
+  distractionsBlocked: number
+}
+
