@@ -69,7 +69,13 @@ export default function SignUpPage() {
         router.push('/')
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to create account')
+      console.error('Sign up error:', err)
+      const errorMessage = err.message || 'Failed to create account'
+      setError(errorMessage)
+      // If email already in use, suggest signing in
+      if (err.message?.includes('already registered') || err.code === 'auth/email-already-in-use') {
+        setError(`${errorMessage} Click "Sign in" below to access your account.`)
+      }
     } finally {
       setLoading(false)
     }
@@ -102,9 +108,21 @@ export default function SignUpPage() {
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Create Account</h2>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-2 text-red-700 dark:text-red-400">
-              <AlertCircle className="w-5 h-5" />
-              <span className="text-sm">{error}</span>
+            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+              <div className="flex items-start gap-2 text-red-700 dark:text-red-400">
+                <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <span className="text-sm block">{error}</span>
+                  {error.includes('already registered') && (
+                    <Link 
+                      href="/auth/login" 
+                      className="text-sm underline mt-1 inline-block font-medium hover:text-red-800 dark:hover:text-red-300"
+                    >
+                      Go to Sign In →
+                    </Link>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 

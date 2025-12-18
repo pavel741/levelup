@@ -60,9 +60,54 @@ export const signUp = async (email: string, password: string, name: string): Pro
     }
 
     await createUserData(user)
+    console.log('Created new user:', user.id)
     return user
   } catch (error: any) {
     console.error('Error signing up:', error)
+    
+    // If email already in use, try to sign them in and create Firestore doc if missing
+    if (error.code === 'auth/email-already-in-use') {
+      console.log('Email already in use, attempting to sign in and create missing Firestore document')
+      try {
+        // Try to sign in with the provided credentials
+        await signInWithEmailAndPassword(auth, email, password)
+        const firebaseUser = auth.currentUser
+        if (firebaseUser) {
+          let user = await getUserData(firebaseUser.uid)
+          
+          // If user doesn't exist in Firestore, create it
+          if (!user) {
+            console.log('Creating missing Firestore document for existing Auth user')
+            user = {
+              id: firebaseUser.uid,
+              name,
+              email: firebaseUser.email || email,
+              level: 1,
+              xp: 0,
+              xpToNextLevel: 100,
+              streak: 0,
+              longestStreak: 0,
+              achievements: [],
+              joinedAt: new Date(),
+            }
+            await createUserData(user)
+            console.log('Created missing Firestore document:', user.id)
+            return user
+          }
+          
+          // User exists in both Auth and Firestore
+          throw new Error('This email is already registered. Please sign in instead.')
+        }
+      } catch (signInError: any) {
+        // If sign-in fails (wrong password), throw original error
+        if (signInError.code === 'auth/wrong-password' || signInError.code === 'auth/invalid-credential') {
+          throw new Error('This email is already registered. Please sign in with your password.')
+        }
+        // Otherwise, re-throw the original error
+        throw new Error(getErrorMessage(error))
+      }
+    }
+    
     const friendlyError = new Error(getErrorMessage(error))
     throw friendlyError
   }
@@ -77,7 +122,28 @@ export const signIn = async (email: string, password: string): Promise<User | nu
     await signInWithEmailAndPassword(auth, email, password)
     const firebaseUser = auth.currentUser
     if (firebaseUser) {
-      return await getUserData(firebaseUser.uid)
+      let user = await getUserData(firebaseUser.uid)
+      
+      // If user exists in Auth but not in Firestore, create Firestore document
+      if (!user) {
+        console.log('User exists in Auth but not in Firestore, creating Firestore document')
+        user = {
+          id: firebaseUser.uid,
+          name: firebaseUser.displayName || email.split('@')[0],
+          email: firebaseUser.email || email,
+          level: 1,
+          xp: 0,
+          xpToNextLevel: 100,
+          streak: 0,
+          longestStreak: 0,
+          achievements: [],
+          joinedAt: new Date(),
+        }
+        await createUserData(user)
+        console.log('Created missing Firestore document for user:', user.id)
+      }
+      
+      return user
     }
     return null
   } catch (error: any) {

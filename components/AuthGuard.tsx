@@ -32,7 +32,28 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
     const unsubscribe = onAuthChange(async (firebaseUser) => {
       if (firebaseUser) {
-        const userData = await getUserData(firebaseUser.uid)
+        let userData = await getUserData(firebaseUser.uid)
+        
+        // If user exists in Auth but not in Firestore, create Firestore document
+        if (!userData) {
+          console.log('User exists in Auth but not in Firestore, creating document')
+          const { createUserData } = await import('@/lib/firestore')
+          userData = {
+            id: firebaseUser.uid,
+            name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+            email: firebaseUser.email || '',
+            level: 1,
+            xp: 0,
+            xpToNextLevel: 100,
+            streak: 0,
+            longestStreak: 0,
+            achievements: [],
+            joinedAt: new Date(),
+          }
+          await createUserData(userData)
+          console.log('Created missing Firestore document:', userData.id)
+        }
+        
         if (userData) {
           setUser(userData)
           await syncUser(firebaseUser.uid)
@@ -49,7 +70,27 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       router.push('/auth/login')
       setChecking(false)
     } else if (currentUser) {
-      getUserData(currentUser.uid).then((userData) => {
+      getUserData(currentUser.uid).then(async (userData) => {
+        // If user exists in Auth but not in Firestore, create Firestore document
+        if (!userData) {
+          console.log('User exists in Auth but not in Firestore, creating document')
+          const { createUserData } = await import('@/lib/firestore')
+          userData = {
+            id: currentUser.uid,
+            name: currentUser.displayName || currentUser.email?.split('@')[0] || 'User',
+            email: currentUser.email || '',
+            level: 1,
+            xp: 0,
+            xpToNextLevel: 100,
+            streak: 0,
+            longestStreak: 0,
+            achievements: [],
+            joinedAt: new Date(),
+          }
+          await createUserData(userData)
+          console.log('Created missing Firestore document:', userData.id)
+        }
+        
         if (userData) {
           setUser(userData)
           syncUser(currentUser.uid)

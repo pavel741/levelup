@@ -62,7 +62,13 @@ export default function LoginPage() {
         router.push('/')
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to sign in')
+      console.error('Sign in error:', err)
+      const errorMessage = err.message || 'Failed to sign in'
+      setError(errorMessage)
+      // If user not found, suggest signing up
+      if (err.message?.includes('No account found') || err.code === 'auth/user-not-found') {
+        setError(`${errorMessage} Click "Sign up" below to create an account.`)
+      }
     } finally {
       setLoading(false)
     }
@@ -95,9 +101,21 @@ export default function LoginPage() {
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Sign In</h2>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-2 text-red-700 dark:text-red-400">
-              <AlertCircle className="w-5 h-5" />
-              <span className="text-sm">{error}</span>
+            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+              <div className="flex items-start gap-2 text-red-700 dark:text-red-400">
+                <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <span className="text-sm block">{error}</span>
+                  {error.includes('No account found') && (
+                    <Link 
+                      href="/auth/signup" 
+                      className="text-sm underline mt-1 inline-block font-medium hover:text-red-800 dark:hover:text-red-300"
+                    >
+                      Go to Sign Up →
+                    </Link>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
