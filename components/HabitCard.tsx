@@ -17,6 +17,7 @@ export default function HabitCard({ habit, onEdit }: HabitCardProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showMissedModal, setShowMissedModal] = useState(false)
   const [missedReason, setMissedReason] = useState('')
+  const [missedDate, setMissedDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [validationResult, setValidationResult] = useState<{ valid: boolean; message?: string } | null>(null)
   const today = format(new Date(), 'yyyy-MM-dd')
   const isCompleted = habit.completedDates.includes(today)
@@ -47,6 +48,40 @@ export default function HabitCard({ habit, onEdit }: HabitCardProps) {
       return
     }
 
+    // Validate the selected date
+    const selectedDate = new Date(missedDate)
+    const todayDate = new Date(today)
+    
+    // Can't mark future dates as missed
+    if (selectedDate > todayDate) {
+      alert('Cannot mark future dates as missed')
+      return
+    }
+
+    // Check if date is already completed
+    if (habit.completedDates.includes(missedDate)) {
+      alert('This date is already marked as completed. Uncomplete it first if you want to mark it as missed.')
+      return
+    }
+
+    // Check if date is already marked as missed
+    if (habit.missedDates?.some((m) => m.date === missedDate)) {
+      alert('This date is already marked as missed')
+      return
+    }
+
+    // Check if date is before habit start date
+    if (habit.startDate) {
+      const startDate = habit.startDate instanceof Date 
+        ? habit.startDate 
+        : new Date(habit.startDate)
+      const startDateStr = format(startDate, 'yyyy-MM-dd')
+      if (missedDate < startDateStr) {
+        alert(`Cannot mark dates before the habit start date (${format(startDate, 'MMM d, yyyy')})`)
+        return
+      }
+    }
+
     const validation = validateMissedReason(missedReason)
     setValidationResult(validation)
 
@@ -54,15 +89,17 @@ export default function HabitCard({ habit, onEdit }: HabitCardProps) {
     if (validation.message) {
       // Small delay to show message, then proceed
       setTimeout(async () => {
-        await markHabitMissed(habit.id, today, missedReason)
+        await markHabitMissed(habit.id, missedDate, missedReason)
         setShowMissedModal(false)
         setMissedReason('')
+        setMissedDate(format(new Date(), 'yyyy-MM-dd'))
         setValidationResult(null)
       }, 1500)
     } else {
-      await markHabitMissed(habit.id, today, missedReason)
+      await markHabitMissed(habit.id, missedDate, missedReason)
       setShowMissedModal(false)
       setMissedReason('')
+      setMissedDate(format(new Date(), 'yyyy-MM-dd'))
       setValidationResult(null)
     }
   }
@@ -99,11 +136,14 @@ export default function HabitCard({ habit, onEdit }: HabitCardProps) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {!isCompleted && !isMissed && hasStarted && (
+            {hasStarted && (
               <button
-                onClick={() => setShowMissedModal(true)}
+                onClick={() => {
+                  setMissedDate(format(new Date(), 'yyyy-MM-dd'))
+                  setShowMissedModal(true)
+                }}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors text-sm font-medium"
-                title="Mark as missed with explanation"
+                title="Mark as missed with explanation (can select past dates)"
               >
                 <AlertCircle className="w-4 h-4" />
                 <span>Missed</span>
@@ -176,22 +216,41 @@ export default function HabitCard({ habit, onEdit }: HabitCardProps) {
               </div>
             </div>
           )}
-          {isMissed && habit.missedDates && (
-            <div className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
-              <div className="flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-orange-900 dark:text-orange-300">Missed Today</p>
-                  <p className="text-xs text-orange-700 dark:text-orange-400 mt-1">
-                    {habit.missedDates.find((m) => m.date === today)?.reason}
-                  </p>
-                  {habit.missedDates.find((m) => m.date === today)?.valid === false && (
-                    <p className="text-xs text-red-600 dark:text-red-400 mt-1 font-medium">
-                      ⚠️ Invalid reason - streak reset
-                    </p>
-                  )}
-                </div>
-              </div>
+          {habit.missedDates && habit.missedDates.length > 0 && (
+            <div className="space-y-2">
+              {habit.missedDates
+                .filter((m) => {
+                  // Show recent missed dates (last 7 days)
+                  const missedDate = new Date(m.date)
+                  const sevenDaysAgo = new Date()
+                  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+                  return missedDate >= sevenDaysAgo
+                })
+                .sort((a, b) => b.date.localeCompare(a.date))
+                .slice(0, 3) // Show max 3 recent missed dates
+                .map((missed) => {
+                  const isToday = missed.date === today
+                  return (
+                    <div key={missed.date} className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="w-4 h-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-orange-900 dark:text-orange-300">
+                            {isToday ? 'Missed Today' : `Missed on ${format(new Date(missed.date), 'MMM d, yyyy')}`}
+                          </p>
+                          <p className="text-xs text-orange-700 dark:text-orange-400 mt-1">
+                            {missed.reason}
+                          </p>
+                          {missed.valid === false && (
+                            <p className="text-xs text-red-600 dark:text-red-400 mt-1 font-medium">
+                              ⚠️ Invalid reason - streak reset
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
             </div>
           )}
           <div className="flex items-center justify-between text-sm">
@@ -232,6 +291,7 @@ export default function HabitCard({ habit, onEdit }: HabitCardProps) {
                 onClick={() => {
                   setShowMissedModal(false)
                   setMissedReason('')
+                  setMissedDate(format(new Date(), 'yyyy-MM-dd'))
                   setValidationResult(null)
                 }}
                 className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
@@ -240,9 +300,46 @@ export default function HabitCard({ habit, onEdit }: HabitCardProps) {
               </button>
             </div>
             <p className="text-gray-600 dark:text-gray-400 mb-4">
-              Why did you miss <span className="font-semibold text-gray-900 dark:text-white">"{habit.name}"</span> today?
+              Why did you miss <span className="font-semibold text-gray-900 dark:text-white">"{habit.name}"</span>?
             </p>
             <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Select Date
+              </label>
+              <input
+                type="date"
+                value={missedDate}
+                onChange={(e) => setMissedDate(e.target.value)}
+                max={format(new Date(), 'yyyy-MM-dd')}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white mb-4"
+              />
+              {habit.startDate && (() => {
+                const startDate = habit.startDate instanceof Date 
+                  ? habit.startDate 
+                  : new Date(habit.startDate)
+                const startDateStr = format(startDate, 'yyyy-MM-dd')
+                if (missedDate < startDateStr) {
+                  return (
+                    <p className="text-xs text-red-500 dark:text-red-400 mb-2">
+                      Cannot mark dates before habit start date ({format(startDate, 'MMM d, yyyy')})
+                    </p>
+                  )
+                }
+                return null
+              })()}
+              {habit.completedDates.includes(missedDate) && (
+                <p className="text-xs text-orange-500 dark:text-orange-400 mb-2">
+                  ⚠️ This date is already marked as completed. Uncomplete it first if you want to mark it as missed.
+                </p>
+              )}
+              {habit.missedDates?.some((m) => m.date === missedDate) && (
+                <p className="text-xs text-orange-500 dark:text-orange-400 mb-2">
+                  ⚠️ This date is already marked as missed.
+                </p>
+              )}
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 mt-4">
+                Reason
+              </label>
               <textarea
                 value={missedReason}
                 onChange={(e) => handleReasonChange(e.target.value)}
@@ -275,6 +372,7 @@ export default function HabitCard({ habit, onEdit }: HabitCardProps) {
                 onClick={() => {
                   setShowMissedModal(false)
                   setMissedReason('')
+                  setMissedDate(format(new Date(), 'yyyy-MM-dd'))
                   setValidationResult(null)
                 }}
                 className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium"
