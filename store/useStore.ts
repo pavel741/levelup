@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { User, Habit, Challenge, Achievement, DistractionBlock, DailyStats } from '@/types'
+import { User, Habit, Challenge, Achievement, DailyStats } from '@/types'
 import { format } from 'date-fns'
 
 interface AppState {
@@ -19,11 +19,6 @@ interface AppState {
   activeChallenges: Challenge[]
   joinChallenge: (challengeId: string) => void
   completeChallenge: (challengeId: string) => void
-  
-  // Distractions
-  blockedSites: DistractionBlock[]
-  blockSite: (site: string) => void
-  unblockSite: (id: string) => void
   
   // Stats
   dailyStats: DailyStats[]
@@ -131,25 +126,6 @@ export const useStore = create<AppState>((set, get) => ({
       activeChallenges: state.activeChallenges.filter((c) => c.id !== challengeId),
     }))
   },
-
-  blockedSites: [],
-  blockSite: (site) =>
-    set((state) => ({
-      blockedSites: [
-        ...state.blockedSites,
-        {
-          id: Date.now().toString(),
-          userId: state.user!.id,
-          site,
-          isBlocked: true,
-          createdAt: new Date(),
-        },
-      ],
-    })),
-  unblockSite: (id) =>
-    set((state) => ({
-      blockedSites: state.blockedSites.filter((b) => b.id !== id),
-    })),
 
   dailyStats: [],
   updateDailyStats: (stats) =>
