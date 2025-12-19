@@ -55,6 +55,15 @@ export default function FinancePage() {
   const [customDateTo, setCustomDateTo] = useState('')
   const [showCustomDateRange, setShowCustomDateRange] = useState(false)
   
+  // Advanced filters
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
+  const [filterMinAmount, setFilterMinAmount] = useState('')
+  const [filterMaxAmount, setFilterMaxAmount] = useState('')
+  const [filterCategories, setFilterCategories] = useState<string[]>([])
+  
+  // Category suggestions
+  const [categorySuggestions, setCategorySuggestions] = useState<string[]>([])
+  
   // CSV Import state
   const [csvFile, setCsvFile] = useState<File | null>(null)
   const [csvImportStatus, setCsvImportStatus] = useState<string>('')
@@ -126,6 +135,54 @@ export default function FinancePage() {
     return Object.keys(typeCategories)
   }, [categories, formType])
 
+  // Get all categories (for advanced filter)
+  const allCategories = useMemo(() => {
+    if (!categories) return []
+    const cats: string[] = []
+    if (Array.isArray(categories.income)) {
+      cats.push(...categories.income)
+    }
+    if (Array.isArray(categories.expense)) {
+      cats.push(...categories.expense)
+    }
+    return [...new Set(cats)]
+  }, [categories])
+
+  // Generate category suggestions based on description
+  useEffect(() => {
+    if (!formDescription || !transactions.length) {
+      setCategorySuggestions([])
+      return
+    }
+
+    const descLower = formDescription.toLowerCase()
+    const categoryCounts: Record<string, number> = {}
+
+    // Count how many times each category appears with similar descriptions
+    transactions.forEach((tx) => {
+      if (tx.description && tx.category) {
+        const txDescLower = tx.description.toLowerCase()
+        // Check for word matches
+        const descWords = descLower.split(/\s+/)
+        const txWords = txDescLower.split(/\s+/)
+        const commonWords = descWords.filter((w) => w.length > 2 && txWords.includes(w))
+
+        if (commonWords.length > 0) {
+          categoryCounts[tx.category] = (categoryCounts[tx.category] || 0) + commonWords.length
+        }
+      }
+    })
+
+    // Get top 3 suggestions
+    const suggestions = Object.entries(categoryCounts)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 3)
+      .map(([cat]) => cat)
+      .filter((cat) => availableCategories.includes(cat))
+
+    setCategorySuggestions(suggestions)
+  }, [formDescription, transactions, availableCategories])
+
   // Filter transactions based on current filters
   const filteredTransactions = useMemo(() => {
     let filtered = [...transactions]
@@ -187,6 +244,25 @@ export default function FinancePage() {
           (tx.category || '').toLowerCase().includes(query) ||
           String(tx.amount || '').includes(query)
       )
+    }
+
+    // Filter by min/max amount
+    if (filterMinAmount) {
+      const min = parseFloat(filterMinAmount)
+      if (!isNaN(min)) {
+        filtered = filtered.filter((tx) => Math.abs(Number(tx.amount) || 0) >= min)
+      }
+    }
+    if (filterMaxAmount) {
+      const max = parseFloat(filterMaxAmount)
+      if (!isNaN(max)) {
+        filtered = filtered.filter((tx) => Math.abs(Number(tx.amount) || 0) <= max)
+      }
+    }
+
+    // Filter by categories
+    if (filterCategories.length > 0) {
+      filtered = filtered.filter((tx) => filterCategories.includes(tx.category || ''))
     }
 
     // Sort by date descending
@@ -434,6 +510,108 @@ export default function FinancePage() {
       'Detsember',
     ]
     return `${monthNames[month - 1]} ${year}`
+  }
+
+  // Verify imported dates
+  const handleVerifyDates = () => {
+    if (transactions.length === 0) {
+      alert('No transactions to verify')
+      return
+    }
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const oneYearAgo = new Date(today)
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
+
+    const stats = {
+      total: transactions.length,
+      todayCount: 0,
+      futureCount: 0,
+      veryOldCount: 0,
+      invalidCount: 0,
+      suspiciousDates: [] as Array<{ description: string; date: any; issue: string }>,
+    }
+
+    transactions.forEach((tx) => {
+      let txDate: Date
+      try {
+        if (typeof tx.date === 'string') {
+          txDate = new Date(tx.date + 'T00:00:00')
+        } else if (tx.date && typeof tx.date === 'object' && 'toDate' in tx.date && typeof (tx.date as any).toDate === 'function') {
+          txDate = (tx.date as any).toDate()
+        } else if (tx.date instanceof Date) {
+          txDate = tx.date
+        } else {
+          txDate = new Date(tx.date as any)
+        }
+        txDate.setHours(0, 0, 0, 0)
+
+        if (isNaN(txDate.getTime())) {
+          stats.invalidCount++
+          stats.suspiciousDates.push({
+            description: tx.description || 'Unknown',
+            date: tx.date,
+            issue: 'Invalid date format',
+          })
+          return
+        }
+
+        if (txDate.getTime() === today.getTime()) {
+          stats.todayCount++
+          if (stats.todayCount <= 5) {
+            stats.suspiciousDates.push({
+              description: tx.description || 'Unknown',
+              date: tx.date,
+              issue: 'Date is today (might indicate parsing failure)',
+            })
+          }
+        } else if (txDate > today) {
+          stats.futureCount++
+          if (stats.futureCount <= 5) {
+            stats.suspiciousDates.push({
+              description: tx.description || 'Unknown',
+              date: tx.date,
+              issue: 'Future date',
+            })
+          }
+        } else if (txDate < oneYearAgo) {
+          stats.veryOldCount++
+          if (stats.veryOldCount <= 5) {
+            stats.suspiciousDates.push({
+              description: tx.description || 'Unknown',
+              date: tx.date,
+              issue: 'Very old date (more than 1 year ago)',
+            })
+          }
+        }
+      } catch (error) {
+        stats.invalidCount++
+        stats.suspiciousDates.push({
+          description: tx.description || 'Unknown',
+          date: tx.date,
+          issue: 'Error parsing date',
+        })
+      }
+    })
+
+    let message = `Date Verification Results:\n\n`
+    message += `Total transactions: ${stats.total}\n`
+    message += `Today's date: ${stats.todayCount}\n`
+    message += `Future dates: ${stats.futureCount}\n`
+    message += `Very old dates (>1 year): ${stats.veryOldCount}\n`
+    message += `Invalid dates: ${stats.invalidCount}\n\n`
+
+    if (stats.suspiciousDates.length > 0) {
+      message += `Suspicious dates (showing first 5):\n`
+      stats.suspiciousDates.slice(0, 5).forEach((item, idx) => {
+        message += `${idx + 1}. ${item.description}: ${item.date} (${item.issue})\n`
+      })
+    } else {
+      message += `All dates appear to be valid!`
+    }
+
+    alert(message)
   }
 
   // CSV Import handlers
@@ -773,6 +951,23 @@ export default function FinancePage() {
                               </option>
                             ))}
                           </select>
+                          {categorySuggestions.length > 0 && (
+                            <div className="mt-2">
+                              <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">Suggested categories:</div>
+                              <div className="flex gap-2 flex-wrap">
+                                {categorySuggestions.map((cat) => (
+                                  <button
+                                    key={cat}
+                                    type="button"
+                                    onClick={() => setFormCategory(cat)}
+                                    className="px-2 py-1 text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+                                  >
+                                    {cat}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                         <div>
                           <label htmlFor="date" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -856,6 +1051,16 @@ export default function FinancePage() {
                           >
                             Choose CSV File
                           </label>
+                          {transactions.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={handleVerifyDates}
+                              className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                              title="Verify imported dates"
+                            >
+                              🔍 Verify Dates
+                            </button>
+                          )}
                         </div>
                         
                         {csvImportStatus && (
@@ -999,6 +1204,68 @@ export default function FinancePage() {
                             Custom
                           </button>
                         </div>
+                        {/* Quick Filter Presets */}
+                        <div className="flex gap-2 flex-wrap mt-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const today = new Date()
+                              const last7Days = new Date(today)
+                              last7Days.setDate(last7Days.getDate() - 7)
+                              setCustomDateFrom(last7Days.toISOString().split('T')[0])
+                              setCustomDateTo(today.toISOString().split('T')[0])
+                              setDateRange('custom')
+                              setShowCustomDateRange(true)
+                            }}
+                            className="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-gray-700 dark:text-gray-300"
+                          >
+                            Last 7 Days
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const today = new Date()
+                              const last30Days = new Date(today)
+                              last30Days.setDate(last30Days.getDate() - 30)
+                              setCustomDateFrom(last30Days.toISOString().split('T')[0])
+                              setCustomDateTo(today.toISOString().split('T')[0])
+                              setDateRange('custom')
+                              setShowCustomDateRange(true)
+                            }}
+                            className="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-gray-700 dark:text-gray-300"
+                          >
+                            Last 30 Days
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const today = new Date()
+                              const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1)
+                              const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0)
+                              setCustomDateFrom(lastMonth.toISOString().split('T')[0])
+                              setCustomDateTo(lastMonthEnd.toISOString().split('T')[0])
+                              setDateRange('custom')
+                              setShowCustomDateRange(true)
+                            }}
+                            className="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-gray-700 dark:text-gray-300"
+                          >
+                            Last Month
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const today = new Date()
+                              const thisMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+                              setCustomDateFrom(thisMonth.toISOString().split('T')[0])
+                              setCustomDateTo(today.toISOString().split('T')[0])
+                              setDateRange('custom')
+                              setShowCustomDateRange(true)
+                            }}
+                            className="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-gray-700 dark:text-gray-300"
+                          >
+                            This Month
+                          </button>
+                        </div>
                         {showCustomDateRange && (
                           <div className="flex gap-2 items-end flex-wrap p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
                             <div>
@@ -1048,13 +1315,105 @@ export default function FinancePage() {
 
                       {/* Search */}
                       <div className="mb-4">
-                        <input
-                          type="text"
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          placeholder="Search transactions..."
-                          className="w-full px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Search transactions..."
+                            className="flex-1 px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                          {searchQuery && (
+                            <button
+                              type="button"
+                              onClick={() => setSearchQuery('')}
+                              className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                            >
+                              Clear
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Advanced Filters */}
+                      <div className="mb-4">
+                        <button
+                          type="button"
+                          onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                          className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                        >
+                          {showAdvancedFilters ? 'Hide Advanced Filters' : 'Show Advanced Filters'}
+                        </button>
+                        {showAdvancedFilters && (
+                          <div className="mt-3 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                            <div className="grid grid-cols-2 gap-4 mb-4">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                  Min Amount
+                                </label>
+                                <input
+                                  type="number"
+                                  value={filterMinAmount}
+                                  onChange={(e) => setFilterMinAmount(e.target.value)}
+                                  placeholder="0.00"
+                                  step="0.01"
+                                  min="0"
+                                  className="w-full px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                  Max Amount
+                                </label>
+                                <input
+                                  type="number"
+                                  value={filterMaxAmount}
+                                  onChange={(e) => setFilterMaxAmount(e.target.value)}
+                                  placeholder="0.00"
+                                  step="0.01"
+                                  min="0"
+                                  className="w-full px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                              </div>
+                            </div>
+                            <div className="mb-4">
+                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                Filter by Category
+                              </label>
+                              <select
+                                multiple
+                                value={filterCategories}
+                                onChange={(e) => {
+                                  const selected = Array.from(e.target.selectedOptions, (option) => option.value)
+                                  setFilterCategories(selected)
+                                }}
+                                className="w-full px-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white min-h-[80px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              >
+                                {allCategories.map((cat) => (
+                                  <option key={cat} value={cat}>
+                                    {cat}
+                                  </option>
+                                ))}
+                              </select>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                Hold Ctrl/Cmd to select multiple categories
+                              </p>
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setFilterMinAmount('')
+                                  setFilterMaxAmount('')
+                                  setFilterCategories([])
+                                }}
+                                className="flex-1 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                              >
+                                Clear Filters
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* Filter Buttons */}
@@ -1076,7 +1435,7 @@ export default function FinancePage() {
                       </div>
 
                       {/* Transaction List */}
-                      <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                      <div className="space-y-0 max-h-[600px] overflow-y-auto">
                         {isLoading ? (
                           <div className="text-center py-10 text-gray-500 dark:text-gray-400">Loading...</div>
                         ) : filteredTransactions.length === 0 ? (
@@ -1088,17 +1447,19 @@ export default function FinancePage() {
                             </p>
                           </div>
                         ) : (
-                          filteredTransactions.map((tx) => (
+                          filteredTransactions.map((tx, index) => (
                             <div
                               key={tx.id}
-                              className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                              className={`flex items-center justify-between p-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
+                                index === filteredTransactions.length - 1 ? 'border-b-0' : ''
+                              }`}
                             >
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-3 mb-1">
-                                  <span className="font-medium text-gray-900 dark:text-white truncate">
+                              <div className="flex-1 min-w-0 mr-4">
+                                <div className="flex items-center gap-3 mb-1.5">
+                                  <span className="font-semibold text-gray-900 dark:text-white truncate text-base">
                                     {tx.description || '—'}
                                   </span>
-                                  <span className="text-xs text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-2 py-0.5 rounded">
+                                  <span className="text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 px-2 py-0.5 rounded-md whitespace-nowrap">
                                     {tx.category || 'Uncategorized'}
                                   </span>
                                 </div>
@@ -1106,9 +1467,9 @@ export default function FinancePage() {
                                   {formatDisplayDate(tx.date)}
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2 ml-4">
+                              <div className="flex items-center gap-3 flex-shrink-0">
                                 <span
-                                  className={`font-semibold font-mono tabular-nums ${
+                                  className={`text-lg font-bold font-mono tabular-nums ${
                                     (tx.type || '').toLowerCase() === 'income' || (Number(tx.amount) || 0) > 0
                                       ? 'text-green-600 dark:text-green-400'
                                       : 'text-red-600 dark:text-red-400'
@@ -1119,14 +1480,14 @@ export default function FinancePage() {
                                 <button
                                   type="button"
                                   onClick={() => handleEdit(tx as FinanceTransaction & { id: string })}
-                                  className="px-2 py-1 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                  className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                                 >
                                   Edit
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => handleDelete(tx.id!)}
-                                  className="px-2 py-1 text-xs bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                                  className="px-3 py-1.5 text-xs font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                                 >
                                   Delete
                                 </button>
