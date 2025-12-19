@@ -308,7 +308,8 @@ export const batchAddTransactions = async (
         const docsWithSelgitus = docs.filter(d => 'selgitus' in d)
         if (docsWithSelgitus.length > 0 && i === 0) {
           console.log(`📝 Batch import: ${docsWithSelgitus.length} transactions with selgitus out of ${docs.length} in first batch`)
-          console.log('Sample selgitus:', docsWithSelgitus[0].selgitus?.substring(0, 50))
+          const sampleSelgitus = (docsWithSelgitus[0] as any).selgitus
+          console.log('Sample selgitus:', typeof sampleSelgitus === 'string' ? sampleSelgitus.substring(0, 50) : sampleSelgitus)
         }
 
         await collection.insertMany(docs, { ordered: false }) // Continue on errors
