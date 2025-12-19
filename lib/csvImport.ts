@@ -61,19 +61,7 @@ export class CSVImportService {
    * Map CSV headers to expected columns
    */
   mapColumns(headers: string[]): ColumnMapping {
-    const mapping: {
-      type: number | null
-      description: number | null
-      amount: number | null
-      category: number | null
-      date: number | null
-      _recipientName?: number
-      _referenceNumber?: number
-      _archiveId?: number
-      _foundColumns: string[]
-      _allHeaders: string[]
-      _normalizedHeaders: string[]
-    } = {
+    const mapping: ColumnMapping = {
       type: null,
       description: null,
       amount: null,
