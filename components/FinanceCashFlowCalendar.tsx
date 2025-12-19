@@ -13,8 +13,8 @@ interface Props {
 interface DayData {
   day: number
   amount: number
-  income?: number
-  expenses?: number
+  income: number
+  expenses: number
   date: Date | null
 }
 
@@ -70,8 +70,8 @@ export function FinanceCashFlowCalendar({ transactions, months = 3, view = 'net'
         currentWeek.push({
           day: date.getDate(),
           amount: netFlow, // Net cash flow (income - expenses)
-          income,
-          expenses,
+          income: income || 0,
+          expenses: expenses || 0,
           date: isCurrentMonth ? date : null,
         })
 
@@ -186,7 +186,7 @@ export function FinanceCashFlowCalendar({ transactions, months = 3, view = 'net'
                 <div key={weekIndex} className="grid grid-cols-7 gap-1">
                   {week.map((day, dayIndex) => {
                     const tooltipText = day.date 
-                      ? view === 'both' && day.income !== undefined && day.expenses !== undefined
+                      ? view === 'both'
                         ? `${format(day.date, 'MMM dd, yyyy')}\nIncome: ${formatter.format(day.income)}\nExpenses: ${formatter.format(day.expenses)}\nNet: ${formatter.format(day.amount)}`
                         : `${format(day.date, 'MMM dd, yyyy')}: ${formatter.format(day.amount)}`
                       : ''
@@ -211,7 +211,7 @@ export function FinanceCashFlowCalendar({ transactions, months = 3, view = 'net'
                               ? day.amount > 0 ? 'text-green-700 dark:text-green-300' : 'text-red-700 dark:text-red-300'
                               : 'text-gray-700 dark:text-gray-300'
                           }`}>
-                            {view === 'both' && day.income !== undefined && day.expenses !== undefined
+                            {view === 'both'
                               ? `${day.income > 0 ? '+' : ''}${formatter.format(day.income)} / ${formatter.format(day.expenses)}`
                               : formatter.format(day.amount)
                             }
