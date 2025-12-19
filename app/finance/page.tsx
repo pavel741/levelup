@@ -623,11 +623,16 @@ export default function FinancePage() {
           )
           
           // Check if category needs recategorization
+          // POS: and ATM: patterns can be in description OR category field
           const hasPosInCategory = currentCategory.includes('POS:') || currentCategory.match(/\d{4}\s+\d{2}\*+/)
           const hasAtmInCategory = currentCategory.includes('ATM:')
           const hasPsd2KlixInCategory = /psd2|klix/i.test(currentCategory)
           const hasPosInDescription = /pos\s*:/i.test(description) || /\d{4}\s+\d{2}\*+/.test(description)
-          const hasAtmInDescription = /^atm\s*:/i.test(description)
+          const hasAtmInDescription = /^atm\s*:/i.test(description) || /^atm\s+/i.test(description)
+          
+          // Combined check: POS: or ATM: in either description or category
+          const hasPosPattern = hasPosInDescription || hasPosInCategory
+          const hasAtmPattern = hasAtmInDescription || hasAtmInCategory
           const hasPsd2Klix = /psd2|klix/i.test(effectiveDescription) || hasPsd2KlixInCategory
           const hasOtherPaymentRef = /makse\s*\/|blid/i.test(effectiveDescription)
           // Check for loan patterns in both description and category
@@ -648,34 +653,36 @@ export default function FinancePage() {
           // Utility patterns should be categorized as Kommunaalid
           const shouldBeKommunaalid = hasUtilityPattern && currentCategory !== 'Kommunaalid'
           
-          // ATM: prefix should be categorized as ATM Withdrawal
-          const shouldBeAtm = (hasAtmInCategory || hasAtmInDescription) && currentCategory !== 'ATM Withdrawal'
+          // ATM: prefix should be categorized as ATM Withdrawal (moved up, see combined check below)
           
           // POS: prefix should be categorized as Card Payment
-          const shouldBeCardPayment = hasPosInCategory && currentCategory !== 'Card Payment'
+          // Check both description and category fields
+          const shouldBeCardPayment = hasPosPattern && currentCategory !== 'Card Payment'
+          
+          // ATM: prefix should be categorized as ATM Withdrawal
+          // Check both description and category fields
+          const shouldBeAtm = hasAtmPattern && currentCategory !== 'ATM Withdrawal'
           
           // Reference number (viitenumber) should be categorized as Bills
-          // BUT: POS: transactions can also have reference numbers, so POS: takes priority
-          // If transaction has a reference number but isn't already Bills (and isn't a card payment), recategorize
+          // BUT: POS: and ATM: transactions can also have reference numbers, so they take priority
+          // If transaction has a reference number but isn't already Bills (and isn't a card payment or ATM), recategorize
           const hasReferenceNumber = tx.referenceNumber && tx.referenceNumber.trim().length > 0
           const shouldBeBills = hasReferenceNumber && 
             currentCategory !== 'Bills' && 
-            !hasPosInDescription && // POS: takes priority over reference number
-            !hasPosInCategory && // Check category field too
-            !hasAtmInDescription &&
-            !hasAtmInCategory &&
+            !hasPosPattern && // POS: takes priority over reference number
+            !hasAtmPattern && // ATM: takes priority over reference number
             !hasPsd2Klix &&
             !hasLoanPattern &&
             !hasUtilityPattern
           
           const isWrongCategory = 
-            (hasPosInDescription && currentCategory !== 'Card Payment' && currentCategory !== 'ATM Withdrawal' && currentCategory !== 'Bills' && currentCategory !== 'ESTO' && currentCategory !== 'Kodulaen' && currentCategory !== 'Kommunaalid') ||
-            (hasAtmInDescription && currentCategory !== 'ATM Withdrawal') ||
+            (hasPosPattern && currentCategory !== 'Card Payment' && currentCategory !== 'ATM Withdrawal' && currentCategory !== 'Bills' && currentCategory !== 'ESTO' && currentCategory !== 'Kodulaen' && currentCategory !== 'Kommunaalid') ||
+            (hasAtmPattern && currentCategory !== 'ATM Withdrawal') ||
             (hasPsd2Klix && currentCategory !== 'ESTO') ||
             (hasLoanPattern && currentCategory !== 'Kodulaen') ||
             (hasUtilityPattern && currentCategory !== 'Kommunaalid') ||
             (hasOtherPaymentRef && currentCategory !== 'Bills' && currentCategory !== 'Card Payment' && currentCategory !== 'ATM Withdrawal' && currentCategory !== 'ESTO' && currentCategory !== 'Kodulaen' && currentCategory !== 'Kommunaalid') ||
-            shouldBeBills
+            (shouldBeBills && !hasPosPattern && !hasAtmPattern) // Only Bills if not POS: or ATM:
           
           const needsRecategorization = 
             (!currentCategory || currentCategory === 'Other') ||
@@ -688,15 +695,16 @@ export default function FinancePage() {
             shouldBeKommunaalid ||
             shouldBeAtm ||
             shouldBeCardPayment ||
-            shouldBeBills || // Reference number should be Bills
-            (hasPosInDescription && !suggestedCategory) || // If description has POS but no category, try to categorize
-            (hasAtmInDescription && !suggestedCategory) || // If description has ATM but no category, try to categorize
+            shouldBeBills || // Reference number should be Bills (but only if not POS: or ATM:)
+            (hasPosPattern && !suggestedCategory) || // If has POS pattern but no category, try to categorize
+            (hasAtmPattern && !suggestedCategory) || // If has ATM pattern but no category, try to categorize
             (hasLoanPattern && !suggestedCategory) || // If description has loan pattern but no category, try to categorize
             (hasUtilityPattern && !suggestedCategory) || // If description has utility pattern but no category, try to categorize
             (hasPsd2Klix && !suggestedCategory) || // If description has PSD2/KLIX but no category, try to categorize
-            (hasReferenceNumber && !suggestedCategory) // If has reference number but no category, try to categorize
+            (hasReferenceNumber && !hasPosPattern && !hasAtmPattern && !suggestedCategory) // If has reference number but no POS/ATM and no category, try to categorize
           
           // Override suggested category based on prefix detection
+          // IMPORTANT: Order matters - POS: and ATM: must come BEFORE Bills
           let finalCategory = suggestedCategory
           if (shouldBeKommunaalid) {
             finalCategory = 'Kommunaalid'
@@ -704,11 +712,14 @@ export default function FinancePage() {
             finalCategory = 'Kodulaen'
           } else if (shouldBeEsto) {
             finalCategory = 'ESTO'
-          } else if (shouldBeAtm) {
-            finalCategory = 'ATM Withdrawal'
           } else if (shouldBeCardPayment) {
+            // POS: takes priority over Bills
             finalCategory = 'Card Payment'
+          } else if (shouldBeAtm) {
+            // ATM: takes priority over Bills
+            finalCategory = 'ATM Withdrawal'
           } else if (shouldBeBills) {
+            // Bills only if no POS: or ATM: patterns
             finalCategory = 'Bills'
           }
           
