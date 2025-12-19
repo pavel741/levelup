@@ -5,6 +5,7 @@ import { useFirestoreStore } from '@/store/useFirestoreStore'
 import AuthGuard from '@/components/AuthGuard'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
+import { Wallet, TrendingUp, TrendingDown, DollarSign } from 'lucide-react'
 import {
   subscribeToTransactions,
   addTransaction,
@@ -149,7 +150,18 @@ export default function FinancePage() {
 
     if (startDate && endDate) {
       filtered = filtered.filter((tx) => {
-        const txDate = typeof tx.date === 'string' ? new Date(tx.date) : (tx.date as any)?.toDate?.() || new Date(tx.date)
+        let txDate: Date
+        if (typeof tx.date === 'string') {
+          txDate = new Date(tx.date)
+        } else if (tx.date && typeof tx.date === 'object' && 'toDate' in tx.date && typeof (tx.date as any).toDate === 'function') {
+          // Firestore Timestamp
+          txDate = (tx.date as any).toDate()
+        } else if (tx.date instanceof Date) {
+          txDate = tx.date
+        } else {
+          // Fallback: try to convert
+          txDate = new Date(tx.date as any)
+        }
         return txDate >= startDate! && txDate <= endDate!
       })
     }
@@ -167,8 +179,21 @@ export default function FinancePage() {
 
     // Sort by date descending
     filtered.sort((a, b) => {
-      const dateA = typeof a.date === 'string' ? new Date(a.date) : (a.date as any)?.toDate?.() || new Date(a.date)
-      const dateB = typeof b.date === 'string' ? new Date(b.date) : (b.date as any)?.toDate?.() || new Date(b.date)
+      const getDate = (date: string | Date | any): Date => {
+        if (typeof date === 'string') {
+          return new Date(date)
+        } else if (date && typeof date === 'object' && 'toDate' in date && typeof date.toDate === 'function') {
+          // Firestore Timestamp
+          return date.toDate()
+        } else if (date instanceof Date) {
+          return date
+        } else {
+          // Fallback: try to convert
+          return new Date(date)
+        }
+      }
+      const dateA = getDate(a.date)
+      const dateB = getDate(b.date)
       return dateB.getTime() - dateA.getTime()
     })
 
@@ -185,7 +210,18 @@ export default function FinancePage() {
     let expenses = 0
 
     transactions.forEach((tx) => {
-      const txDate = typeof tx.date === 'string' ? new Date(tx.date) : (tx.date as any)?.toDate?.() || new Date(tx.date)
+      let txDate: Date
+      if (typeof tx.date === 'string') {
+        txDate = new Date(tx.date)
+      } else if (tx.date && typeof tx.date === 'object' && 'toDate' in tx.date && typeof (tx.date as any).toDate === 'function') {
+        // Firestore Timestamp
+        txDate = (tx.date as any).toDate()
+      } else if (tx.date instanceof Date) {
+        txDate = tx.date
+      } else {
+        // Fallback: try to convert
+        txDate = new Date(tx.date as any)
+      }
       if (txDate >= startDate && txDate <= endDate) {
         const amount = Number(tx.amount) || 0
         const type = (tx.type || '').toLowerCase()
@@ -367,49 +403,54 @@ export default function FinancePage() {
 
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-[#f8fafc] dark:bg-[#0f172a] text-[#0f172a] dark:text-[#f1f5f9]">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
         <div className="flex h-screen overflow-hidden">
           <Sidebar isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
           <div className="flex-1 flex flex-col overflow-hidden lg:ml-0">
             <Header onMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)} isMenuOpen={isMobileMenuOpen} />
-            <main className="flex-1 overflow-y-auto p-5">
-              <div className="max-w-[1400px] mx-auto">
+            <main className="flex-1 overflow-y-auto p-4 sm:p-6">
+              <div className="max-w-7xl mx-auto">
                 {/* Header */}
-                <header className="mb-8">
-                  <div className="flex justify-between items-center flex-wrap gap-5">
+                <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <div>
-                      <h1 className="text-[2.5rem] font-extrabold mb-1">💰 Budget Tracker</h1>
-                      <p className="text-[#475569] dark:text-[#cbd5e1] text-lg">Take control of your finances</p>
+                    <div className="flex items-center gap-3 mb-2">
+                      <Wallet className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+                      <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                        Finance Tracker
+                      </h1>
                     </div>
-                    <div className="flex items-center gap-4 flex-wrap">
-                      <a
-                        href="/finance/analytics"
-                        className="px-4 py-2 bg-white dark:bg-[#1e293b] border-2 border-[#e2e8f0] dark:border-[#334155] rounded-lg text-sm font-semibold hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b] transition-colors"
-                      >
-                        Analytics
-                      </a>
-                      <a
-                        href="/finance/settings"
-                        className="px-4 py-2 bg-white dark:bg-[#1e293b] border-2 border-[#e2e8f0] dark:border-[#334155] rounded-lg text-sm font-semibold hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b] transition-colors"
-                      >
-                        Settings
-                      </a>
-                    </div>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      Track your income, expenses, and see a quick overview of your cashflow.
+                    </p>
                   </div>
-                </header>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <a
+                      href="/finance/analytics"
+                      className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                    >
+                      Analytics
+                    </a>
+                    <a
+                      href="/finance/settings"
+                      className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                    >
+                      Settings
+                    </a>
+                  </div>
+                </div>
 
                 {/* Dashboard */}
-                <div className="mb-8">
-                  <div className="flex justify-between items-center mb-5 flex-wrap gap-4">
-                    <h2 className="text-2xl font-bold m-0">Summary</h2>
-                    <div className="flex gap-2 bg-[#f8fafc] dark:bg-[#0f172a] rounded-lg p-1 border-2 border-[#e2e8f0] dark:border-[#334155]">
+                <div className="mb-6">
+                  <div className="flex justify-between items-center mb-4 flex-wrap gap-4">
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Summary</h2>
+                    <div className="flex gap-2 bg-white dark:bg-gray-800 rounded-lg p-1 border border-gray-200 dark:border-gray-700">
                       <button
                         type="button"
                         onClick={() => setSummaryView('monthly')}
-                        className={`px-5 py-2.5 border-none rounded-md font-semibold text-sm cursor-pointer transition-all min-h-[44px] ${
+                        className={`px-4 py-2 rounded-md font-medium text-sm transition-colors ${
                           summaryView === 'monthly'
-                            ? 'bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] text-white shadow-sm'
-                            : 'bg-transparent text-[#475569] dark:text-[#cbd5e1] hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b]'
+                            ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
+                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                         }`}
                       >
                         Monthly
@@ -417,10 +458,10 @@ export default function FinancePage() {
                       <button
                         type="button"
                         onClick={() => setSummaryView('alltime')}
-                        className={`px-5 py-2.5 border-none rounded-md font-semibold text-sm cursor-pointer transition-all min-h-[44px] ${
+                        className={`px-4 py-2 rounded-md font-medium text-sm transition-colors ${
                           summaryView === 'alltime'
-                            ? 'bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] text-white shadow-sm'
-                            : 'bg-transparent text-[#475569] dark:text-[#cbd5e1] hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b]'
+                            ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
+                            : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                         }`}
                       >
                         All Time
@@ -430,13 +471,13 @@ export default function FinancePage() {
 
                   {/* Monthly View */}
                   {summaryView === 'monthly' && (
-                    <div className="mb-5">
-                      <div className="mb-5">
-                        <div className="flex items-center gap-2">
+                    <div className="mb-6">
+                      <div className="mb-4">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <button
                             type="button"
                             onClick={() => navigateMonth(-1)}
-                            className="w-11 h-11 bg-white dark:bg-[#1e293b] border-2 border-[#e2e8f0] dark:border-[#334155] rounded-lg flex items-center justify-center cursor-pointer text-2xl text-[#0f172a] dark:text-[#f1f5f9] transition-all hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b] hover:border-[#6366f1] hover:scale-105 active:scale-95 shadow-sm"
+                            className="w-10 h-10 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg flex items-center justify-center text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                             title="Previous period"
                           >
                             ‹
@@ -446,16 +487,16 @@ export default function FinancePage() {
                               type="month"
                               value={selectedMonth}
                               onChange={(e) => setSelectedMonth(e.target.value)}
-                              className="px-3 py-2 border-2 border-[#e2e8f0] dark:border-[#334155] rounded-lg text-base bg-white dark:bg-[#1e293b] text-transparent cursor-pointer transition-colors focus:outline-none focus:border-[#6366f1] relative"
+                              className="px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-transparent cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             />
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#0f172a] dark:text-[#f1f5f9] text-sm bg-white dark:bg-[#1e293b] px-1 whitespace-nowrap z-10">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-900 dark:text-white text-sm bg-white dark:bg-gray-800 px-1 whitespace-nowrap z-10">
                               {getEstonianMonth(selectedMonth)}
                             </span>
                           </div>
                           <button
                             type="button"
                             onClick={() => navigateMonth(1)}
-                            className="w-11 h-11 bg-white dark:bg-[#1e293b] border-2 border-[#e2e8f0] dark:border-[#334155] rounded-lg flex items-center justify-center cursor-pointer text-2xl text-[#0f172a] dark:text-[#f1f5f9] transition-all hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b] hover:border-[#6366f1] hover:scale-105 active:scale-95 shadow-sm"
+                            className="w-10 h-10 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg flex items-center justify-center text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                             title="Next period"
                           >
                             ›
@@ -463,31 +504,43 @@ export default function FinancePage() {
                           <button
                             type="button"
                             onClick={setCurrentMonth}
-                            className="px-4 py-2 bg-white dark:bg-[#1e293b] border-2 border-[#e2e8f0] dark:border-[#334155] rounded-lg text-sm font-semibold hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b] transition-colors ml-2.5"
+                            className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                           >
                             Current Period
                           </button>
                         </div>
                       </div>
-                      <div className="grid grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-6">
-                        <div className="bg-white dark:bg-[#1e293b] p-7 rounded-xl shadow-sm border border-[#f1f5f9] dark:border-[#334155] relative overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg group">
-                          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                          <h3 className="text-sm text-[#475569] dark:text-[#cbd5e1] mb-2.5 uppercase tracking-wide">Monthly Balance</h3>
-                          <div className="text-[2rem] font-bold text-[#6366f1] font-mono tabular-nums">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 transition-all hover:shadow-xl">
+                          <div className="flex items-center justify-between mb-2">
+                            <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+                              Monthly Balance
+                            </h3>
+                            <DollarSign className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                          </div>
+                          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400 font-mono tabular-nums">
                             {formatCurrency(summary.balance)}
                           </div>
                         </div>
-                        <div className="bg-white dark:bg-[#1e293b] p-7 rounded-xl shadow-sm border border-[#f1f5f9] dark:border-[#334155] relative overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg group">
-                          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#10b981] to-[#34d399] opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                          <h3 className="text-sm text-[#475569] dark:text-[#cbd5e1] mb-2.5 uppercase tracking-wide">Monthly Income</h3>
-                          <div className="text-[2rem] font-bold text-[#10b981] font-mono tabular-nums">
+                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 transition-all hover:shadow-xl">
+                          <div className="flex items-center justify-between mb-2">
+                            <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+                              Monthly Income
+                            </h3>
+                            <TrendingUp className="w-5 h-5 text-green-600 dark:text-green-400" />
+                          </div>
+                          <div className="text-2xl font-bold text-green-600 dark:text-green-400 font-mono tabular-nums">
                             {formatCurrency(summary.income)}
                           </div>
                         </div>
-                        <div className="bg-white dark:bg-[#1e293b] p-7 rounded-xl shadow-sm border border-[#f1f5f9] dark:border-[#334155] relative overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg group">
-                          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#ef4444] to-[#f87171] opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                          <h3 className="text-sm text-[#475569] dark:text-[#cbd5e1] mb-2.5 uppercase tracking-wide">Monthly Expenses</h3>
-                          <div className="text-[2rem] font-bold text-[#ef4444] font-mono tabular-nums">
+                        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 transition-all hover:shadow-xl">
+                          <div className="flex items-center justify-between mb-2">
+                            <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+                              Monthly Expenses
+                            </h3>
+                            <TrendingDown className="w-5 h-5 text-red-600 dark:text-red-400" />
+                          </div>
+                          <div className="text-2xl font-bold text-red-600 dark:text-red-400 font-mono tabular-nums">
                             {formatCurrency(summary.expenses)}
                           </div>
                         </div>
@@ -497,25 +550,37 @@ export default function FinancePage() {
 
                   {/* All Time View */}
                   {summaryView === 'alltime' && (
-                    <div className="grid grid-cols-[repeat(auto-fit,minmax(250px,1fr))] gap-6">
-                      <div className="bg-white dark:bg-[#1e293b] p-7 rounded-xl shadow-sm border border-[#f1f5f9] dark:border-[#334155] relative overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg group">
-                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                        <h3 className="text-sm text-[#475569] dark:text-[#cbd5e1] mb-2.5 uppercase tracking-wide">Total Balance</h3>
-                        <div className="text-[2rem] font-bold text-[#6366f1] font-mono tabular-nums">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 transition-all hover:shadow-xl">
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+                            Total Balance
+                          </h3>
+                          <DollarSign className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div className="text-2xl font-bold text-blue-600 dark:text-blue-400 font-mono tabular-nums">
                           {formatCurrency(summary.balance)}
                         </div>
                       </div>
-                      <div className="bg-white dark:bg-[#1e293b] p-7 rounded-xl shadow-sm border border-[#f1f5f9] dark:border-[#334155] relative overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg group">
-                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#10b981] to-[#34d399] opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                        <h3 className="text-sm text-[#475569] dark:text-[#cbd5e1] mb-2.5 uppercase tracking-wide">Total Income</h3>
-                        <div className="text-[2rem] font-bold text-[#10b981] font-mono tabular-nums">
+                      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 transition-all hover:shadow-xl">
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+                            Total Income
+                          </h3>
+                          <TrendingUp className="w-5 h-5 text-green-600 dark:text-green-400" />
+                        </div>
+                        <div className="text-2xl font-bold text-green-600 dark:text-green-400 font-mono tabular-nums">
                           {formatCurrency(summary.income)}
                         </div>
                       </div>
-                      <div className="bg-white dark:bg-[#1e293b] p-7 rounded-xl shadow-sm border border-[#f1f5f9] dark:border-[#334155] relative overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg group">
-                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#ef4444] to-[#f87171] opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                        <h3 className="text-sm text-[#475569] dark:text-[#cbd5e1] mb-2.5 uppercase tracking-wide">Total Expenses</h3>
-                        <div className="text-[2rem] font-bold text-[#ef4444] font-mono tabular-nums">
+                      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 transition-all hover:shadow-xl">
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+                            Total Expenses
+                          </h3>
+                          <TrendingDown className="w-5 h-5 text-red-600 dark:text-red-400" />
+                        </div>
+                        <div className="text-2xl font-bold text-red-600 dark:text-red-400 font-mono tabular-nums">
                           {formatCurrency(summary.expenses)}
                         </div>
                       </div>
@@ -524,14 +589,16 @@ export default function FinancePage() {
                 </div>
 
                 {/* Main View */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start w-full max-w-full overflow-x-hidden">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
                   {/* Left Panel - Add Transaction Form */}
-                  <div className="flex flex-col gap-5 w-full max-w-full min-w-0 overflow-x-hidden">
-                    <div className="bg-white dark:bg-[#1e293b] p-6 rounded-xl shadow-sm border border-[#e2e8f0] dark:border-[#334155]">
-                      <h2 className="text-xl font-bold mb-5">{editingTransactionId ? 'Edit Transaction' : 'Add Transaction'}</h2>
+                  <div className="flex flex-col gap-6">
+                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
+                      <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">
+                        {editingTransactionId ? 'Edit Transaction' : 'Add Transaction'}
+                      </h2>
                       <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
-                          <label htmlFor="type" className="block text-sm font-medium mb-2">
+                          <label htmlFor="type" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Type
                           </label>
                           <select
@@ -542,14 +609,14 @@ export default function FinancePage() {
                               setFormCategory('') // Reset category when type changes
                             }}
                             required
-                            className="w-full px-4 py-2 border-2 border-[#e2e8f0] dark:border-[#334155] rounded-lg bg-white dark:bg-[#1e293b] text-[#0f172a] dark:text-[#f1f5f9] focus:outline-none focus:border-[#6366f1]"
+                            className="w-full px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           >
                             <option value="income">Income</option>
                             <option value="expense">Expense</option>
                           </select>
                         </div>
                         <div>
-                          <label htmlFor="description" className="block text-sm font-medium mb-2">
+                          <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Description
                           </label>
                           <input
@@ -559,11 +626,11 @@ export default function FinancePage() {
                             onChange={(e) => setFormDescription(e.target.value)}
                             placeholder="e.g. Salary, Groceries"
                             required
-                            className="w-full px-4 py-2 border-2 border-[#e2e8f0] dark:border-[#334155] rounded-lg bg-white dark:bg-[#1e293b] text-[#0f172a] dark:text-[#f1f5f9] focus:outline-none focus:border-[#6366f1]"
+                            className="w-full px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           />
                         </div>
                         <div>
-                          <label htmlFor="amount" className="block text-sm font-medium mb-2">
+                          <label htmlFor="amount" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Amount
                           </label>
                           <input
@@ -575,11 +642,11 @@ export default function FinancePage() {
                             step="0.01"
                             min="0"
                             required
-                            className="w-full px-4 py-2 border-2 border-[#e2e8f0] dark:border-[#334155] rounded-lg bg-white dark:bg-[#1e293b] text-[#0f172a] dark:text-[#f1f5f9] focus:outline-none focus:border-[#6366f1]"
+                            className="w-full px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           />
                         </div>
                         <div>
-                          <label htmlFor="category" className="block text-sm font-medium mb-2">
+                          <label htmlFor="category" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Category
                           </label>
                           <select
@@ -587,7 +654,7 @@ export default function FinancePage() {
                             value={formCategory}
                             onChange={(e) => setFormCategory(e.target.value)}
                             required
-                            className="w-full px-4 py-2 border-2 border-[#e2e8f0] dark:border-[#334155] rounded-lg bg-white dark:bg-[#1e293b] text-[#0f172a] dark:text-[#f1f5f9] focus:outline-none focus:border-[#6366f1]"
+                            className="w-full px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           >
                             <option value="">Select category</option>
                             {availableCategories.map((cat) => (
@@ -598,7 +665,7 @@ export default function FinancePage() {
                           </select>
                         </div>
                         <div>
-                          <label htmlFor="date" className="block text-sm font-medium mb-2">
+                          <label htmlFor="date" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Date
                           </label>
                           <input
@@ -607,37 +674,37 @@ export default function FinancePage() {
                             value={formDate}
                             onChange={(e) => setFormDate(e.target.value)}
                             required
-                            className="w-full px-4 py-2 border-2 border-[#e2e8f0] dark:border-[#334155] rounded-lg bg-white dark:bg-[#1e293b] text-[#0f172a] dark:text-[#f1f5f9] focus:outline-none focus:border-[#6366f1]"
+                            className="w-full px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           />
-                          <div className="flex gap-1.5 mt-1.5 flex-wrap">
+                          <div className="flex gap-2 mt-2 flex-wrap">
                             <button
                               type="button"
                               onClick={() => setQuickDate('today')}
-                              className="px-3 py-1.5 text-xs bg-[#f1f5f9] dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#334155] rounded-md hover:bg-[#e2e8f0] dark:hover:bg-[#334155] transition-colors"
+                              className="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-gray-700 dark:text-gray-300"
                             >
                               Today
                             </button>
                             <button
                               type="button"
                               onClick={() => setQuickDate('yesterday')}
-                              className="px-3 py-1.5 text-xs bg-[#f1f5f9] dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#334155] rounded-md hover:bg-[#e2e8f0] dark:hover:bg-[#334155] transition-colors"
+                              className="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-gray-700 dark:text-gray-300"
                             >
                               Yesterday
                             </button>
                             <button
                               type="button"
                               onClick={() => setQuickDate('week')}
-                              className="px-3 py-1.5 text-xs bg-[#f1f5f9] dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#334155] rounded-md hover:bg-[#e2e8f0] dark:hover:bg-[#334155] transition-colors"
+                              className="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-gray-700 dark:text-gray-300"
                             >
                               This Week
                             </button>
                           </div>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 pt-2">
                           <button
                             type="submit"
                             disabled={isSubmitting}
-                            className="flex-1 px-4 py-2 bg-gradient-to-r from-[#6366f1] to-[#8b5cf6] text-white rounded-lg font-semibold hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-medium hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             {isSubmitting ? 'Saving...' : editingTransactionId ? 'Update Transaction' : 'Add Transaction'}
                           </button>
@@ -645,7 +712,7 @@ export default function FinancePage() {
                             <button
                               type="button"
                               onClick={handleCancelEdit}
-                              className="px-4 py-2 bg-white dark:bg-[#1e293b] border-2 border-[#e2e8f0] dark:border-[#334155] rounded-lg font-semibold hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b] transition-colors"
+                              className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                             >
                               Cancel
                             </button>
@@ -656,15 +723,15 @@ export default function FinancePage() {
                   </div>
 
                   {/* Right Panel - Transaction List */}
-                  <div className="flex flex-col gap-5 w-full max-w-full min-w-0 overflow-x-hidden">
-                    <div className="bg-white dark:bg-[#1e293b] p-6 rounded-xl shadow-sm border border-[#e2e8f0] dark:border-[#334155]">
-                      <div className="flex justify-between items-center mb-5">
-                        <h2 className="text-xl font-bold m-0">Recent Transactions</h2>
+                  <div className="flex flex-col gap-6">
+                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
+                      <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Recent Transactions</h2>
                       </div>
 
                       {/* Date Range Filter */}
-                      <div className="mb-5">
-                        <label className="block text-sm font-medium mb-2">Date Range:</label>
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Date Range:</label>
                         <div className="flex gap-2 flex-wrap mb-3">
                           {(['month', 'today', 'week', 'year', 'all'] as const).map((range) => (
                             <button
@@ -674,10 +741,10 @@ export default function FinancePage() {
                                 setDateRange(range)
                                 setShowCustomDateRange(false)
                               }}
-                              className={`px-3 py-1.5 text-sm rounded-md border-2 transition-colors ${
+                              className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
                                 dateRange === range && !showCustomDateRange
-                                  ? 'bg-[#6366f1] text-white border-[#6366f1]'
-                                  : 'bg-white dark:bg-[#1e293b] border-[#e2e8f0] dark:border-[#334155] text-[#0f172a] dark:text-[#f1f5f9] hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b]'
+                                  ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white border-transparent shadow-md'
+                                  : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400'
                               }`}
                             >
                               {range === 'month' ? 'This Month' : range === 'today' ? 'Today' : range === 'week' ? 'This Week' : range === 'year' ? 'This Year' : 'All Time'}
@@ -689,33 +756,33 @@ export default function FinancePage() {
                               setDateRange('custom')
                               setShowCustomDateRange(true)
                             }}
-                            className={`px-3 py-1.5 text-sm rounded-md border-2 transition-colors ${
+                            className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
                               dateRange === 'custom' && showCustomDateRange
-                                ? 'bg-[#6366f1] text-white border-[#6366f1]'
-                                : 'bg-white dark:bg-[#1e293b] border-[#e2e8f0] dark:border-[#334155] text-[#0f172a] dark:text-[#f1f5f9] hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b]'
+                                ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white border-transparent shadow-md'
+                                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400'
                             }`}
                           >
                             Custom
                           </button>
                         </div>
                         {showCustomDateRange && (
-                          <div className="flex gap-2 items-end flex-wrap p-4 bg-[#f1f5f9] dark:bg-[#1e293b] rounded-lg">
+                          <div className="flex gap-2 items-end flex-wrap p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
                             <div>
-                              <label className="block text-xs mb-1">From:</label>
+                              <label className="block text-xs mb-1 text-gray-600 dark:text-gray-400">From:</label>
                               <input
                                 type="date"
                                 value={customDateFrom}
                                 onChange={(e) => setCustomDateFrom(e.target.value)}
-                                className="px-3 py-1.5 border-2 border-[#e2e8f0] dark:border-[#334155] rounded-md bg-white dark:bg-[#1e293b] text-sm"
+                                className="px-3 py-1.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                               />
                             </div>
                             <div>
-                              <label className="block text-xs mb-1">To:</label>
+                              <label className="block text-xs mb-1 text-gray-600 dark:text-gray-400">To:</label>
                               <input
                                 type="date"
                                 value={customDateTo}
                                 onChange={(e) => setCustomDateTo(e.target.value)}
-                                className="px-3 py-1.5 border-2 border-[#e2e8f0] dark:border-[#334155] rounded-md bg-white dark:bg-[#1e293b] text-sm"
+                                className="px-3 py-1.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                               />
                             </div>
                             <div className="flex gap-2">
@@ -726,7 +793,7 @@ export default function FinancePage() {
                                     setDateRange('custom')
                                   }
                                 }}
-                                className="px-3 py-1.5 bg-[#6366f1] text-white rounded-md text-sm font-semibold hover:bg-[#4f46e5] transition-colors"
+                                className="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg text-sm font-medium hover:shadow-md transition-all"
                               >
                                 Apply
                               </button>
@@ -736,7 +803,7 @@ export default function FinancePage() {
                                   setShowCustomDateRange(false)
                                   setDateRange('month')
                                 }}
-                                className="px-3 py-1.5 bg-white dark:bg-[#1e293b] border-2 border-[#e2e8f0] dark:border-[#334155] rounded-md text-sm font-semibold hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b] transition-colors"
+                                className="px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                               >
                                 Cancel
                               </button>
@@ -746,27 +813,27 @@ export default function FinancePage() {
                       </div>
 
                       {/* Search */}
-                      <div className="mb-5">
+                      <div className="mb-4">
                         <input
                           type="text"
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
                           placeholder="Search transactions..."
-                          className="w-full px-4 py-2 border-2 border-[#e2e8f0] dark:border-[#334155] rounded-lg bg-white dark:bg-[#1e293b] text-[#0f172a] dark:text-[#f1f5f9] focus:outline-none focus:border-[#6366f1] text-sm"
+                          className="w-full px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         />
                       </div>
 
                       {/* Filter Buttons */}
-                      <div className="flex gap-2 mb-5">
+                      <div className="flex gap-2 mb-4">
                         {(['all', 'income', 'expense'] as const).map((filter) => (
                           <button
                             key={filter}
                             type="button"
                             onClick={() => setCurrentFilter(filter)}
-                            className={`px-4 py-2 rounded-lg font-semibold text-sm transition-colors ${
+                            className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
                               currentFilter === filter
-                                ? 'bg-[#6366f1] text-white'
-                                : 'bg-[#f1f5f9] dark:bg-[#1e293b] text-[#0f172a] dark:text-[#f1f5f9] hover:bg-[#e2e8f0] dark:hover:bg-[#334155]'
+                                ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                             }`}
                           >
                             {filter === 'all' ? 'All' : filter.charAt(0).toUpperCase() + filter.slice(1)}
@@ -777,31 +844,31 @@ export default function FinancePage() {
                       {/* Transaction List */}
                       <div className="space-y-2 max-h-[600px] overflow-y-auto">
                         {isLoading ? (
-                          <div className="text-center py-10 text-[#475569] dark:text-[#cbd5e1]">Loading...</div>
+                          <div className="text-center py-10 text-gray-500 dark:text-gray-400">Loading...</div>
                         ) : filteredTransactions.length === 0 ? (
                           <div className="text-center py-10">
                             <div className="text-4xl mb-3">📊</div>
-                            <h3 className="text-lg font-semibold mb-2">Start tracking your expenses</h3>
-                            <p className="text-sm text-[#475569] dark:text-[#cbd5e1] mb-4">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Start tracking your expenses</h3>
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                               Add your first transaction to start managing your finances.
                             </p>
-                  </div>
-                ) : (
+                          </div>
+                        ) : (
                           filteredTransactions.map((tx) => (
                             <div
                               key={tx.id}
-                              className="flex items-center justify-between p-4 bg-[#f8fafc] dark:bg-[#0f172a] rounded-lg border border-[#e2e8f0] dark:border-[#334155] hover:bg-[#f1f5f9] dark:hover:bg-[#1e293b] transition-colors"
+                              className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                             >
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-3 mb-1">
-                                  <span className="font-semibold text-[#0f172a] dark:text-[#f1f5f9] truncate">
+                                  <span className="font-medium text-gray-900 dark:text-white truncate">
                                     {tx.description || '—'}
                                   </span>
-                                  <span className="text-xs text-[#475569] dark:text-[#cbd5e1] bg-[#e2e8f0] dark:bg-[#334155] px-2 py-0.5 rounded">
+                                  <span className="text-xs text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-2 py-0.5 rounded">
                                     {tx.category || 'Uncategorized'}
                                   </span>
                                 </div>
-                                <div className="text-xs text-[#475569] dark:text-[#cbd5e1]">
+                                <div className="text-xs text-gray-500 dark:text-gray-400">
                                   {formatDisplayDate(tx.date)}
                                 </div>
                               </div>
@@ -809,8 +876,8 @@ export default function FinancePage() {
                                 <span
                                   className={`font-semibold font-mono tabular-nums ${
                                     (tx.type || '').toLowerCase() === 'income' || (Number(tx.amount) || 0) > 0
-                                      ? 'text-[#10b981]'
-                                      : 'text-[#ef4444]'
+                                      ? 'text-green-600 dark:text-green-400'
+                                      : 'text-red-600 dark:text-red-400'
                                   }`}
                                 >
                                   {formatCurrency(Number(tx.amount) || 0)}
@@ -818,14 +885,14 @@ export default function FinancePage() {
                                 <button
                                   type="button"
                                   onClick={() => handleEdit(tx as FinanceTransaction & { id: string })}
-                                  className="px-2 py-1 text-xs bg-[#6366f1] text-white rounded hover:bg-[#4f46e5] transition-colors"
+                                  className="px-2 py-1 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                                 >
                                   Edit
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => handleDelete(tx.id!)}
-                                  className="px-2 py-1 text-xs bg-[#ef4444] text-white rounded hover:bg-[#dc2626] transition-colors"
+                                  className="px-2 py-1 text-xs bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                                 >
                                   Delete
                                 </button>
