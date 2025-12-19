@@ -65,26 +65,20 @@ export function categorizeTransaction(
   }
 
   // 1. Check for reference number (viitenumber) → Bills
-  // Rule: If viitenumber is not null/empty, it's a Bills transaction
-  // BUT: Only if NO POS: or ATM: patterns were found above
-  if (refNum && refNum.trim().length > 0) {
-    // Clean the reference number (remove spaces)
-    const cleanRefNum = refNum.replace(/\s+/g, '').trim()
-    
-    // If reference number exists and is not empty, it's a bill
-    // Only validate it looks like a reference number (contains digits)
-    // BUT: Double-check that we don't have POS: or ATM: patterns (should have been caught above)
-    if (cleanRefNum.length > 0 && /\d/.test(cleanRefNum)) {
-      // Final safety check: make sure we didn't miss POS: or ATM: patterns
-      if (!hasPosPattern && !hasAtmPattern && !hasCardPattern) {
-        return {
-          category: 'Bills',
-          confidence: 'high',
-          reason: 'Reference number (viitenumber) detected',
-        }
-      }
-    }
-  }
+  // SKIP THIS FOR NOW - focus on POS: and ATM: first
+  // We'll add this back later once POS:/ATM: are working correctly
+  // if (refNum && refNum.trim().length > 0) {
+  //   const cleanRefNum = refNum.replace(/\s+/g, '').trim()
+  //   if (cleanRefNum.length > 0 && /\d/.test(cleanRefNum)) {
+  //     if (!hasPosPattern && !hasAtmPattern && !hasCardPattern) {
+  //       return {
+  //         category: 'Bills',
+  //         confidence: 'high',
+  //         reason: 'Reference number (viitenumber) detected',
+  //       }
+  //     }
+  //   }
+  // }
 
   // 2. Check for loan patterns → Kodulaen category
   // Pattern: "laenu 33627" or similar loan references

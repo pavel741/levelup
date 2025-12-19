@@ -663,17 +663,10 @@ export default function FinancePage() {
           // Check both description and category fields
           const shouldBeAtm = hasAtmPattern && currentCategory !== 'ATM Withdrawal'
           
-          // Reference number (viitenumber) should be categorized as Bills
-          // BUT: POS: and ATM: transactions can also have reference numbers, so they take priority
-          // If transaction has a reference number but isn't already Bills (and isn't a card payment or ATM), recategorize
+          // Reference number (viitenumber) - SKIP FOR NOW
+          // Focus on POS: and ATM: first, we'll add Bills logic back later
           const hasReferenceNumber = tx.referenceNumber && tx.referenceNumber.trim().length > 0
-          const shouldBeBills = hasReferenceNumber && 
-            currentCategory !== 'Bills' && 
-            !hasPosPattern && // POS: takes priority over reference number
-            !hasAtmPattern && // ATM: takes priority over reference number
-            !hasPsd2Klix &&
-            !hasLoanPattern &&
-            !hasUtilityPattern
+          const shouldBeBills = false // Disabled for now - focus on POS:/ATM: first
           
           const isWrongCategory = 
             (hasPosPattern && currentCategory !== 'Card Payment' && currentCategory !== 'ATM Withdrawal' && currentCategory !== 'Bills' && currentCategory !== 'ESTO' && currentCategory !== 'Kodulaen' && currentCategory !== 'Kommunaalid') ||
@@ -704,31 +697,27 @@ export default function FinancePage() {
             (hasReferenceNumber && !hasPosPattern && !hasAtmPattern && !suggestedCategory) // If has reference number but no POS/ATM and no category, try to categorize
           
           // Override suggested category based on prefix detection
-          // IMPORTANT: Order matters - POS: and ATM: must come BEFORE Bills
+          // IMPORTANT: POS: and ATM: take absolute priority
           let finalCategory = suggestedCategory
           
-          // First check: If suggested category is already Card Payment or ATM Withdrawal, keep it
-          // (This handles cases where categorizer correctly identified POS:/ATM:)
-          if (suggestedCategory === 'Card Payment' && hasPosPattern) {
+          // Priority 1: POS: → Card Payment (absolute priority)
+          if (hasPosPattern || shouldBeCardPayment) {
             finalCategory = 'Card Payment'
-          } else if (suggestedCategory === 'ATM Withdrawal' && hasAtmPattern) {
+          }
+          // Priority 2: ATM: → ATM Withdrawal (absolute priority)
+          else if (hasAtmPattern || shouldBeAtm) {
             finalCategory = 'ATM Withdrawal'
-          } else if (shouldBeKommunaalid) {
+          }
+          // Priority 3: Other special categories
+          else if (shouldBeKommunaalid) {
             finalCategory = 'Kommunaalid'
           } else if (shouldBeKodulaen) {
             finalCategory = 'Kodulaen'
           } else if (shouldBeEsto) {
             finalCategory = 'ESTO'
-          } else if (shouldBeCardPayment || hasPosPattern) {
-            // POS: takes priority over Bills - check both shouldBeCardPayment and hasPosPattern
-            finalCategory = 'Card Payment'
-          } else if (shouldBeAtm || hasAtmPattern) {
-            // ATM: takes priority over Bills - check both shouldBeAtm and hasAtmPattern
-            finalCategory = 'ATM Withdrawal'
-          } else if (shouldBeBills && !hasPosPattern && !hasAtmPattern) {
-            // Bills only if no POS: or ATM: patterns detected
-            finalCategory = 'Bills'
           }
+          // Priority 4: Use suggested category from categorizer
+          // (Bills logic disabled for now)
           
           if (needsRecategorization && finalCategory && finalCategory !== currentCategory) {
             try {
