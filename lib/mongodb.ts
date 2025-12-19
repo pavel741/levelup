@@ -3,29 +3,34 @@ import { MongoClient, Db } from 'mongodb'
 // Get MongoDB URI from environment variable
 // Make sure to add MONGODB_URI to .env.local
 // Connection string format: mongodb+srv://username:password@cluster.mongodb.net/database?options
-const defaultUri = 'mongodb+srv://paveltim1991_db_user:ZqtmOj5hoH8BI1Qx@globalexpat.wgwihbe.mongodb.net/levelup?retryWrites=true&w=majority&appName=globalexpat'
-let uri = process.env.MONGODB_URI || defaultUri
+// NEVER commit credentials to the repository - always use environment variables!
+const uri = process.env.MONGODB_URI
+
+if (!uri) {
+  throw new Error(
+    'MONGODB_URI environment variable is not set. ' +
+    'Please add it to .env.local file. ' +
+    'Format: mongodb+srv://username:password@cluster.mongodb.net/database?options'
+  )
+}
 
 // Clean up the URI - remove any line breaks or extra spaces
-uri = uri.trim().replace(/\s+/g, '').replace(/\r?\n/g, '')
+const cleanUri = uri.trim().replace(/\s+/g, '').replace(/\r?\n/g, '')
 
 // Validate connection string format
-if (uri && !uri.includes('mongodb.net')) {
-  console.error('❌ Invalid MongoDB connection string format')
-  console.error('Expected format: mongodb+srv://user:pass@cluster.mongodb.net/database')
-  console.error('Current URI (first 100 chars):', uri.substring(0, 100))
+if (!cleanUri.includes('mongodb.net')) {
+  throw new Error(
+    'Invalid MongoDB connection string format. ' +
+    'Expected format: mongodb+srv://user:pass@cluster.mongodb.net/database'
+  )
 }
 
 // Debug: Log the URI being used (hide credentials)
 if (process.env.NODE_ENV === 'development') {
-  const maskedUri = uri.replace(/\/\/[^:]+:[^@]+@/, '//***:***@')
+  const maskedUri = cleanUri.replace(/\/\/[^:]+:[^@]+@/, '//***:***@')
   console.log('🔍 MongoDB URI:', maskedUri)
-  console.log('🔍 URI ends with .mongodb.net:', uri.includes('.mongodb.net'))
-  console.log('🔍 URI length:', uri.length)
-}
-
-if (!uri) {
-  throw new Error('Please add your Mongo URI to .env.local as MONGODB_URI')
+  console.log('🔍 URI ends with .mongodb.net:', cleanUri.includes('.mongodb.net'))
+  console.log('🔍 URI length:', cleanUri.length)
 }
 
 // MongoDB connection options with better timeout and retry settings
@@ -50,17 +55,17 @@ if (process.env.NODE_ENV === 'development') {
   }
 
   // Clear cached connection if URI changed (for hot reload)
-  if (globalWithMongo._mongoUri && globalWithMongo._mongoUri !== uri) {
+  if (globalWithMongo._mongoUri && globalWithMongo._mongoUri !== cleanUri) {
     console.log('🔄 MongoDB URI changed, clearing cached connection')
     delete globalWithMongo._mongoClientPromise
   }
 
   if (!globalWithMongo._mongoClientPromise) {
-    globalWithMongo._mongoUri = uri
-    client = new MongoClient(uri, options)
+    globalWithMongo._mongoUri = cleanUri
+    client = new MongoClient(cleanUri, options)
     globalWithMongo._mongoClientPromise = client.connect().catch((error) => {
       console.error('❌ MongoDB connection failed:', error.message)
-      console.error('💡 URI being used:', uri.replace(/\/\/[^:]+:[^@]+@/, '//***:***@'))
+      console.error('💡 URI being used:', cleanUri.replace(/\/\/[^:]+:[^@]+@/, '//***:***@'))
       console.error('💡 Make sure your IP is whitelisted in MongoDB Atlas')
       console.error('💡 If you\'re using a VPN, add your VPN IP to the whitelist')
       console.error('💡 Go to: MongoDB Atlas → Network Access → Add IP Address')
@@ -73,7 +78,7 @@ if (process.env.NODE_ENV === 'development') {
   clientPromise = globalWithMongo._mongoClientPromise
 } else {
   // In production mode, it's best to not use a global variable.
-  client = new MongoClient(uri, options)
+  client = new MongoClient(cleanUri, options)
   clientPromise = client.connect().catch((error) => {
     console.error('❌ MongoDB connection failed:', error.message)
     throw error
@@ -92,7 +97,7 @@ export async function getDatabase(): Promise<Db> {
     let dbName = 'levelup' // Default database name
     
     // Try to extract database name from URI
-    const dbMatch = uri.match(/mongodb\+srv:\/\/[^/]+\/([^?]+)/)
+    const dbMatch = cleanUri.match(/mongodb\+srv:\/\/[^/]+\/([^?]+)/)
     if (dbMatch && dbMatch[1]) {
       dbName = dbMatch[1]
     }
@@ -104,7 +109,7 @@ export async function getDatabase(): Promise<Db> {
     if (error.message?.includes('ENOTFOUND') || error.message?.includes('querySrv')) {
       console.error('💡 DNS resolution failed. Check your connection string:')
       console.error('💡 Make sure it ends with .mongodb.net (not .mongo)')
-      console.error('💡 Current URI:', uri.replace(/\/\/[^:]+:[^@]+@/, '//***:***@'))
+      console.error('💡 Current URI:', cleanUri.replace(/\/\/[^:]+:[^@]+@/, '//***:***@'))
       throw new Error('MongoDB DNS resolution failed. Please check your connection string format.')
     }
     
