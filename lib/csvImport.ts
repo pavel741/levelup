@@ -1,4 +1,19 @@
 // CSV Import Utility - TypeScript version
+
+type ColumnMapping = {
+  type: number | null
+  description: number | null
+  amount: number | null
+  category: number | null
+  date: number | null
+  _recipientName?: number
+  _referenceNumber?: number
+  _archiveId?: number
+  _foundColumns: string[]
+  _allHeaders: string[]
+  _normalizedHeaders: string[]
+}
+
 export class CSVImportService {
   private _debugLogged = false
 
@@ -44,19 +59,7 @@ export class CSVImportService {
   /**
    * Map CSV headers to expected columns
    */
-  mapColumns(headers: string[]): {
-    type: number | null
-    description: number | null
-    amount: number | null
-    category: number | null
-    date: number | null
-    _recipientName?: number
-    _referenceNumber?: number
-    _archiveId?: number
-    _foundColumns: string[]
-    _allHeaders: string[]
-    _normalizedHeaders: string[]
-  } {
+  mapColumns(headers: string[]): ColumnMapping {
     const mapping: {
       type: number | null
       description: number | null
@@ -287,7 +290,7 @@ export class CSVImportService {
    */
   mapRowToTransaction(
     row: Record<string, string>,
-    columnMap: ReturnType<typeof this.mapColumns>
+    columnMap: ColumnMapping
   ): {
     type: string
     description: string
@@ -455,7 +458,7 @@ export class CSVImportService {
       referenceNumber?: string
       recipientName?: string
     }>
-    columnMapping: ReturnType<typeof this.mapColumns>
+    columnMapping: ColumnMapping
   } {
     const lines = csvText.split('\n').filter((line) => line.trim())
     if (lines.length === 0) {
