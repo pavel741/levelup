@@ -26,14 +26,52 @@ export function categorizeTransaction(
   const posPattern = /pos\s*:/i
   const cardPattern = /\d{4}\s+\d{2}\*+\s+\*+\s+\d{4}|\d{4}\s+\d{2}\*+\s+\d{4}/
 
+  // PRIORITY ORDER:
+  // 1. Card payment patterns (POS:, card numbers, ATM:) - highest priority
+  // 2. Reference number (viitenumber) - if present and not empty, it's Bills
+  // 3. Other patterns (loans, utilities, etc.)
+  
+  // Check for POS: prefix → Card Payment (highest priority for card payments)
+  if (posPattern.test(desc)) {
+    return {
+      category: 'Card Payment',
+      confidence: 'high',
+      reason: 'POS: prefix detected (card payment)',
+    }
+  }
+
+  // Check for card number patterns → Card Payment
+  if (cardPattern.test(desc)) {
+    return {
+      category: 'Card Payment',
+      confidence: 'high',
+      reason: 'Card number pattern detected',
+    }
+  }
+
+  // Check for ATM: prefix → ATM Withdrawal
+  if (/^atm\s*:/i.test(desc) || /^atm\s+/i.test(desc)) {
+    return {
+      category: 'ATM Withdrawal',
+      confidence: 'high',
+      reason: 'ATM: prefix detected',
+    }
+  }
+
   // 1. Check for reference number (viitenumber) → Bills
-  if (refNum && refNum.length > 0) {
-    // Reference numbers are typically numeric and at least 4 digits
-    if (/^\d{4,}$/.test(refNum.replace(/\s+/g, ''))) {
+  // Rule: If viitenumber is not null/empty, it's a Bills transaction
+  // This takes priority over other patterns (except card payment patterns above)
+  if (refNum && refNum.trim().length > 0) {
+    // Clean the reference number (remove spaces)
+    const cleanRefNum = refNum.replace(/\s+/g, '').trim()
+    
+    // If reference number exists and is not empty, it's a bill
+    // Only validate it looks like a reference number (contains digits)
+    if (cleanRefNum.length > 0 && /\d/.test(cleanRefNum)) {
       return {
         category: 'Bills',
         confidence: 'high',
-        reason: 'Reference number detected',
+        reason: 'Reference number (viitenumber) detected',
       }
     }
   }
@@ -72,6 +110,7 @@ export function categorizeTransaction(
 
   // 5. Check description for reference number patterns
   // Estonian reference numbers: usually 7-20 digits, sometimes with spaces
+  // Only categorize as Bills if NO card payment patterns were found above
   const refNumPattern = /\b\d{7,20}\b/
   if (refNumPattern.test(desc)) {
     // Check if it's not a card number or date
@@ -79,33 +118,15 @@ export function categorizeTransaction(
     if (potentialRefNum.length >= 7 && potentialRefNum.length <= 20) {
       // Make sure it's not a date (YYYYMMDD format)
       if (!/^\d{8}$/.test(potentialRefNum) || !isValidDate(potentialRefNum)) {
-        return {
-          category: 'Bills',
-          confidence: 'high',
-          reason: 'Reference number pattern in description',
+        // Double-check: if description contains card payment patterns, don't categorize as Bills
+        if (!cardPattern.test(desc) && !posPattern.test(desc)) {
+          return {
+            category: 'Bills',
+            confidence: 'high',
+            reason: 'Reference number pattern in description',
+          }
         }
       }
-    }
-  }
-
-  // 6. Check for ATM: prefix → ATM Withdrawal
-  // Pattern: "ATM: [location]" or "ATM: [description]"
-  if (/^atm\s*:/i.test(desc) || /^atm\s+/i.test(desc)) {
-    return {
-      category: 'ATM Withdrawal',
-      confidence: 'high',
-      reason: 'ATM: prefix detected',
-    }
-  }
-
-  // 7. Check for POS: prefix → Card Payment
-  // Pattern: "POS: 5374 87** **** 4961, 17.12.2025 14:55:34" or "POS:Kultuuribaar Naiiv \Tartu \EST"
-  // All POS: transactions are card payments
-  if (posPattern.test(desc)) {
-    return {
-      category: 'Card Payment',
-      confidence: 'high',
-      reason: 'POS: prefix detected (card payment)',
     }
   }
 
