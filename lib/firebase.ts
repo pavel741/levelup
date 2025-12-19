@@ -2,7 +2,6 @@ import { initializeApp, getApps, FirebaseApp } from 'firebase/app'
 import { getAuth, Auth, setPersistence, browserLocalPersistence } from 'firebase/auth'
 import { getFirestore, Firestore } from 'firebase/firestore'
 import { getAnalytics, Analytics } from 'firebase/analytics'
-import { getStorage, FirebaseStorage } from 'firebase/storage'
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -53,7 +52,6 @@ let app: FirebaseApp | undefined
 let auth: Auth | undefined
 let db: Firestore | undefined
 let analytics: Analytics | null = null
-let storage: FirebaseStorage | undefined
 let firebaseInitialized = false
 let firebaseInitPromise: Promise<void> | null = null
 
@@ -103,7 +101,6 @@ The variables must be present BEFORE the build runs.`
         }
 
         db = getFirestore(app)
-        storage = getStorage(app)
 
         console.log('✅ Firebase initialized successfully')
         console.log('Project ID:', firebaseConfig.projectId)
@@ -190,6 +187,6 @@ export const waitForFirebaseInit = async (): Promise<void> => {
 }
 
 // Export with type assertions - these will only be used client-side
-export { auth, db, analytics, storage }
+export { auth, db, analytics }
 export default app!
 

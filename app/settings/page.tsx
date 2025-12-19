@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, ChangeEvent } from 'react'
+import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
 export const dynamic = 'force-dynamic'
@@ -10,7 +10,6 @@ import Header from '@/components/Header'
 import { User, Bell, Shield, Moon, CheckCircle2 } from 'lucide-react'
 import { useTheme } from '@/components/ThemeProvider'
 import { requestNotificationPermission } from '@/lib/notifications'
-import { uploadAvatar } from '@/lib/storage'
 
 export default function SettingsPage() {
   const { user, updateUserPreference } = useFirestoreStore()
@@ -20,9 +19,8 @@ export default function SettingsPage() {
   const [isUpdatingEmail, setIsUpdatingEmail] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [name, setName] = useState(user?.name || '')
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(user?.avatar || null)
+  const [avatarUrl, setAvatarUrl] = useState(user?.avatar || '')
   const [isSavingProfile, setIsSavingProfile] = useState(false)
-  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
 
   useEffect(() => {
     if ('Notification' in window) {
@@ -34,7 +32,7 @@ export default function SettingsPage() {
     if (user) {
       setEmailSummaryEnabled(user.emailSummaryEnabled || false)
       setName(user.name || '')
-      setAvatarPreview(user.avatar || null)
+      setAvatarUrl(user.avatar || '')
     }
   }, [user])
 
@@ -65,45 +63,18 @@ export default function SettingsPage() {
     if (!user) return
     const trimmedName = name.trim()
     if (!trimmedName) return
+    const trimmedAvatar = avatarUrl.trim()
 
     setIsSavingProfile(true)
     try {
       await updateUserPreference('name', trimmedName)
+      if (trimmedAvatar) {
+        await updateUserPreference('avatar', trimmedAvatar)
+      }
     } catch (error) {
       console.error('Error saving profile:', error)
     } finally {
       setIsSavingProfile(false)
-    }
-  }
-
-  const handleAvatarChange = async (event: ChangeEvent<HTMLInputElement>) => {
-    if (!user) return
-
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    if (!file.type.startsWith('image/')) {
-      console.error('Please select an image file')
-      return
-    }
-
-    const maxSizeMb = 5
-    if (file.size > maxSizeMb * 1024 * 1024) {
-      console.error('Image too large (max 5MB)')
-      return
-    }
-
-    setIsUploadingAvatar(true)
-    try {
-      const url = await uploadAvatar(user.id, file)
-      await updateUserPreference('avatar', url)
-      setAvatarPreview(url)
-    } catch (error) {
-      console.error('Error uploading avatar:', error)
-    } finally {
-      setIsUploadingAvatar(false)
-      // Reset input so the same file can be selected again if needed
-      event.target.value = ''
     }
   }
 
@@ -132,10 +103,10 @@ export default function SettingsPage() {
                 <div className="p-6 space-y-6">
                   {/* Avatar */}
                   <div className="flex items-center gap-4">
-                    {avatarPreview ? (
+                    {avatarUrl ? (
                       <div className="relative w-16 h-16 rounded-full overflow-hidden border border-gray-200 dark:border-gray-700">
                         <Image
-                          src={avatarPreview}
+                          src={avatarUrl}
                           alt={user?.name || 'User avatar'}
                           fill
                           className="object-cover"
@@ -147,25 +118,20 @@ export default function SettingsPage() {
                       </div>
                     )}
 
-                    <div>
+                    <div className="flex-1">
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Profile picture
+                        Profile picture URL
                       </label>
                       <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleAvatarChange}
-                        disabled={isUploadingAvatar || !user}
-                        className="text-sm text-gray-600 dark:text-gray-300"
+                        type="url"
+                        value={avatarUrl}
+                        onChange={(e) => setAvatarUrl(e.target.value)}
+                        placeholder="https://example.com/your-avatar.jpg"
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
                       />
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        JPG/PNG, up to 5MB.
+                        Paste a public image URL (e.g. from GitHub, Gravatar, or another host). No upload to Firebase required.
                       </p>
-                      {isUploadingAvatar && (
-                        <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                          Uploading...
-                        </p>
-                      )}
                     </div>
                   </div>
 
