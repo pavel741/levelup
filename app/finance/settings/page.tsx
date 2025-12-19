@@ -58,6 +58,12 @@ export default function FinanceSettingsPage() {
   const [reconciliationHistory, setReconciliationHistory] = useState<FinanceReconciliationRecord[]>([])
   const [lastReconciliation, setLastReconciliation] = useState<FinanceReconciliationRecord | null>(null)
   const [isSavingReconciliation, setIsSavingReconciliation] = useState(false)
+  
+  // Period settings
+  const [usePaydayPeriod, setUsePaydayPeriod] = useState(false)
+  const [periodStartDay, setPeriodStartDay] = useState(1)
+  const [periodEndDay, setPeriodEndDay] = useState<number | null>(null)
+  const [isSavingPeriod, setIsSavingPeriod] = useState(false)
 
   useEffect(() => {
     if (!user?.id) return
@@ -77,6 +83,14 @@ export default function FinanceSettingsPage() {
         )
         setGoalsText(JSON.stringify(goals ?? {}, null, 2) || '{\n  "monthlySavingsTarget": 500\n}')
         setAppSettingsText(JSON.stringify(settings ?? {}, null, 2) || '{\n  "currency": "EUR"\n}')
+        
+        // Load period settings
+        if (settings) {
+          setUsePaydayPeriod(settings.usePaydayPeriod || false)
+          setPeriodStartDay(settings.periodStartDay ?? 1)
+          setPeriodEndDay(settings.periodEndDay ?? null)
+        }
+        
         if (lastRec) {
           setLastReconciliation(lastRec)
         }
@@ -145,6 +159,39 @@ export default function FinanceSettingsPage() {
       setSettingsError('Invalid JSON. Please fix and try again.')
     } finally {
       setIsSavingAppSettings(false)
+    }
+  }
+
+  const handleSavePeriodSettings = async () => {
+    if (!user?.id) return
+    setIsSavingPeriod(true)
+    try {
+      let currentSettings: FinanceSettings = {}
+      try {
+        currentSettings = JSON.parse(appSettingsText) as FinanceSettings
+      } catch {
+        // If parsing fails, start with empty object
+        currentSettings = {}
+      }
+      const updatedSettings: FinanceSettings = {
+        ...currentSettings,
+        usePaydayPeriod,
+        periodStartDay,
+        periodEndDay,
+      }
+      await saveFinanceSettings(user.id, updatedSettings)
+      setAppSettingsText(JSON.stringify(updatedSettings, null, 2))
+      // Reload settings to ensure consistency
+      const reloaded = await getFinanceSettings(user.id)
+      if (reloaded) {
+        setUsePaydayPeriod(reloaded.usePaydayPeriod || false)
+        setPeriodStartDay(reloaded.periodStartDay ?? 1)
+        setPeriodEndDay(reloaded.periodEndDay ?? null)
+      }
+    } catch (e: any) {
+      console.error('Error saving period settings:', e)
+    } finally {
+      setIsSavingPeriod(false)
     }
   }
 
@@ -289,6 +336,87 @@ export default function FinanceSettingsPage() {
                         {isSavingGoals ? 'Saving…' : 'Save goals'}
                       </button>
                     </div>
+                  </div>
+                </div>
+
+                {/* Period Settings */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Period Settings</h2>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                    Configure how monthly periods are calculated for your budget and analytics.
+                  </p>
+                  
+                  {/* Payday Period Option */}
+                  <div className="mb-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={usePaydayPeriod}
+                        onChange={(e) => {
+                          setUsePaydayPeriod(e.target.checked)
+                        }}
+                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                      />
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                        Use Payday Period (Last Working Day)
+                      </span>
+                    </label>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-6">
+                      Use payday-to-payday periods (last working day of previous month to last working day of current month) instead of custom period.
+                    </p>
+                  </div>
+                  
+                  {/* Custom Period Settings */}
+                  <div className={`space-y-4 ${usePaydayPeriod ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Set the start and end day of your monthly period. Default is from the 1st to the end of the month.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="periodStartDay" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Start Day:
+                        </label>
+                        <input
+                          type="number"
+                          id="periodStartDay"
+                          min="1"
+                          max="31"
+                          value={periodStartDay}
+                          onChange={(e) => setPeriodStartDay(parseInt(e.target.value) || 1)}
+                          disabled={usePaydayPeriod}
+                          className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="periodEndDay" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          End Day:
+                        </label>
+                        <input
+                          type="number"
+                          id="periodEndDay"
+                          min="1"
+                          max="31"
+                          value={periodEndDay || ''}
+                          onChange={(e) => setPeriodEndDay(e.target.value ? parseInt(e.target.value) : null)}
+                          disabled={usePaydayPeriod}
+                          placeholder="End of month"
+                          className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        />
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          Leave empty for end of month
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4 flex justify-end">
+                    <button
+                      onClick={handleSavePeriodSettings}
+                      disabled={isSavingPeriod || !user}
+                      className="px-4 py-2 text-xs sm:text-sm bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {isSavingPeriod ? 'Saving…' : 'Save Period Settings'}
+                    </button>
                   </div>
                 </div>
 

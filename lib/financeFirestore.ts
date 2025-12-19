@@ -200,6 +200,55 @@ export const subscribeToTransactions = (
   )
 }
 
+/**
+ * Get all transactions for summary calculations (no limit)
+ * This loads all transactions in batches to avoid Firestore limits
+ */
+export const getAllTransactionsForSummary = async (
+  userId: string
+): Promise<WithId<FinanceTransaction>[]> => {
+  if (!db) {
+    throw new Error('Firestore is not initialized')
+  }
+
+  const transactionsRef = getTransactionsRef(userId)
+  const allTransactions: WithId<FinanceTransaction>[] = []
+  let lastDoc: any = null
+  const batchSize = 1000 // Firestore limit per query
+
+  while (true) {
+    let q = query(transactionsRef, orderBy('date', 'desc'), limit(batchSize))
+    if (lastDoc) {
+      q = query(q, startAfter(lastDoc))
+    }
+
+    const snapshot = await getDocs(q)
+    
+    if (snapshot.empty) {
+      break
+    }
+
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data()
+      const converted = convertFirestoreData(data) as FinanceTransaction
+      const { id: _ignoreId, ...rest } = converted as any
+      allTransactions.push({
+        ...(rest as FinanceTransaction),
+        id: docSnap.id,
+      })
+    })
+
+    // If we got fewer than batchSize, we've reached the end
+    if (snapshot.size < batchSize) {
+      break
+    }
+
+    lastDoc = snapshot.docs[snapshot.docs.length - 1]
+  }
+
+  return allTransactions
+}
+
 export const loadMoreTransactions = async (
   userId: string,
   lastDoc: any,

@@ -390,10 +390,13 @@ export class CSVImportService {
       date = new Date().toISOString().split('T')[0]
     }
 
-    // Parse amount - handle Estonian number format
+    // Parse amount - handle Estonian number format and negative amounts
     let amountNum = 0
     if (amount) {
       let cleaned = amount.toString().trim()
+      // Check if amount starts with "-" or contains negative indicator
+      const isNegative = cleaned.startsWith('-') || cleaned.startsWith('−') || cleaned.includes('−')
+      
       if (cleaned.includes(',') && cleaned.includes(' ')) {
         cleaned = cleaned.replace(/\s/g, '').replace(',', '.')
       } else if (cleaned.includes(',')) {
@@ -412,6 +415,18 @@ export class CSVImportService {
       if (isNaN(amountNum)) {
         amountNum = 0
       }
+      
+      // If amount is negative or has negative indicator, ensure type is expense
+      if (amountNum < 0 || isNegative) {
+        type = 'expense'
+        // Keep negative sign for expenses
+        if (amountNum > 0 && isNegative) {
+          amountNum = -amountNum
+        }
+      } else if (amountNum > 0 && !type) {
+        // If positive and no type specified, default to income
+        type = 'income'
+      }
     }
 
     const transaction: {
@@ -426,7 +441,8 @@ export class CSVImportService {
     } = {
       type: type || 'expense',
       description: description.trim() || 'Imported transaction',
-      amount: Math.abs(amountNum),
+      // Preserve negative amounts for expenses, positive for income
+      amount: amountNum,
       category: (category && category.trim()) ? category.trim() : 'Other',
       date: date,
     }

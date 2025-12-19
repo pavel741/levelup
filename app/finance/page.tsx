@@ -15,8 +15,11 @@ import {
   getCategories,
   batchAddTransactions,
   batchDeleteTransactions,
+  getFinanceSettings,
+  getAllTransactionsForSummary,
 } from '@/lib/financeFirestore'
-import type { FinanceTransaction, FinanceCategories } from '@/types/finance'
+import type { FinanceTransaction, FinanceCategories, FinanceSettings } from '@/types/finance'
+import { getPeriodDates } from '@/lib/financeDateUtils'
 import { CSVImportService } from '@/lib/csvImport'
 
 export const dynamic = 'force-dynamic'
@@ -25,8 +28,11 @@ export default function FinancePage() {
   const { user } = useFirestoreStore()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [transactions, setTransactions] = useState<FinanceTransaction[]>([])
+  const [allTransactionsForSummary, setAllTransactionsForSummary] = useState<FinanceTransaction[]>([])
   const [categories, setCategories] = useState<FinanceCategories | null>(null)
+  const [financeSettings, setFinanceSettings] = useState<FinanceSettings | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isLoadingSummary, setIsLoadingSummary] = useState(true)
   
   // Dashboard state
   const [summaryView, setSummaryView] = useState<'monthly' | 'alltime'>('monthly')
@@ -101,6 +107,51 @@ export default function FinancePage() {
     return () => unsubscribe()
   }, [user?.id])
 
+  // Load finance settings (for period configuration)
+  useEffect(() => {
+    if (!user?.id) return
+
+    const loadSettings = async () => {
+      try {
+        const settings = await getFinanceSettings(user.id)
+        setFinanceSettings(settings)
+      } catch (e) {
+        console.error('Error loading finance settings:', e)
+      }
+    }
+
+    loadSettings()
+  }, [user?.id])
+
+  // Load ALL transactions for summary calculations (no limit)
+  const loadAllTransactionsForSummary = async () => {
+    if (!user?.id) return
+    setIsLoadingSummary(true)
+    try {
+      const allTxs = await getAllTransactionsForSummary(user.id)
+      setAllTransactionsForSummary(allTxs)
+    } catch (e) {
+      console.error('Error loading all transactions for summary:', e)
+    } finally {
+      setIsLoadingSummary(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!user?.id) return
+    loadAllTransactionsForSummary()
+  }, [user?.id])
+
+  // Reload summary transactions when regular transactions change significantly
+  useEffect(() => {
+    if (!user?.id || transactions.length === 0) return
+    // Debounce reload to avoid too many calls
+    const timeoutId = setTimeout(() => {
+      loadAllTransactionsForSummary()
+    }, 2000)
+    return () => clearTimeout(timeoutId)
+  }, [user?.id, transactions.length])
+
   // Initialize categories if they don't exist
   useEffect(() => {
     if (!user?.id || categories !== null) return
@@ -145,7 +196,7 @@ export default function FinancePage() {
     if (Array.isArray(categories.expense)) {
       cats.push(...categories.expense)
     }
-    return [...new Set(cats)]
+    return Array.from(new Set(cats))
   }, [categories])
 
   // Generate category suggestions based on description
@@ -288,16 +339,32 @@ export default function FinancePage() {
     return filtered
   }, [transactions, currentFilter, dateRange, searchQuery, customDateFrom, customDateTo])
 
-  // Calculate summary for selected month
+  // Calculate summary for selected month (using ALL transactions)
   const monthlySummary = useMemo(() => {
-    const [year, month] = selectedMonth.split('-').map(Number)
-    const startDate = new Date(year, month - 1, 1)
-    const endDate = new Date(year, month, 0, 23, 59, 59)
+    // Use period settings if available, otherwise default to calendar month
+    let startDate: Date
+    let endDate: Date
+    
+    if (financeSettings?.usePaydayPeriod || financeSettings?.periodStartDay !== undefined) {
+      const periodDates = getPeriodDates(
+        selectedMonth,
+        financeSettings.usePaydayPeriod || false,
+        financeSettings.periodStartDay ?? 1,
+        financeSettings.periodEndDay ?? null
+      )
+      startDate = periodDates.startDate
+      endDate = periodDates.endDate
+    } else {
+      // Default to calendar month
+      const [year, month] = selectedMonth.split('-').map(Number)
+      startDate = new Date(year, month - 1, 1)
+      endDate = new Date(year, month, 0, 23, 59, 59)
+    }
 
     let income = 0
     let expenses = 0
 
-    transactions.forEach((tx) => {
+    allTransactionsForSummary.forEach((tx) => {
       let txDate: Date
       if (typeof tx.date === 'string') {
         txDate = new Date(tx.date)
@@ -324,15 +391,21 @@ export default function FinancePage() {
       }
     })
 
-    return { income, expenses, balance: income - expenses }
-  }, [transactions, selectedMonth])
+    return {
+      income,
+      expenses,
+      balance: income - expenses,
+      startDate,
+      endDate,
+    }
+  }, [allTransactionsForSummary, selectedMonth, financeSettings])
 
-  // Calculate all-time summary
+  // Calculate all-time summary (using ALL transactions)
   const allTimeSummary = useMemo(() => {
     let income = 0
     let expenses = 0
 
-    transactions.forEach((tx) => {
+    allTransactionsForSummary.forEach((tx) => {
       const amount = Number(tx.amount) || 0
       const type = (tx.type || '').toLowerCase()
       if (type === 'income') {
@@ -346,7 +419,7 @@ export default function FinancePage() {
     })
 
     return { income, expenses, balance: income - expenses }
-  }, [transactions])
+  }, [allTransactionsForSummary])
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('et-EE', {
@@ -379,10 +452,14 @@ export default function FinancePage() {
 
     setIsSubmitting(true)
     try {
+      // Ensure expenses are stored as negative amounts
+      const amount = Number(formAmount)
+      const finalAmount = formType === 'expense' && amount > 0 ? -amount : amount
+      
       const transaction: Omit<FinanceTransaction, 'id'> = {
         type: formType,
         description: formDescription,
-        amount: Number(formAmount),
+        amount: finalAmount,
         category: formCategory,
         date: formDate,
       }
@@ -410,9 +487,15 @@ export default function FinancePage() {
   // Handle edit transaction
   const handleEdit = (tx: FinanceTransaction & { id: string }) => {
     setEditingTransactionId(tx.id)
-    setFormType((tx.type || 'expense') as 'income' | 'expense')
+    const txType = (tx.type || '').toLowerCase()
+    const amount = Number(tx.amount) || 0
+    // Determine type: if amount is negative, it's an expense; if type is set, use that
+    const inferredType = amount < 0 ? 'expense' : (txType === 'income' ? 'income' : txType === 'expense' ? 'expense' : 'expense')
+    
+    setFormType(inferredType as 'income' | 'expense')
     setFormDescription(tx.description || '')
-    setFormAmount(String(tx.amount || ''))
+    // Display absolute value in form (user enters positive numbers)
+    setFormAmount(String(Math.abs(amount) || ''))
     setFormCategory(tx.category || '')
     setFormDate(formatDate(tx.date))
   }
@@ -669,6 +752,9 @@ export default function FinancePage() {
       setCsvImportStatus(`Successfully imported ${result.success} transactions${result.errors > 0 ? ` (${result.errors} errors)` : ''}`)
       setCsvImportProgress(100)
       
+      // Reload all transactions for summary calculations
+      await loadAllTransactionsForSummary()
+      
       // Reset after 3 seconds
       setTimeout(() => {
         setShowCsvMapping(false)
@@ -780,6 +866,12 @@ export default function FinancePage() {
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-900 dark:text-white text-sm bg-white dark:bg-gray-800 px-1 whitespace-nowrap z-10">
                               {getEstonianMonth(selectedMonth)}
                             </span>
+                          </div>
+                          {summaryView === 'monthly' && monthlySummary.startDate && monthlySummary.endDate && (
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              {monthlySummary.startDate.toLocaleDateString()} - {monthlySummary.endDate.toLocaleDateString()}
+                            </div>
+                          )}
                           </div>
                           <button
                             type="button"
@@ -1468,15 +1560,36 @@ export default function FinancePage() {
                                 </div>
                               </div>
                               <div className="flex items-center gap-3 flex-shrink-0">
-                                <span
-                                  className={`text-lg font-bold font-mono tabular-nums ${
-                                    (tx.type || '').toLowerCase() === 'income' || (Number(tx.amount) || 0) > 0
-                                      ? 'text-green-600 dark:text-green-400'
-                                      : 'text-red-600 dark:text-red-400'
-                                  }`}
-                                >
-                                  {formatCurrency(Number(tx.amount) || 0)}
-                                </span>
+                                {(() => {
+                                  const txType = (tx.type || '').toLowerCase()
+                                  const amount = Number(tx.amount) || 0
+                                  
+                                  // Determine if income or expense: prioritize type field, then check amount sign
+                                  let isIncome: boolean
+                                  if (txType === 'income') {
+                                    isIncome = true
+                                  } else if (txType === 'expense') {
+                                    isIncome = false
+                                  } else {
+                                    // If type not set, use amount sign: positive = income, negative = expense
+                                    isIncome = amount >= 0
+                                  }
+                                  
+                                  // Display amount: if expense with positive amount, show as negative
+                                  const displayAmount = !isIncome && amount > 0 ? -amount : amount
+                                  
+                                  return (
+                                    <span
+                                      className={`text-lg font-bold font-mono tabular-nums ${
+                                        isIncome
+                                          ? 'text-green-600 dark:text-green-400'
+                                          : 'text-red-600 dark:text-red-400'
+                                      }`}
+                                    >
+                                      {formatCurrency(displayAmount)}
+                                    </span>
+                                  )
+                                })()}
                                 <button
                                   type="button"
                                   onClick={() => handleEdit(tx as FinanceTransaction & { id: string })}
