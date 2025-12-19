@@ -209,6 +209,15 @@ export const addTransaction = async (
       date: transaction.date instanceof Date ? transaction.date : new Date(transaction.date),
       createdAt: new Date(),
     }
+    
+    // Debug: Log if selgitus is present
+    if ('selgitus' in transaction) {
+      console.log('📝 Saving transaction with selgitus:', {
+        description: transaction.description?.substring(0, 50),
+        selgitus: (transaction as any).selgitus?.substring(0, 50),
+        hasSelgitus: !!txData.selgitus
+      })
+    }
 
     const result = await collection.insertOne(txData)
     return result.insertedId.toString()
@@ -294,6 +303,13 @@ export const batchAddTransactions = async (
           date: tx.date instanceof Date ? tx.date : new Date(tx.date),
           createdAt: new Date(),
         }))
+        
+        // Debug: Log selgitus in first few transactions
+        const docsWithSelgitus = docs.filter(d => 'selgitus' in d)
+        if (docsWithSelgitus.length > 0 && i === 0) {
+          console.log(`📝 Batch import: ${docsWithSelgitus.length} transactions with selgitus out of ${docs.length} in first batch`)
+          console.log('Sample selgitus:', docsWithSelgitus[0].selgitus?.substring(0, 50))
+        }
 
         await collection.insertMany(docs, { ordered: false }) // Continue on errors
         successCount += chunk.length

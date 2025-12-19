@@ -377,8 +377,13 @@ export class CSVImportService {
       providedCategory.match(/^[A-Z0-9\s#\/\\-]+$/) && providedCategory.length > 20 // Long alphanumeric strings
     
     // Always try to get a smart category
+    // Include selgitus in description if it exists (for PSD2-KLIX detection, etc.)
+    const fullDescription = selgitus && selgitus.trim().length > 0 
+      ? `${description} ${selgitus}`.trim() 
+      : description
+    
     const suggestedCategory = getSuggestedCategory(
-      description,
+      fullDescription,
       referenceNumber || undefined,
       recipientName || undefined,
       parseFloat(amount || '0')

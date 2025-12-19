@@ -65,20 +65,21 @@ export function categorizeTransaction(
   }
 
   // 1. Check for reference number (viitenumber) → Bills
-  // SKIP THIS FOR NOW - focus on POS: and ATM: first
-  // We'll add this back later once POS:/ATM: are working correctly
-  // if (refNum && refNum.trim().length > 0) {
-  //   const cleanRefNum = refNum.replace(/\s+/g, '').trim()
-  //   if (cleanRefNum.length > 0 && /\d/.test(cleanRefNum)) {
-  //     if (!hasPosPattern && !hasAtmPattern && !hasCardPattern) {
-  //       return {
-  //         category: 'Bills',
-  //         confidence: 'high',
-  //         reason: 'Reference number (viitenumber) detected',
-  //       }
-  //     }
-  //   }
-  // }
+  // Rule: If viitenumber is not null/empty, it's a Bills transaction
+  // BUT: Only if NO POS: or ATM: patterns were found above
+  if (refNum && refNum.trim().length > 0) {
+    const cleanRefNum = refNum.replace(/\s+/g, '').trim()
+    if (cleanRefNum.length > 0 && /\d/.test(cleanRefNum)) {
+      // Only categorize as Bills if no card payment patterns detected
+      if (!hasPosPattern && !hasAtmPattern && !hasCardPattern) {
+        return {
+          category: 'Bills',
+          confidence: 'high',
+          reason: 'Reference number (viitenumber) detected',
+        }
+      }
+    }
+  }
 
   // 2. Check for loan patterns → Kodulaen category
   // Pattern: "laenu 33627" or similar loan references
@@ -101,9 +102,15 @@ export function categorizeTransaction(
   }
 
   // 4. Check for PSD2/KLIX payment references → ESTO category
-  // Pattern: "PSD2 - KLIX-521110689641" or similar payment references
-  if (/psd2\s*-/i.test(combinedText) || /klix/i.test(combinedText)) {
-    if (!posPattern.test(combinedText) && !cardPattern.test(desc)) {
+  // Pattern: "PSD2 - KLIX-521110689641" or "PSD2-KLIX" or similar payment references
+  // Check in description, combinedText, and make sure it's not a card payment
+  const hasPsd2KlixPattern = /psd2\s*-?\s*klix/i.test(combinedText) || 
+                              /psd2\s*-/i.test(combinedText) || 
+                              /klix/i.test(combinedText)
+  
+  if (hasPsd2KlixPattern) {
+    // Only categorize as ESTO if it's not a card payment (POS: or card number patterns)
+    if (!hasPosPattern && !hasCardPattern) {
       return {
         category: 'ESTO',
         confidence: 'high',

@@ -1008,6 +1008,17 @@ export default function FinancePage() {
         amount: tx.amount || 0,
         category: tx.category || 'Other',
         date: tx.date || new Date().toISOString().split('T')[0],
+        // Include all other fields from CSV (selgitus, referenceNumber, recipientName, archiveId, etc.)
+        ...(tx.referenceNumber && { referenceNumber: tx.referenceNumber }),
+        ...(tx.recipientName && { recipientName: tx.recipientName }),
+        ...(tx.archiveId && { archiveId: tx.archiveId }),
+        ...(tx.selgitus && { selgitus: tx.selgitus }),
+        // Include any other fields that might be present
+        ...Object.fromEntries(
+          Object.entries(tx).filter(([key]) => 
+            !['type', 'description', 'amount', 'category', 'date'].includes(key)
+          )
+        ),
       }))
 
       const result = await batchAddTransactions(
