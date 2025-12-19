@@ -1,0 +1,119 @@
+'use client'
+
+import { useMemo } from 'react'
+import { Doughnut } from 'react-chartjs-2'
+import {
+  ArcElement,
+  Chart as ChartJS,
+  Legend,
+  Tooltip,
+  ChartOptions,
+  ChartData,
+} from 'chart.js'
+import type { FinanceTransaction } from '@/types/finance'
+
+ChartJS.register(ArcElement, Tooltip, Legend)
+
+interface Props {
+  transactions: FinanceTransaction[]
+}
+
+const COLORS = [
+  '#6366f1',
+  '#ef4444',
+  '#10b981',
+  '#f59e0b',
+  '#8b5cf6',
+  '#ec4899',
+  '#06b6d4',
+  '#84cc16',
+  '#f97316',
+  '#14b8a6',
+  '#a855f7',
+  '#eab308',
+  '#22c55e',
+  '#3b82f6',
+  '#f43f5e',
+]
+
+export function FinanceCategoryChart({ transactions }: Props) {
+  const { data, options } = useMemo(() => {
+    const categoryTotals: Record<string, number> = {}
+
+    for (const tx of transactions) {
+      const amount = Number(tx.amount) || 0
+      const type = (tx.type || '').toLowerCase()
+
+      // Focus on expenses; treat negative as expense as well
+      const isExpense = type === 'expense' || amount < 0
+      if (!isExpense) continue
+
+      const absAmount = Math.abs(amount)
+      const category = tx.category || 'Other'
+      categoryTotals[category] = (categoryTotals[category] || 0) + absAmount
+    }
+
+    const categories = Object.keys(categoryTotals)
+    const amounts = categories.map((c) => categoryTotals[c])
+    const total = amounts.reduce((sum, v) => sum + v, 0)
+
+    const chartData: ChartData<'doughnut'> = {
+      labels: categories,
+      datasets: [
+        {
+          data: amounts,
+          backgroundColor: categories.map((_, i) => COLORS[i % COLORS.length]),
+          borderColor: '#ffffff',
+          borderWidth: 2,
+        },
+      ],
+    }
+
+    const options: ChartOptions<'doughnut'> = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: {
+            boxWidth: 14,
+            font: {
+              size: 11,
+            },
+          },
+        },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const value = ctx.parsed || 0
+              const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0'
+              const formatter = new Intl.NumberFormat('et-EE', {
+                style: 'currency',
+                currency: 'EUR',
+              })
+              return `${formatter.format(value)} (${percentage}%)`
+            },
+          },
+        },
+      },
+    }
+
+    return { data: chartData, options }
+  }, [transactions])
+
+  if (!transactions.length) {
+    return (
+      <div className="flex items-center justify-center h-64 text-sm text-gray-500 dark:text-gray-400">
+        No expense data yet to show a category breakdown.
+      </div>
+    )
+  }
+
+  return (
+    <div className="h-72">
+      <Doughnut data={data} options={options} />
+    </div>
+  )
+}
+
+

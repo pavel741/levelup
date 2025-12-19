@@ -181,10 +181,11 @@ export const subscribeToTransactions = (
       const transactions: WithId<FinanceTransaction>[] = []
       snapshot.forEach((docSnap) => {
         const data = docSnap.data()
-        const converted = convertFirestoreData(data)
+        const converted = convertFirestoreData(data) as FinanceTransaction
+        const { id: _ignoreId, ...rest } = converted as any
         transactions.push({
+          ...(rest as FinanceTransaction),
           id: docSnap.id,
-          ...(converted as FinanceTransaction),
         })
       })
       callback(transactions, {
@@ -220,10 +221,11 @@ export const loadMoreTransactions = async (
 
   snapshot.forEach((docSnap) => {
     const data = docSnap.data()
-    const converted = convertFirestoreData(data)
+    const converted = convertFirestoreData(data) as FinanceTransaction
+    const { id: _ignoreId, ...rest } = converted as any
     transactions.push({
+      ...(rest as FinanceTransaction),
       id: docSnap.id,
-      ...(converted as FinanceTransaction),
     })
   })
 
@@ -355,8 +357,9 @@ export const getTransaction = async (
   const snap = await getDoc(transactionRef)
   if (!snap.exists()) return null
 
-  const data = convertFirestoreData(snap.data())
-  return { id: snap.id, ...(data as FinanceTransaction) }
+  const data = convertFirestoreData(snap.data()) as FinanceTransaction
+  const { id: _ignoreId, ...rest } = data as any
+  return { ...(rest as FinanceTransaction), id: snap.id }
 }
 
 // ---------- Categories ----------
@@ -502,8 +505,9 @@ export const subscribeToReconciliationHistory = (
     (snapshot) => {
       const history: WithId<FinanceReconciliationRecord>[] = []
       snapshot.forEach((docSnap) => {
-        const data = convertFirestoreData(docSnap.data())
-        history.push({ id: docSnap.id, ...(data as FinanceReconciliationRecord) })
+        const data = convertFirestoreData(docSnap.data()) as FinanceReconciliationRecord
+        const { id: _ignoreId, ...rest } = data as any
+        history.push({ ...(rest as FinanceReconciliationRecord), id: docSnap.id })
       })
       callback(history)
     },
@@ -560,8 +564,9 @@ export const subscribeToRecurringTransactions = (
     (snapshot) => {
       const items: WithId<FinanceRecurringTransaction>[] = []
       snapshot.forEach((docSnap) => {
-        const data = convertFirestoreData(docSnap.data())
-        items.push({ id: docSnap.id, ...(data as FinanceRecurringTransaction) })
+        const data = convertFirestoreData(docSnap.data()) as FinanceRecurringTransaction
+        const { id: _ignoreId, ...rest } = data as any
+        items.push({ ...(rest as FinanceRecurringTransaction), id: docSnap.id })
       })
       callback(items)
     },
