@@ -602,6 +602,11 @@ export default function FinancePage() {
           // Always check if category should be updated based on description
           const currentCategory = tx.category || ''
           const description = tx.description || ''
+          // Check selgitus field (Estonian for "description") - some transactions might have description there
+          const selgitus = (tx as any).selgitus || ''
+          
+          // Combine description and selgitus - use whichever has content
+          const fullDescription = `${description} ${selgitus}`.trim() || description || selgitus
           
           // If category looks like a description (contains POS:, ATM:, loan patterns, utility patterns, or PSD2/KLIX), use it as description for categorization
           const categoryHasPos = currentCategory.includes('POS:')
@@ -611,10 +616,11 @@ export default function FinancePage() {
           const categoryHasPsd2Klix = /psd2|klix/i.test(currentCategory)
           // Combine category and description if category has POS, ATM, loan, utility, or PSD2/KLIX patterns
           const effectiveDescription = (categoryHasPos || categoryHasAtm || categoryHasLoan || categoryHasUtility || categoryHasPsd2Klix)
-            ? `${currentCategory} ${description}`.trim() 
-            : description
+            ? `${currentCategory} ${fullDescription}`.trim() 
+            : fullDescription
           
           // Get suggested category based on description (or category if it contains POS/ATM pattern)
+          // Use effectiveDescription which includes selgitus
           const suggestedCategory = getSuggestedCategory(
             effectiveDescription,
             tx.referenceNumber,
@@ -623,16 +629,38 @@ export default function FinancePage() {
           )
           
           // Check if category needs recategorization
-          // POS: and ATM: patterns can be in description OR category field
+          // POS: and ATM: patterns can be in description, selgitus, OR category field
           const hasPosInCategory = currentCategory.includes('POS:') || currentCategory.match(/\d{4}\s+\d{2}\*+/)
           const hasAtmInCategory = currentCategory.includes('ATM:')
           const hasPsd2KlixInCategory = /psd2|klix/i.test(currentCategory)
-          const hasPosInDescription = /pos\s*:/i.test(description) || /\d{4}\s+\d{2}\*+/.test(description)
-          const hasAtmInDescription = /^atm\s*:/i.test(description) || /^atm\s+/i.test(description)
           
-          // Combined check: POS: or ATM: in either description or category
-          const hasPosPattern = hasPosInDescription || hasPosInCategory
-          const hasAtmPattern = hasAtmInDescription || hasAtmInCategory
+          // Check POS: and ATM: in description, selgitus, and effectiveDescription
+          const hasPosInDescription = /pos\s*:/i.test(description) || /\d{4}\s+\d{2}\*+/.test(description)
+          const hasPosInSelgitus = /pos\s*:/i.test(selgitus) || /\d{4}\s+\d{2}\*+/.test(selgitus)
+          const hasPosInEffective = /pos\s*:/i.test(effectiveDescription) || /\d{4}\s+\d{2}\*+/.test(effectiveDescription)
+          
+          const hasAtmInDescription = /^atm\s*:/i.test(description) || /^atm\s+/i.test(description) || /atm\s*:/i.test(description)
+          const hasAtmInSelgitus = /^atm\s*:/i.test(selgitus) || /^atm\s+/i.test(selgitus) || /atm\s*:/i.test(selgitus)
+          const hasAtmInEffective = /^atm\s*:/i.test(effectiveDescription) || /^atm\s+/i.test(effectiveDescription) || /atm\s*:/i.test(effectiveDescription)
+          
+          // Combined check: POS: or ATM: in description, selgitus, effectiveDescription, or category
+          const hasPosPattern = hasPosInDescription || hasPosInSelgitus || hasPosInEffective || hasPosInCategory
+          const hasAtmPattern = hasAtmInDescription || hasAtmInSelgitus || hasAtmInEffective || hasAtmInCategory
+          
+          // Debug logging for first few transactions with POS:/ATM: patterns
+          if (i < 5 && (hasPosPattern || hasAtmPattern)) {
+            console.log('🔍 Pattern detection:', {
+              description: description.substring(0, 50),
+              currentCategory,
+              hasPosInDescription,
+              hasPosInCategory,
+              hasPosPattern,
+              hasAtmInDescription,
+              hasAtmInCategory,
+              hasAtmPattern,
+              suggestedCategory
+            })
+          }
           const hasPsd2Klix = /psd2|klix/i.test(effectiveDescription) || hasPsd2KlixInCategory
           const hasOtherPaymentRef = /makse\s*\/|blid/i.test(effectiveDescription)
           // Check for loan patterns in both description and category
@@ -703,10 +731,16 @@ export default function FinancePage() {
           // Priority 1: POS: → Card Payment (absolute priority)
           if (hasPosPattern || shouldBeCardPayment) {
             finalCategory = 'Card Payment'
+            if (i < 5) {
+              console.log('✅ Setting Card Payment for POS: transaction:', description.substring(0, 50))
+            }
           }
           // Priority 2: ATM: → ATM Withdrawal (absolute priority)
           else if (hasAtmPattern || shouldBeAtm) {
             finalCategory = 'ATM Withdrawal'
+            if (i < 5) {
+              console.log('✅ Setting ATM Withdrawal for ATM: transaction:', description.substring(0, 50))
+            }
           }
           // Priority 3: Other special categories
           else if (shouldBeKommunaalid) {
@@ -718,6 +752,16 @@ export default function FinancePage() {
           }
           // Priority 4: Use suggested category from categorizer
           // (Bills logic disabled for now)
+          
+          // Debug: Log if we're not changing the category but should
+          if (i < 5 && (hasPosPattern || hasAtmPattern)) {
+            console.log('📊 Final decision:', {
+              currentCategory,
+              suggestedCategory,
+              finalCategory,
+              willUpdate: finalCategory !== currentCategory
+            })
+          }
           
           if (needsRecategorization && finalCategory && finalCategory !== currentCategory) {
             try {

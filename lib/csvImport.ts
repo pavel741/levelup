@@ -9,6 +9,7 @@ type ColumnMapping = {
   _recipientName?: number
   _referenceNumber?: number
   _archiveId?: number
+  _selgitus?: number  // Estonian "description" field
   _foundColumns: string[]
   _allHeaders: string[]
   _normalizedHeaders: string[]
@@ -120,12 +121,18 @@ export class CSVImportService {
           mapping._recipientName = index
           mapping._foundColumns.push(`recipient/payer name: "${header}"`)
         }
-      } else if (normalized === 'selgitus' || normalized.includes('selgitus')) {
-        if (mapping.category === null) {
-          mapping.category = index
-          mapping._foundColumns.push(`category (selgitus): "${header}"`)
-        }
-      } else if (
+      } else         if (normalized === 'selgitus' || normalized.includes('selgitus')) {
+          // Map selgitus to its own field, not category
+          if (mapping._selgitus === undefined) {
+            mapping._selgitus = index
+            mapping._foundColumns.push(`selgitus: "${header}"`)
+          }
+          // Also use it as category if category is not already set
+          if (mapping.category === null) {
+            mapping.category = index
+            mapping._foundColumns.push(`category (selgitus): "${header}"`)
+          }
+        } else if (
         normalized.includes('category') ||
         normalized.includes('cat') ||
         normalized.includes('tag') ||
@@ -300,6 +307,7 @@ export class CSVImportService {
     archiveId?: string
     referenceNumber?: string
     recipientName?: string
+    selgitus?: string
   } {
     const headers = columnMap._normalizedHeaders || Object.keys(row)
 
@@ -319,6 +327,7 @@ export class CSVImportService {
     const referenceNumber =
       columnMap._referenceNumber !== undefined ? getValue(columnMap._referenceNumber) : null
     const archiveId = columnMap._archiveId !== undefined ? getValue(columnMap._archiveId) : null
+    const selgitus = columnMap._selgitus !== undefined ? getValue(columnMap._selgitus) : null
     let date = getValue(columnMap.date)
 
     // Normalize type
@@ -462,6 +471,7 @@ export class CSVImportService {
       archiveId?: string
       referenceNumber?: string
       recipientName?: string
+      selgitus?: string
     } = {
       type: type || 'expense',
       description: description.trim() || 'Imported transaction',
@@ -480,6 +490,9 @@ export class CSVImportService {
     if (recipientName && recipientName.trim().length > 0) {
       transaction.recipientName = recipientName.trim()
     }
+    if (selgitus && selgitus.trim().length > 0) {
+      transaction.selgitus = selgitus.trim()
+    }
 
     return transaction
   }
@@ -497,6 +510,7 @@ export class CSVImportService {
       archiveId?: string
       referenceNumber?: string
       recipientName?: string
+      selgitus?: string
     }>
     columnMapping: ColumnMapping
   } {
