@@ -22,14 +22,26 @@ interface Alert {
 
 export function FinanceSpendingAlerts({ transactions, months = 6 }: Props) {
   const alerts = useMemo(() => {
-    const now = new Date()
+    // Calculate the actual date range from transactions
+    let minDate: Date | null = null
+    let maxDate: Date | null = null
+    
+    transactions.forEach((tx) => {
+      const txDate = typeof tx.date === 'string' ? new Date(tx.date) : (tx.date as Date)
+      if (!minDate || txDate < minDate) minDate = txDate
+      if (!maxDate || txDate > maxDate) maxDate = txDate
+    })
+    
+    // If no transactions, use current date as fallback
+    const referenceDate = maxDate || new Date()
+    
     const alertsList: Alert[] = []
     const categoryMonthlyTotals: Record<string, number[]> = {}
     const categoryNames: Record<string, string> = {}
 
-    // Collect monthly totals for each category
+    // Collect monthly totals for each category from transaction date range
     for (let i = months - 1; i >= 0; i--) {
-      const monthStart = startOfMonth(subMonths(now, i))
+      const monthStart = startOfMonth(subMonths(referenceDate, i))
       const monthEnd = endOfMonth(monthStart)
 
       transactions.forEach((tx) => {

@@ -27,14 +27,30 @@ interface Props {
 
 export function FinanceSpendingVelocity({ transactions, view = 'weekly', days = 30, weeks = 12 }: Props) {
   const { data, options } = useMemo(() => {
-    const now = new Date()
+    // Calculate the actual date range from transactions
+    let minDate: Date | null = null
+    let maxDate: Date | null = null
+    
+    transactions.forEach((tx) => {
+      const txDate = typeof tx.date === 'string' ? new Date(tx.date) : (tx.date as Date)
+      if (!minDate || txDate < minDate) minDate = txDate
+      if (!maxDate || txDate > maxDate) maxDate = txDate
+    })
+    
+    // If no transactions, use current date as fallback
+    const endDate = maxDate || new Date()
+    const startDate = minDate || new Date()
     
     let labels: string[] = []
     let velocityData: number[] = []
 
     if (view === 'daily') {
-      const startDate = startOfDay(subDays(now, days - 1))
-      const dayDates = eachDayOfInterval({ start: startDate, end: now })
+      // Use the actual date range from transactions
+      // If transactions span fewer days than requested, use the transaction range
+      // Otherwise, show the last 'days' days ending at the latest transaction date
+      const calculatedStartDate = startOfDay(subDays(endDate, days - 1))
+      const actualStartDate = calculatedStartDate < startDate ? startOfDay(startDate) : calculatedStartDate
+      const dayDates = eachDayOfInterval({ start: actualStartDate, end: endDate })
 
       const dailyTotals: Record<string, number> = {}
 
@@ -66,8 +82,12 @@ export function FinanceSpendingVelocity({ transactions, view = 'weekly', days = 
       })
     } else {
       // Weekly view
-      const startDate = startOfWeek(subWeeks(now, weeks - 1))
-      const weekStarts = eachWeekOfInterval({ start: startDate, end: now }, { weekStartsOn: 1 }) // Monday
+      // Use the actual date range from transactions
+      // If transactions span fewer weeks than requested, use the transaction range
+      // Otherwise, show the last 'weeks' weeks ending at the latest transaction date
+      const calculatedStartDate = startOfWeek(subWeeks(endDate, weeks - 1), { weekStartsOn: 1 })
+      const actualStartDate = calculatedStartDate < startDate ? startOfWeek(startDate, { weekStartsOn: 1 }) : calculatedStartDate
+      const weekStarts = eachWeekOfInterval({ start: actualStartDate, end: endDate }, { weekStartsOn: 1 }) // Monday
 
       const weeklyTotals: Array<{ week: string; total: number; days: number }> = []
 

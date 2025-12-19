@@ -23,9 +23,20 @@ interface RecurringExpense {
 
 export function FinanceRecurringExpenses({ transactions, months = 6 }: Props) {
   const recurringExpenses = useMemo(() => {
-    const now = new Date()
-    const startDate = startOfMonth(subMonths(now, months))
-    const endDate = endOfMonth(now)
+    // Calculate the actual date range from transactions
+    let minDate: Date | null = null
+    let maxDate: Date | null = null
+    
+    transactions.forEach((tx) => {
+      const txDate = typeof tx.date === 'string' ? new Date(tx.date) : (tx.date as Date)
+      if (!minDate || txDate < minDate) minDate = txDate
+      if (!maxDate || txDate > maxDate) maxDate = txDate
+    })
+    
+    // If no transactions, use current date as fallback
+    const referenceDate = maxDate || new Date()
+    const startDate = startOfMonth(subMonths(referenceDate, months))
+    const endDate = endOfMonth(referenceDate)
 
     // Group transactions by normalized description and category
     const transactionGroups: Record<string, FinanceTransaction[]> = {}

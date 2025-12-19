@@ -20,7 +20,23 @@ interface DayData {
 
 export function FinanceCashFlowCalendar({ transactions, months = 3, view = 'net' }: Props) {
   const calendarData = useMemo(() => {
-    const now = new Date()
+    // Calculate the actual date range from transactions
+    let minDate: Date | null = null
+    let maxDate: Date | null = null
+    
+    transactions.forEach((tx) => {
+      const txDate = typeof tx.date === 'string' ? new Date(tx.date) : (tx.date as Date)
+      if (!minDate || txDate < minDate) minDate = txDate
+      if (!maxDate || txDate > maxDate) maxDate = txDate
+    })
+    
+    // If no transactions, use current date as fallback
+    const endDate = maxDate || new Date()
+    const startDate = minDate || new Date()
+    
+    // Calculate the reference month (use the latest transaction month)
+    const referenceMonth = new Date(endDate.getFullYear(), endDate.getMonth(), 1)
+    
     const calendars: Array<{
       month: string
       year: number
@@ -28,7 +44,7 @@ export function FinanceCashFlowCalendar({ transactions, months = 3, view = 'net'
     }> = []
 
     for (let i = 0; i < months; i++) {
-      const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const monthDate = new Date(referenceMonth.getFullYear(), referenceMonth.getMonth() - i, 1)
       const monthStart = startOfMonth(monthDate)
       const monthEnd = endOfMonth(monthDate)
       const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 }) // Monday

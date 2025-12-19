@@ -26,12 +26,24 @@ interface Props {
 
 export function FinanceCategoryForecast({ transactions, months = 6 }: Props) {
   const { data, options, forecastData } = useMemo(() => {
-    const now = new Date()
+    // Calculate the actual date range from transactions
+    let minDate: Date | null = null
+    let maxDate: Date | null = null
+    
+    transactions.forEach((tx) => {
+      const txDate = typeof tx.date === 'string' ? new Date(tx.date) : (tx.date as Date)
+      if (!minDate || txDate < minDate) minDate = txDate
+      if (!maxDate || txDate > maxDate) maxDate = txDate
+    })
+    
+    // If no transactions, use current date as fallback
+    const referenceDate = maxDate || new Date()
+    
     const categoryMonthlyTotals: Record<string, number[]> = {}
 
-    // Collect monthly totals for each category over the last N months
+    // Collect monthly totals for each category over the last N months from transaction date range
     for (let i = months - 1; i >= 0; i--) {
-      const monthStart = startOfMonth(subMonths(now, i))
+      const monthStart = startOfMonth(subMonths(referenceDate, i))
       const monthEnd = endOfMonth(monthStart)
 
       transactions.forEach((tx) => {
