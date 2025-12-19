@@ -365,21 +365,45 @@ export class CSVImportService {
       }
     }
 
-    // Category handling
-    if (category && category.trim().length > 0) {
-      category = category.trim()
+    // Category handling - ALWAYS use smart categorization, even if category is provided
+    // This ensures we don't use descriptions as categories
+    const { getSuggestedCategory } = require('./transactionCategorizer')
+    
+    // Check if the provided category looks like a description (should be recategorized)
+    const providedCategory = category && category.trim().length > 0 ? category.trim() : ''
+    const looksLikeDescription = 
+      providedCategory.includes('POS:') ||
+      providedCategory.match(/\d{4}\s+\d{2}\*+/) ||
+      providedCategory.includes('/') ||
+      providedCategory.includes('\\') ||
+      providedCategory.length > 50 ||
+      providedCategory.match(/^[A-Z0-9\s#\/\\-]+$/) && providedCategory.length > 20 // Long alphanumeric strings
+    
+    // Always try to get a smart category
+    const suggestedCategory = getSuggestedCategory(
+      description,
+      referenceNumber || undefined,
+      recipientName || undefined,
+      parseFloat(amount || '0')
+    )
+    
+    if (suggestedCategory) {
+      // Use suggested category if available
+      category = suggestedCategory
+    } else if (!looksLikeDescription && providedCategory && providedCategory !== 'Other') {
+      // Use provided category only if it doesn't look like a description
+      category = providedCategory
     } else {
-      if (referenceNumber && referenceNumber.trim().length > 0) {
-        category = 'Arved'
+      // Fallback to old logic for backward compatibility
+      const descriptionLower = (description || '').toLowerCase()
+      if (descriptionLower.includes('iseteenindus.energia')) {
+        category = 'Bills'
+      } else if (descriptionLower.includes('makse') || descriptionLower.includes('payment')) {
+        category = 'Bills'
+      } else if (recipientName && recipientName.trim().toLowerCase().startsWith('kaart')) {
+        category = 'Card Payment'
       } else {
-        const descriptionLower = (description || '').toLowerCase()
-        if (descriptionLower.includes('iseteenindus.energia')) {
-          category = 'Arved'
-        } else if (recipientName && recipientName.trim().toLowerCase().startsWith('kaart')) {
-          category = 'Entertainment'
-        } else {
-          category = 'Other'
-        }
+        category = 'Other'
       }
     }
 

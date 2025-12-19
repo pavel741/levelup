@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import AuthGuard from '@/components/AuthGuard'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
@@ -19,7 +20,7 @@ import {
   subscribeToReconciliationHistory,
   getLastReconciliation,
   saveLastReconciliation,
-} from '@/lib/financeFirestore'
+} from '@/lib/financeApi'
 import type {
   FinanceCategories,
   FinanceBudgetGoals,
@@ -27,34 +28,47 @@ import type {
   FinanceRecurringTransaction,
   FinanceReconciliationRecord,
 } from '@/types/finance'
-import { Settings, Repeat, History } from 'lucide-react'
+import { Settings, Repeat, History, ArrowLeft, Plus, Trash2, Edit2, X, Save } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
+interface CategoryItem {
+  name: string
+  color: string
+  monthlyLimit?: number
+}
+
 export default function FinanceSettingsPage() {
   const { user } = useFirestoreStore()
+  const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
-  const [categoriesText, setCategoriesText] = useState('')
-  const [goalsText, setGoalsText] = useState('')
-  const [appSettingsText, setAppSettingsText] = useState('')
-
+  // Categories
+  const [categories, setCategories] = useState<CategoryItem[]>([])
+  const [editingCategory, setEditingCategory] = useState<string | null>(null)
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [newCategoryColor, setNewCategoryColor] = useState('#6366f1')
+  const [newCategoryLimit, setNewCategoryLimit] = useState('')
   const [isSavingCategories, setIsSavingCategories] = useState(false)
+
+  // Budget Goals
+  const [monthlySavingsTarget, setMonthlySavingsTarget] = useState('')
+  const [emergencyFundTarget, setEmergencyFundTarget] = useState('')
   const [isSavingGoals, setIsSavingGoals] = useState(false)
-  const [isSavingAppSettings, setIsSavingAppSettings] = useState(false)
 
-  const [categoriesError, setCategoriesError] = useState<string | null>(null)
-  const [goalsError, setGoalsError] = useState<string | null>(null)
-  const [settingsError, setSettingsError] = useState<string | null>(null)
+  // App Settings
+  const [currency, setCurrency] = useState('EUR')
+  const [isSavingSettings, setIsSavingSettings] = useState(false)
 
+  // Recurring
   const [recurring, setRecurring] = useState<FinanceRecurringTransaction[]>([])
   const [recurringLoading, setRecurringLoading] = useState(true)
-
   const [newRecurringName, setNewRecurringName] = useState('')
   const [newRecurringAmount, setNewRecurringAmount] = useState('')
   const [newRecurringCategory, setNewRecurringCategory] = useState('')
   const [newRecurringInterval, setNewRecurringInterval] = useState('monthly')
 
+  // Reconciliation
   const [reconciliationHistory, setReconciliationHistory] = useState<FinanceReconciliationRecord[]>([])
   const [lastReconciliation, setLastReconciliation] = useState<FinanceReconciliationRecord | null>(null)
   const [isSavingReconciliation, setIsSavingReconciliation] = useState(false)
@@ -77,15 +91,25 @@ export default function FinanceSettingsPage() {
           getLastReconciliation(user.id),
         ])
 
-        setCategoriesText(
-          JSON.stringify(cats ?? {}, null, 2) ||
-            '{\n  "Groceries": { "color": "#22c55e" },\n  "Rent": { "color": "#6366f1" }\n}'
-        )
-        setGoalsText(JSON.stringify(goals ?? {}, null, 2) || '{\n  "monthlySavingsTarget": 500\n}')
-        setAppSettingsText(JSON.stringify(settings ?? {}, null, 2) || '{\n  "currency": "EUR"\n}')
-        
-        // Load period settings
+        // Load categories
+        if (cats) {
+          const categoryList: CategoryItem[] = Object.entries(cats).map(([name, data]: [string, any]) => ({
+            name,
+            color: data?.color || '#6366f1',
+            monthlyLimit: data?.monthlyLimit || data?.limit,
+          }))
+          setCategories(categoryList)
+        }
+
+        // Load budget goals
+        if (goals) {
+          setMonthlySavingsTarget(goals.monthlySavingsTarget?.toString() || '')
+          setEmergencyFundTarget(goals.emergencyFundTarget?.toString() || '')
+        }
+
+        // Load app settings
         if (settings) {
+          setCurrency(settings.currency || 'EUR')
           setUsePaydayPeriod(settings.usePaydayPeriod || false)
           setPeriodStartDay(settings.periodStartDay ?? 1)
           setPeriodEndDay(settings.periodEndDay ?? null)
@@ -119,29 +143,87 @@ export default function FinanceSettingsPage() {
 
   const handleSaveCategories = async () => {
     if (!user?.id) return
-    setCategoriesError(null)
     setIsSavingCategories(true)
     try {
-      const parsed = JSON.parse(categoriesText) as FinanceCategories
-      await saveCategories(user.id, parsed)
+      const categoriesObj: FinanceCategories = {}
+      categories.forEach((cat) => {
+        categoriesObj[cat.name] = {
+          color: cat.color,
+          ...(cat.monthlyLimit ? { monthlyLimit: Number(cat.monthlyLimit) } : {}),
+        }
+      })
+      await saveCategories(user.id, categoriesObj)
     } catch (e: any) {
       console.error('Error saving finance categories:', e)
-      setCategoriesError('Invalid JSON. Please fix and try again.')
     } finally {
       setIsSavingCategories(false)
     }
   }
 
+  const handleAddCategory = () => {
+    if (!newCategoryName.trim()) return
+    if (categories.some(c => c.name.toLowerCase() === newCategoryName.trim().toLowerCase())) {
+      alert('Category already exists')
+      return
+    }
+    setCategories([...categories, {
+      name: newCategoryName.trim(),
+      color: newCategoryColor,
+      monthlyLimit: newCategoryLimit ? Number(newCategoryLimit) : undefined,
+    }])
+    setNewCategoryName('')
+    setNewCategoryColor('#6366f1')
+    setNewCategoryLimit('')
+    handleSaveCategories()
+  }
+
+  const handleDeleteCategory = (name: string) => {
+    if (confirm(`Delete category "${name}"?`)) {
+      setCategories(categories.filter(c => c.name !== name))
+      handleSaveCategories()
+    }
+  }
+
+  const handleEditCategory = (category: CategoryItem) => {
+    setEditingCategory(category.name)
+    setNewCategoryName(category.name)
+    setNewCategoryColor(category.color)
+    setNewCategoryLimit(category.monthlyLimit?.toString() || '')
+  }
+
+  const handleSaveEditCategory = () => {
+    if (!editingCategory || !newCategoryName.trim()) return
+    const updated = categories.map(c => 
+      c.name === editingCategory 
+        ? { name: newCategoryName.trim(), color: newCategoryColor, monthlyLimit: newCategoryLimit ? Number(newCategoryLimit) : undefined }
+        : c
+    )
+    setCategories(updated)
+    setEditingCategory(null)
+    setNewCategoryName('')
+    setNewCategoryColor('#6366f1')
+    setNewCategoryLimit('')
+    handleSaveCategories()
+  }
+
+  const handleCancelEdit = () => {
+    setEditingCategory(null)
+    setNewCategoryName('')
+    setNewCategoryColor('#6366f1')
+    setNewCategoryLimit('')
+  }
+
   const handleSaveGoals = async () => {
     if (!user?.id) return
-    setGoalsError(null)
     setIsSavingGoals(true)
     try {
-      const parsed = JSON.parse(goalsText) as FinanceBudgetGoals
-      await saveBudgetGoals(user.id, parsed)
+      const goals: FinanceBudgetGoals = {
+        ...(monthlySavingsTarget ? { monthlySavingsTarget: Number(monthlySavingsTarget) } : {}),
+        ...(emergencyFundTarget ? { emergencyFundTarget: Number(emergencyFundTarget) } : {}),
+      }
+      await saveBudgetGoals(user.id, goals)
     } catch (e: any) {
       console.error('Error saving budget goals:', e)
-      setGoalsError('Invalid JSON. Please fix and try again.')
     } finally {
       setIsSavingGoals(false)
     }
@@ -149,50 +231,24 @@ export default function FinanceSettingsPage() {
 
   const handleSaveAppSettings = async () => {
     if (!user?.id) return
-    setSettingsError(null)
-    setIsSavingAppSettings(true)
+    setIsSavingSettings(true)
     try {
-      const parsed = JSON.parse(appSettingsText) as FinanceSettings
-      await saveFinanceSettings(user.id, parsed)
-    } catch (e: any) {
-      console.error('Error saving finance app settings:', e)
-      setSettingsError('Invalid JSON. Please fix and try again.')
-    } finally {
-      setIsSavingAppSettings(false)
-    }
-  }
-
-  const handleSavePeriodSettings = async () => {
-    if (!user?.id) return
-    setIsSavingPeriod(true)
-    try {
-      let currentSettings: FinanceSettings = {}
-      try {
-        currentSettings = JSON.parse(appSettingsText) as FinanceSettings
-      } catch {
-        // If parsing fails, start with empty object
-        currentSettings = {}
-      }
-      const updatedSettings: FinanceSettings = {
-        ...currentSettings,
+      const settings: FinanceSettings = {
+        currency,
         usePaydayPeriod,
         periodStartDay,
         periodEndDay,
       }
-      await saveFinanceSettings(user.id, updatedSettings)
-      setAppSettingsText(JSON.stringify(updatedSettings, null, 2))
-      // Reload settings to ensure consistency
-      const reloaded = await getFinanceSettings(user.id)
-      if (reloaded) {
-        setUsePaydayPeriod(reloaded.usePaydayPeriod || false)
-        setPeriodStartDay(reloaded.periodStartDay ?? 1)
-        setPeriodEndDay(reloaded.periodEndDay ?? null)
-      }
+      await saveFinanceSettings(user.id, settings)
     } catch (e: any) {
-      console.error('Error saving period settings:', e)
+      console.error('Error saving finance app settings:', e)
     } finally {
-      setIsSavingPeriod(false)
+      setIsSavingSettings(false)
     }
+  }
+
+  const handleSavePeriodSettings = async () => {
+    await handleSaveAppSettings()
   }
 
   const handleAddRecurring = async () => {
@@ -268,6 +324,11 @@ export default function FinanceSettingsPage() {
     }
   }
 
+  const categoryColors = [
+    '#6366f1', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899',
+    '#06b6d4', '#84cc16', '#f97316', '#14b8a6', '#a855f7', '#eab308',
+  ]
+
   return (
     <AuthGuard>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
@@ -277,84 +338,192 @@ export default function FinanceSettingsPage() {
             <Header onMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)} isMenuOpen={isMobileMenuOpen} />
             <main className="flex-1 overflow-y-auto p-4 sm:p-6">
               <div className="max-w-6xl mx-auto space-y-6">
+                <button
+                  onClick={() => router.push('/finance')}
+                  className="mb-4 flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Back to Finance
+                </button>
                 <div className="mb-2">
                   <div className="flex items-center gap-3 mb-1">
                     <Settings className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Finance settings</h1>
+                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Finance Settings</h1>
                   </div>
                   <p className="text-gray-600 dark:text-gray-400 text-sm">
-                    Configure categories, budget goals, recurring transactions, and reconciliation snapshots for your
-                    finance data.
+                    Configure categories, budget goals, recurring transactions, and more.
                   </p>
                 </div>
 
-                {/* Categories & Goals */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Categories</h2>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                      This JSON is stored under <code className="font-mono text-[0.7rem]">settings/categories</code> in
-                      Firestore for your user. You can define whatever structure you need (colors, limits, groups, etc.).
-                    </p>
-                    <textarea
-                      value={categoriesText}
-                      onChange={(e) => setCategoriesText(e.target.value)}
-                      className="w-full h-52 font-mono text-xs px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100"
-                    />
-                    {categoriesError && (
-                      <p className="mt-2 text-xs text-red-600 dark:text-red-400">{categoriesError}</p>
-                    )}
-                    <div className="mt-3 flex justify-end">
-                      <button
-                        onClick={handleSaveCategories}
-                        disabled={isSavingCategories || !user}
-                        className="px-4 py-2 text-xs sm:text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                      >
-                        {isSavingCategories ? 'Saving…' : 'Save categories'}
-                      </button>
+                {/* Categories */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Categories</h2>
+                  
+                  {/* Add/Edit Category Form */}
+                  <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+                      <input
+                        type="text"
+                        placeholder="Category name"
+                        value={newCategoryName}
+                        onChange={(e) => setNewCategoryName(e.target.value)}
+                        className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white"
+                      />
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={newCategoryColor}
+                          onChange={(e) => setNewCategoryColor(e.target.value)}
+                          className="w-full h-10 rounded-lg border border-gray-300 dark:border-gray-600 cursor-pointer"
+                        />
+                        <div className="flex gap-1 flex-wrap">
+                          {categoryColors.map((color) => (
+                            <button
+                              key={color}
+                              onClick={() => setNewCategoryColor(color)}
+                              className="w-8 h-8 rounded border-2 border-gray-300 dark:border-gray-600"
+                              style={{ backgroundColor: color }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      <input
+                        type="number"
+                        placeholder="Monthly limit (optional)"
+                        value={newCategoryLimit}
+                        onChange={(e) => setNewCategoryLimit(e.target.value)}
+                        className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white"
+                      />
+                      <div className="flex gap-2">
+                        {editingCategory ? (
+                          <>
+                            <button
+                              onClick={handleSaveEditCategory}
+                              className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm flex items-center justify-center gap-1"
+                            >
+                              <Save className="w-4 h-4" />
+                              Save
+                            </button>
+                            <button
+                              onClick={handleCancelEdit}
+                              className="px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm flex items-center justify-center gap-1"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={handleAddCategory}
+                            disabled={!newCategoryName.trim()}
+                            className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <Plus className="w-4 h-4" />
+                            Add Category
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Budget goals</h2>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                      This JSON is stored under <code className="font-mono text-[0.7rem]">settings/budgetGoals</code>.
-                      Use it for monthly limits, savings targets, emergency fund goals, etc.
-                    </p>
-                    <textarea
-                      value={goalsText}
-                      onChange={(e) => setGoalsText(e.target.value)}
-                      className="w-full h-52 font-mono text-xs px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100"
-                    />
-                    {goalsError && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{goalsError}</p>}
-                    <div className="mt-3 flex justify-end">
-                      <button
-                        onClick={handleSaveGoals}
-                        disabled={isSavingGoals || !user}
-                        className="px-4 py-2 text-xs sm:text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                      >
-                        {isSavingGoals ? 'Saving…' : 'Save goals'}
-                      </button>
+                  {/* Categories List */}
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {categories.length === 0 ? (
+                      <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                        No categories yet. Add your first category above.
+                      </p>
+                    ) : (
+                      categories.map((category) => (
+                        <div
+                          key={category.name}
+                          className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div
+                              className="w-6 h-6 rounded"
+                              style={{ backgroundColor: category.color }}
+                            />
+                            <div>
+                              <p className="font-medium text-gray-900 dark:text-white">{category.name}</p>
+                              {category.monthlyLimit && (
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                  Limit: €{category.monthlyLimit.toLocaleString()}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleEditCategory(category)}
+                              className="p-1.5 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteCategory(category.name)}
+                              className="p-1.5 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Budget Goals */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Budget Goals</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Monthly Savings Target (€)
+                      </label>
+                      <input
+                        type="number"
+                        value={monthlySavingsTarget}
+                        onChange={(e) => setMonthlySavingsTarget(e.target.value)}
+                        placeholder="500"
+                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                      />
                     </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Emergency Fund Target (€)
+                      </label>
+                      <input
+                        type="number"
+                        value={emergencyFundTarget}
+                        onChange={(e) => setEmergencyFundTarget(e.target.value)}
+                        placeholder="3000"
+                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end">
+                    <button
+                      onClick={handleSaveGoals}
+                      disabled={isSavingGoals || !user}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {isSavingGoals ? 'Saving…' : 'Save Goals'}
+                    </button>
                   </div>
                 </div>
 
                 {/* Period Settings */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Period Settings</h2>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Period Settings</h2>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
                     Configure how monthly periods are calculated for your budget and analytics.
                   </p>
                   
-                  {/* Payday Period Option */}
                   <div className="mb-4">
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={usePaydayPeriod}
-                        onChange={(e) => {
-                          setUsePaydayPeriod(e.target.checked)
-                        }}
+                        onChange={(e) => setUsePaydayPeriod(e.target.checked)}
                         className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
                       />
                       <span className="text-sm font-medium text-gray-900 dark:text-white">
@@ -362,100 +531,94 @@ export default function FinanceSettingsPage() {
                       </span>
                     </label>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-6">
-                      Use payday-to-payday periods (last working day of previous month to last working day of current month) instead of custom period.
+                      Use payday-to-payday periods instead of custom period.
                     </p>
                   </div>
                   
-                  {/* Custom Period Settings */}
-                  <div className={`space-y-4 ${usePaydayPeriod ? 'opacity-50 pointer-events-none' : ''}`}>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Set the start and end day of your monthly period. Default is from the 1st to the end of the month.
-                    </p>
+                  <div className={`space-y-4 mb-4 ${usePaydayPeriod ? 'opacity-50 pointer-events-none' : ''}`}>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label htmlFor="periodStartDay" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Start Day:
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Start Day
                         </label>
                         <input
                           type="number"
-                          id="periodStartDay"
                           min="1"
                           max="31"
                           value={periodStartDay}
                           onChange={(e) => setPeriodStartDay(parseInt(e.target.value) || 1)}
                           disabled={usePaydayPeriod}
-                          className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white disabled:opacity-50"
                         />
                       </div>
                       <div>
-                        <label htmlFor="periodEndDay" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          End Day:
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          End Day (leave empty for end of month)
                         </label>
                         <input
                           type="number"
-                          id="periodEndDay"
                           min="1"
                           max="31"
                           value={periodEndDay || ''}
                           onChange={(e) => setPeriodEndDay(e.target.value ? parseInt(e.target.value) : null)}
                           disabled={usePaydayPeriod}
                           placeholder="End of month"
-                          className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white disabled:opacity-50"
                         />
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          Leave empty for end of month
-                        </p>
                       </div>
                     </div>
                   </div>
                   
-                  <div className="mt-4 flex justify-end">
+                  <div className="flex justify-end">
                     <button
                       onClick={handleSavePeriodSettings}
                       disabled={isSavingPeriod || !user}
-                      className="px-4 py-2 text-xs sm:text-sm bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                      className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                       {isSavingPeriod ? 'Saving…' : 'Save Period Settings'}
                     </button>
                   </div>
                 </div>
 
-                {/* App settings */}
+                {/* App Settings */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Finance app settings</h2>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                    Raw JSON stored in <code className="font-mono text-[0.7rem]">settings/appSettings</code> (currency,
-                    default filters, feature flags, etc.).
-                  </p>
-                  <textarea
-                    value={appSettingsText}
-                    onChange={(e) => setAppSettingsText(e.target.value)}
-                    className="w-full h-40 font-mono text-xs px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100"
-                  />
-                  {settingsError && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{settingsError}</p>}
-                  <div className="mt-3 flex justify-end">
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">App Settings</h2>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Currency
+                    </label>
+                    <select
+                      value={currency}
+                      onChange={(e) => setCurrency(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                    >
+                      <option value="EUR">EUR (€)</option>
+                      <option value="USD">USD ($)</option>
+                      <option value="GBP">GBP (£)</option>
+                      <option value="SEK">SEK (kr)</option>
+                      <option value="DKK">DKK (kr)</option>
+                      <option value="NOK">NOK (kr)</option>
+                    </select>
+                  </div>
+                  <div className="flex justify-end">
                     <button
                       onClick={handleSaveAppSettings}
-                      disabled={isSavingAppSettings || !user}
-                      className="px-4 py-2 text-xs sm:text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                      disabled={isSavingSettings || !user}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                     >
-                      {isSavingAppSettings ? 'Saving…' : 'Save app settings'}
+                      {isSavingSettings ? 'Saving…' : 'Save Settings'}
                     </button>
                   </div>
                 </div>
 
-                {/* Recurring & reconciliation */}
+                {/* Recurring & Reconciliation */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Recurring */}
                   <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
-                    <div className="flex items-center gap-2 mb-2">
+                    <div className="flex items-center gap-2 mb-4">
                       <Repeat className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                      <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Recurring transactions</h2>
+                      <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Recurring Transactions</h2>
                     </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                      These are stored in <code className="font-mono text-[0.7rem]">recurringTransactions</code> and can
-                      be used by automation or reminders.
-                    </p>
 
                     <div className="space-y-2 mb-4">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -496,49 +659,50 @@ export default function FinanceSettingsPage() {
                       <button
                         onClick={handleAddRecurring}
                         disabled={!user}
-                        className="mt-1 inline-flex items-center justify-center px-4 py-2 text-xs sm:text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                        className="w-full px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                       >
-                        Add recurring transaction
+                        Add Recurring Transaction
                       </button>
                     </div>
 
                     <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mt-3">
                       {recurringLoading ? (
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Loading recurring transactions…</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Loading…</p>
                       ) : recurring.length === 0 ? (
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          No recurring transactions yet. Add your first one above.
+                        <p className="text-xs text-gray-500 dark:text-gray-400 text-center py-4">
+                          No recurring transactions yet.
                         </p>
                       ) : (
-                        <ul className="space-y-2 max-h-64 overflow-y-auto text-sm">
+                        <ul className="space-y-2 max-h-64 overflow-y-auto">
                           {recurring.map((item) => (
                             <li
                               key={item.id}
-                              className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900/40"
+                              className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900/40 border border-gray-200 dark:border-gray-700"
                             >
-                              <div className="min-w-0">
-                                <p className="text-gray-900 dark:text-white truncate">
-                                  {item.name || 'Untitled'}{' '}
-                                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                                    ({item.interval || 'interval'})
-                                  </span>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                  {item.name || 'Untitled'}
                                 </p>
                                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                                  {item.category || 'Uncategorized'} · {item.amount}
+                                  {item.category || 'Uncategorized'} · €{item.amount} · {item.interval || 'interval'}
                                 </p>
                               </div>
                               <div className="flex items-center gap-2">
                                 <button
                                   onClick={() => handleToggleRecurringActive(item)}
-                                  className="text-xs px-2 py-1 rounded-full border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900/60"
+                                  className={`text-xs px-2 py-1 rounded-full border transition-colors ${
+                                    ((item as any).isActive ?? true)
+                                      ? 'border-green-300 dark:border-green-700 text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20'
+                                      : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 bg-gray-50 dark:bg-gray-900/20'
+                                  }`}
                                 >
                                   {((item as any).isActive ?? true) ? 'Active' : 'Paused'}
                                 </button>
                                 <button
                                   onClick={() => handleDeleteRecurring(item)}
-                                  className="text-xs px-2 py-1 rounded-full border border-red-200 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/40"
+                                  className="p-1.5 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
                                 >
-                                  Delete
+                                  <Trash2 className="w-4 h-4" />
                                 </button>
                               </div>
                             </li>
@@ -550,59 +714,48 @@ export default function FinanceSettingsPage() {
 
                   {/* Reconciliation */}
                   <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
-                    <div className="flex items-center gap-2 mb-2">
+                    <div className="flex items-center gap-2 mb-4">
                       <History className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                      <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                        Reconciliation snapshots
-                      </h2>
+                      <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Reconciliation Snapshots</h2>
                     </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                      These records live under{' '}
-                      <code className="font-mono text-[0.7rem]">reconciliationHistory</code> and{' '}
-                      <code className="font-mono text-[0.7rem]">settings/lastReconciliation</code>. They can be used to
-                      store account balance snapshots or reconciliation notes.
-                    </p>
 
                     <div className="mb-4">
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Last reconciliation:</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Last reconciliation:</p>
                       {lastReconciliation ? (
-                        <p className="text-sm text-gray-900 dark:text-white">
-                          {formatDateTime(lastReconciliation.timestamp)}{' '}
+                        <p className="text-sm text-gray-900 dark:text-white mb-2">
+                          {formatDateTime(lastReconciliation.timestamp)}
                           {(lastReconciliation as any).note && (
-                            <span className="text-xs text-gray-500 dark:text-gray-400">
-                              – {(lastReconciliation as any).note}
+                            <span className="text-xs text-gray-500 dark:text-gray-400 block mt-1">
+                              {(lastReconciliation as any).note}
                             </span>
                           )}
                         </p>
                       ) : (
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          No last reconciliation saved yet.
-                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">No reconciliation saved yet.</p>
                       )}
                       <button
                         onClick={handleSaveReconciliationSnapshot}
                         disabled={isSavingReconciliation || !user}
-                        className="mt-2 px-4 py-2 text-xs sm:text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                        className="w-full px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                       >
-                        {isSavingReconciliation ? 'Saving…' : 'Save manual snapshot'}
+                        {isSavingReconciliation ? 'Saving…' : 'Save Manual Snapshot'}
                       </button>
                     </div>
 
-                    <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mt-3 max-h-64 overflow-y-auto text-sm">
+                    <div className="border-t border-gray-200 dark:border-gray-700 pt-3 mt-3">
                       {reconciliationHistory.length === 0 ? (
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          No reconciliation history yet. When you store records (e.g. from imports or automation), they
-                          will show up here.
+                        <p className="text-xs text-gray-500 dark:text-gray-400 text-center py-4">
+                          No reconciliation history yet.
                         </p>
                       ) : (
-                        <ul className="space-y-2">
+                        <ul className="space-y-2 max-h-64 overflow-y-auto">
                           {reconciliationHistory.map((rec) => (
-                            <li key={rec.id} className="px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900/40">
-                              <p className="text-gray-900 dark:text-white">
-                                {formatDateTime(rec.timestamp)}{' '}
+                            <li key={rec.id} className="px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900/40 border border-gray-200 dark:border-gray-700">
+                              <p className="text-sm text-gray-900 dark:text-white">
+                                {formatDateTime(rec.timestamp)}
                                 {(rec as any).note && (
-                                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                                    – {(rec as any).note}
+                                  <span className="text-xs text-gray-500 dark:text-gray-400 block mt-1">
+                                    {(rec as any).note}
                                   </span>
                                 )}
                               </p>
@@ -621,5 +774,3 @@ export default function FinanceSettingsPage() {
     </AuthGuard>
   )
 }
-
-

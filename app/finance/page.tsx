@@ -6,6 +6,8 @@ import AuthGuard from '@/components/AuthGuard'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import { Wallet, TrendingUp, TrendingDown, DollarSign } from 'lucide-react'
+// Using MongoDB for finance data (no quota limits!)
+// Client-side API wrapper (calls server-side MongoDB via API routes)
 import {
   subscribeToTransactions,
   addTransaction,
@@ -16,10 +18,11 @@ import {
   batchAddTransactions,
   batchDeleteTransactions,
   getFinanceSettings,
-} from '@/lib/financeFirestore'
+} from '@/lib/financeApi'
 import type { FinanceTransaction, FinanceCategories, FinanceSettings } from '@/types/finance'
 import { getPeriodDates } from '@/lib/financeDateUtils'
 import { CSVImportService } from '@/lib/csvImport'
+import { getSuggestedCategory } from '@/lib/transactionCategorizer'
 
 export const dynamic = 'force-dynamic'
 
@@ -85,13 +88,9 @@ export default function FinancePage() {
     
     const loadTransactions = async () => {
       try {
-        // Wait for Firebase to initialize
-        const { waitForFirebaseInit } = await import('@/lib/firebase')
-        await waitForFirebaseInit()
-        
+        // MongoDB doesn't need Firebase initialization
+        // But we still need user to be authenticated (Firebase Auth)
         setIsLoading(true)
-        // Load transactions (limited to 1000 due to Firestore query limits)
-        // For larger datasets, we'd need pagination
         unsubscribe = subscribeToTransactions(
           user.id,
           (txs) => {
@@ -99,13 +98,13 @@ export default function FinancePage() {
             setIsLoading(false)
             // Log how many transactions are loaded
             if (txs.length > 0) {
-              console.log(`📊 Loaded ${txs.length} transactions (most recent)`)
+              console.log(`📊 Loaded ${txs.length} transactions from MongoDB`)
             }
           },
-          { limitCount: 1000 } // Firestore max per query is 1000
+          { limitCount: 0 } // 0 = no limit, load all transactions (MongoDB can handle it!)
         )
       } catch (error) {
-        console.error('Failed to initialize Firebase:', error)
+        console.error('Failed to load transactions from MongoDB:', error)
         setIsLoading(false)
       }
     }
@@ -125,15 +124,12 @@ export default function FinancePage() {
     
     const loadCategories = async () => {
       try {
-        // Wait for Firebase to initialize
-        const { waitForFirebaseInit } = await import('@/lib/firebase')
-        await waitForFirebaseInit()
-        
+        // MongoDB doesn't need Firebase initialization
         unsubscribe = subscribeToCategories(user.id, (cats) => {
           setCategories(cats)
         })
       } catch (error) {
-        console.error('Failed to initialize Firebase:', error)
+        console.error('Failed to load categories from MongoDB:', error)
       }
     }
 
@@ -150,14 +146,11 @@ export default function FinancePage() {
 
     const loadSettings = async () => {
       try {
-        // Wait for Firebase to initialize
-        const { waitForFirebaseInit } = await import('@/lib/firebase')
-        await waitForFirebaseInit()
-        
+        // MongoDB doesn't need Firebase initialization
         const settings = await getFinanceSettings(user.id)
         setFinanceSettings(settings)
       } catch (e) {
-        console.error('Error loading finance settings:', e)
+        console.error('Error loading finance settings from MongoDB:', e)
       }
     }
 
@@ -165,11 +158,9 @@ export default function FinancePage() {
   }, [user?.id])
 
   // Use already-loaded transactions for summary calculations
-  // This avoids hitting Firestore quota limits by not loading all transactions
+  // MongoDB can load all transactions, so we'll use the loaded transactions
   useEffect(() => {
-    // Use the transactions that are already loaded (limited to 500)
-    // For accurate summaries, we'll use these transactions
-    // Note: This means "All Time" summary will be based on the most recent 500 transactions
+    // MongoDB can handle loading all transactions, so use what's loaded
     setAllTransactionsForSummary(transactions)
   }, [transactions])
 
@@ -185,8 +176,8 @@ export default function FinancePage() {
           income: ['Salary', 'Freelance', 'Investment', 'Other'],
           expense: ['Food', 'Transport', 'Shopping', 'Bills', 'Entertainment', 'Arved', 'Other'],
         }
-        // Save to Firestore
-        const { saveCategories } = await import('@/lib/financeFirestore')
+        // Save to MongoDB
+        const { saveCategories } = await import('@/lib/financeApi')
         await saveCategories(user.id, defaultCategories)
         setCategories(defaultCategories)
       }
@@ -222,38 +213,59 @@ export default function FinancePage() {
 
   // Generate category suggestions based on description
   useEffect(() => {
-    if (!formDescription || !transactions.length) {
+    if (!formDescription) {
       setCategorySuggestions([])
       return
     }
 
-    const descLower = formDescription.toLowerCase()
-    const categoryCounts: Record<string, number> = {}
+    const suggestions: string[] = []
 
-    // Count how many times each category appears with similar descriptions
-    transactions.forEach((tx) => {
-      if (tx.description && tx.category) {
-        const txDescLower = tx.description.toLowerCase()
-        // Check for word matches
-        const descWords = descLower.split(/\s+/)
-        const txWords = txDescLower.split(/\s+/)
-        const commonWords = descWords.filter((w) => w.length > 2 && txWords.includes(w))
+    // First, try smart categorization based on patterns
+    const smartCategory = getSuggestedCategory(formDescription)
+    if (smartCategory && availableCategories.includes(smartCategory)) {
+      suggestions.push(smartCategory)
+    }
 
-        if (commonWords.length > 0) {
-          categoryCounts[tx.category] = (categoryCounts[tx.category] || 0) + commonWords.length
+    // Then, look at historical transactions for similar descriptions
+    if (transactions.length > 0) {
+      const descLower = formDescription.toLowerCase()
+      const categoryCounts: Record<string, number> = {}
+
+      // Count how many times each category appears with similar descriptions
+      transactions.forEach((tx) => {
+        if (tx.description && tx.category) {
+          const txDescLower = tx.description.toLowerCase()
+          // Check for word matches
+          const descWords = descLower.split(/\s+/)
+          const txWords = txDescLower.split(/\s+/)
+          const commonWords = descWords.filter((w) => w.length > 2 && txWords.includes(w))
+
+          if (commonWords.length > 0) {
+            categoryCounts[tx.category] = (categoryCounts[tx.category] || 0) + commonWords.length
+          }
         }
+      })
+
+      // Get top 3 historical suggestions (excluding the smart category if already added)
+      const historicalSuggestions = Object.entries(categoryCounts)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 3)
+        .map(([cat]) => cat)
+        .filter((cat) => availableCategories.includes(cat) && !suggestions.includes(cat))
+
+      suggestions.push(...historicalSuggestions)
+    }
+
+    // Auto-fill category if we have a high-confidence suggestion and no category is set
+    if (suggestions.length > 0 && !formCategory) {
+      const smartCategory = getSuggestedCategory(formDescription)
+      if (smartCategory) {
+        setFormCategory(smartCategory)
       }
-    })
+    }
 
-    // Get top 3 suggestions
-    const suggestions = Object.entries(categoryCounts)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 3)
-      .map(([cat]) => cat)
-      .filter((cat) => availableCategories.includes(cat))
-
-    setCategorySuggestions(suggestions)
-  }, [formDescription, transactions, availableCategories])
+    setCategorySuggestions(suggestions.slice(0, 3))
+  }, [formDescription, transactions, availableCategories, formCategory])
 
   // Filter transactions based on current filters
   const filteredTransactions = useMemo(() => {
@@ -360,7 +372,7 @@ export default function FinancePage() {
     return filtered
   }, [transactions, currentFilter, dateRange, searchQuery, customDateFrom, customDateTo, filterMinAmount, filterMaxAmount, filterCategories])
 
-  // Calculate summary for selected month (using loaded transactions)
+  // Calculate summary for selected month (using all loaded transactions from MongoDB)
   const monthlySummary = useMemo(() => {
     // Use period settings if available, otherwise default to calendar month
     let startDate: Date
@@ -421,7 +433,7 @@ export default function FinancePage() {
     }
   }, [allTransactionsForSummary, selectedMonth, financeSettings])
 
-  // Calculate all-time summary (using loaded transactions - most recent 500)
+  // Calculate all-time summary (using all loaded transactions from MongoDB)
   const allTimeSummary = useMemo(() => {
     let income = 0
     let expenses = 0
@@ -553,6 +565,165 @@ export default function FinancePage() {
     } catch (error) {
       console.error('Error deleting all transactions:', error)
       alert('Error deleting transactions. Please try again.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Handle recategorize all transactions
+  const handleRecategorizeAll = async () => {
+    if (!user?.id || transactions.length === 0 || isSubmitting) return
+    
+    const confirmed = confirm(
+      `This will recategorize all ${transactions.length} transactions based on their descriptions and patterns. This may take a moment. Continue?`
+    )
+    
+    if (!confirmed) return
+
+    setIsSubmitting(true)
+    
+    // Create a snapshot of transactions at the start to avoid processing duplicates
+    // as the polling reloads transactions
+    const transactionsSnapshot = [...transactions]
+    const processedIds = new Set<string>() // Track processed transactions to avoid duplicates
+    
+    try {
+      let updatedCount = 0
+      
+      // Process transactions in batches to avoid overwhelming the API
+      const batchSize = 50
+      for (let i = 0; i < transactionsSnapshot.length; i += batchSize) {
+        const batch = transactionsSnapshot.slice(i, i + batchSize)
+        
+        for (const tx of batch) {
+          if (!tx.id || processedIds.has(tx.id)) continue
+          processedIds.add(tx.id)
+          
+          // Always check if category should be updated based on description
+          const currentCategory = tx.category || ''
+          const description = tx.description || ''
+          
+          // If category looks like a description (contains POS:, ATM:, loan patterns, utility patterns, or PSD2/KLIX), use it as description for categorization
+          const categoryHasPos = currentCategory.includes('POS:')
+          const categoryHasAtm = currentCategory.includes('ATM:')
+          const categoryHasLoan = /laenu\s+\d+|kodulaen/i.test(currentCategory)
+          const categoryHasUtility = /iseteenindus\.energia/i.test(currentCategory)
+          const categoryHasPsd2Klix = /psd2|klix/i.test(currentCategory)
+          // Combine category and description if category has POS, ATM, loan, utility, or PSD2/KLIX patterns
+          const effectiveDescription = (categoryHasPos || categoryHasAtm || categoryHasLoan || categoryHasUtility || categoryHasPsd2Klix)
+            ? `${currentCategory} ${description}`.trim() 
+            : description
+          
+          // Get suggested category based on description (or category if it contains POS/ATM pattern)
+          const suggestedCategory = getSuggestedCategory(
+            effectiveDescription,
+            tx.referenceNumber,
+            tx.recipientName,
+            Number(tx.amount) || 0
+          )
+          
+          // Check if category needs recategorization
+          const hasPosInCategory = currentCategory.includes('POS:') || currentCategory.match(/\d{4}\s+\d{2}\*+/)
+          const hasAtmInCategory = currentCategory.includes('ATM:')
+          const hasPsd2KlixInCategory = /psd2|klix/i.test(currentCategory)
+          const hasPosInDescription = /pos\s*:/i.test(description) || /\d{4}\s+\d{2}\*+/.test(description)
+          const hasAtmInDescription = /^atm\s*:/i.test(description)
+          const hasPsd2Klix = /psd2|klix/i.test(effectiveDescription) || hasPsd2KlixInCategory
+          const hasOtherPaymentRef = /makse\s*\/|blid/i.test(effectiveDescription)
+          // Check for loan patterns in both description and category
+          const hasLoanPatternInDesc = /laenu\s+\d+|kodulaen/i.test(effectiveDescription)
+          const hasLoanPatternInCategory = /laenu\s+\d+|kodulaen/i.test(currentCategory)
+          const hasLoanPattern = hasLoanPatternInDesc || hasLoanPatternInCategory
+          
+          // Check for utility patterns (iseteenindus.energia)
+          const hasUtilityPattern = /iseteenindus\.energia/i.test(effectiveDescription) || /iseteenindus\.energia/i.test(currentCategory)
+          
+          // PSD2/KLIX should be categorized as ESTO
+          const shouldBeEsto = hasPsd2Klix && currentCategory !== 'ESTO'
+          
+          // Loan patterns should be categorized as Kodulaen
+          // If category contains loan pattern but isn't "Kodulaen", recategorize it
+          const shouldBeKodulaen = hasLoanPattern && currentCategory !== 'Kodulaen'
+          
+          // Utility patterns should be categorized as Kommunaalid
+          const shouldBeKommunaalid = hasUtilityPattern && currentCategory !== 'Kommunaalid'
+          
+          // ATM: prefix should be categorized as ATM Withdrawal
+          const shouldBeAtm = (hasAtmInCategory || hasAtmInDescription) && currentCategory !== 'ATM Withdrawal'
+          
+          // POS: prefix should be categorized as Card Payment
+          const shouldBeCardPayment = hasPosInCategory && currentCategory !== 'Card Payment'
+          
+          const isWrongCategory = 
+            (hasPosInDescription && currentCategory !== 'Card Payment' && currentCategory !== 'ATM Withdrawal' && currentCategory !== 'Bills' && currentCategory !== 'ESTO' && currentCategory !== 'Kodulaen' && currentCategory !== 'Kommunaalid') ||
+            (hasAtmInDescription && currentCategory !== 'ATM Withdrawal') ||
+            (hasPsd2Klix && currentCategory !== 'ESTO') ||
+            (hasLoanPattern && currentCategory !== 'Kodulaen') ||
+            (hasUtilityPattern && currentCategory !== 'Kommunaalid') ||
+            (hasOtherPaymentRef && currentCategory !== 'Bills' && currentCategory !== 'Card Payment' && currentCategory !== 'ATM Withdrawal' && currentCategory !== 'ESTO' && currentCategory !== 'Kodulaen' && currentCategory !== 'Kommunaalid')
+          
+          const needsRecategorization = 
+            (!currentCategory || currentCategory === 'Other') ||
+            hasPosInCategory ||
+            hasAtmInCategory ||
+            hasPsd2KlixInCategory || // Category contains PSD2/KLIX pattern
+            isWrongCategory ||
+            shouldBeEsto ||
+            shouldBeKodulaen ||
+            shouldBeKommunaalid ||
+            shouldBeAtm ||
+            shouldBeCardPayment ||
+            (hasPosInDescription && !suggestedCategory) || // If description has POS but no category, try to categorize
+            (hasAtmInDescription && !suggestedCategory) || // If description has ATM but no category, try to categorize
+            (hasLoanPattern && !suggestedCategory) || // If description has loan pattern but no category, try to categorize
+            (hasUtilityPattern && !suggestedCategory) || // If description has utility pattern but no category, try to categorize
+            (hasPsd2Klix && !suggestedCategory) // If description has PSD2/KLIX but no category, try to categorize
+          
+          // Override suggested category based on prefix detection
+          let finalCategory = suggestedCategory
+          if (shouldBeKommunaalid) {
+            finalCategory = 'Kommunaalid'
+          } else if (shouldBeKodulaen) {
+            finalCategory = 'Kodulaen'
+          } else if (shouldBeEsto) {
+            finalCategory = 'ESTO'
+          } else if (shouldBeAtm) {
+            finalCategory = 'ATM Withdrawal'
+          } else if (shouldBeCardPayment) {
+            finalCategory = 'Card Payment'
+          }
+          
+          if (needsRecategorization && finalCategory && finalCategory !== currentCategory) {
+            try {
+              console.log(`Recategorizing: "${description.substring(0, 50)}..." from "${currentCategory}" to "${finalCategory}"`)
+              await updateTransaction(user.id, tx.id, {
+                ...tx,
+                category: finalCategory,
+              })
+              updatedCount++
+              // Small delay to avoid overwhelming the API
+              if (updatedCount % 10 === 0) {
+                await new Promise(resolve => setTimeout(resolve, 100))
+              }
+            } catch (error) {
+              console.error(`Error updating transaction ${tx.id}:`, error)
+            }
+          } else if (needsRecategorization && !finalCategory) {
+            // Log when we can't suggest a category
+            console.log(`No suggestion for: "${description.substring(0, 50)}..." (current: "${currentCategory}")`)
+          }
+        }
+        
+        // Add a small delay between batches to avoid overwhelming the API
+        if (i + batchSize < transactionsSnapshot.length) {
+          await new Promise(resolve => setTimeout(resolve, 200))
+        }
+      }
+      
+      alert(`Successfully recategorized ${updatedCount} of ${transactionsSnapshot.length} transactions`)
+    } catch (error) {
+      console.error('Error recategorizing transactions:', error)
+      alert('Error recategorizing transactions. Please try again.')
     } finally {
       setIsSubmitting(false)
     }
@@ -755,8 +926,9 @@ export default function FinancePage() {
     }
 
     setIsSubmitting(true)
-    const estimatedMinutes = Math.ceil(csvParsedData.length / 20 * 3 / 60)
-    setCsvImportStatus(`Importing ${csvParsedData.length} transactions... This may take ~${estimatedMinutes} minute${estimatedMinutes !== 1 ? 's' : ''} (free tier rate limits).`)
+    // MongoDB has no quota limits - imports will be fast!
+    const estimatedSeconds = Math.ceil(csvParsedData.length / 1000 * 0.5) // ~0.5s per 1000 transactions
+    setCsvImportStatus(`Importing ${csvParsedData.length} transactions... This should take ~${estimatedSeconds} second${estimatedSeconds !== 1 ? 's' : ''} (MongoDB - no limits!).`)
     setCsvImportProgress(0)
 
     try {
@@ -1168,13 +1340,11 @@ export default function FinancePage() {
                           Upload a CSV file and select which columns to import
                         </p>
                         {csvParsedData.length > 1000 && (
-                          <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                            <p className="text-xs text-yellow-800 dark:text-yellow-200">
-                              ⚠️ <strong>Large import detected ({csvParsedData.length} transactions)</strong>
+                          <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                            <p className="text-xs text-blue-800 dark:text-blue-200">
+                              ✅ <strong>Large import detected ({csvParsedData.length} transactions)</strong>
                               <br />
-                              Free tier has daily limits (~20k writes/day). This import will take ~{Math.ceil(csvParsedData.length / 20 * 3 / 60)} minutes.
-                              <br />
-                              Consider splitting into smaller files if you hit quota errors.
+                              Using MongoDB - no quota limits! This import will be fast (~{Math.ceil(csvParsedData.length / 1000 * 0.5)} seconds).
                             </p>
                           </div>
                         )}
@@ -1305,14 +1475,25 @@ export default function FinancePage() {
                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
                       <div className="flex justify-between items-center mb-6">
                         <h2 className="text-xl font-bold text-gray-900 dark:text-white">Recent Transactions</h2>
-                        <button
-                          type="button"
-                          onClick={handleDeleteAll}
-                          disabled={transactions.length === 0 || isSubmitting}
-                          className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          Delete All
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={handleRecategorizeAll}
+                            disabled={transactions.length === 0 || isSubmitting}
+                            className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Recategorize all transactions based on patterns (POS, reference numbers, etc.)"
+                          >
+                            🔄 Recategorize All
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleDeleteAll}
+                            disabled={transactions.length === 0 || isSubmitting}
+                            className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Delete All
+                          </button>
+                        </div>
                       </div>
 
                       {/* Date Range Filter */}
@@ -1349,68 +1530,6 @@ export default function FinancePage() {
                             }`}
                           >
                             Custom
-                          </button>
-                        </div>
-                        {/* Quick Filter Presets */}
-                        <div className="flex gap-2 flex-wrap mt-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const today = new Date()
-                              const last7Days = new Date(today)
-                              last7Days.setDate(last7Days.getDate() - 7)
-                              setCustomDateFrom(last7Days.toISOString().split('T')[0])
-                              setCustomDateTo(today.toISOString().split('T')[0])
-                              setDateRange('custom')
-                              setShowCustomDateRange(true)
-                            }}
-                            className="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-gray-700 dark:text-gray-300"
-                          >
-                            Last 7 Days
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const today = new Date()
-                              const last30Days = new Date(today)
-                              last30Days.setDate(last30Days.getDate() - 30)
-                              setCustomDateFrom(last30Days.toISOString().split('T')[0])
-                              setCustomDateTo(today.toISOString().split('T')[0])
-                              setDateRange('custom')
-                              setShowCustomDateRange(true)
-                            }}
-                            className="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-gray-700 dark:text-gray-300"
-                          >
-                            Last 30 Days
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const today = new Date()
-                              const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1)
-                              const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0)
-                              setCustomDateFrom(lastMonth.toISOString().split('T')[0])
-                              setCustomDateTo(lastMonthEnd.toISOString().split('T')[0])
-                              setDateRange('custom')
-                              setShowCustomDateRange(true)
-                            }}
-                            className="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-gray-700 dark:text-gray-300"
-                          >
-                            Last Month
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const today = new Date()
-                              const thisMonth = new Date(today.getFullYear(), today.getMonth(), 1)
-                              setCustomDateFrom(thisMonth.toISOString().split('T')[0])
-                              setCustomDateTo(today.toISOString().split('T')[0])
-                              setDateRange('custom')
-                              setShowCustomDateRange(true)
-                            }}
-                            className="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-gray-700 dark:text-gray-300"
-                          >
-                            This Month
                           </button>
                         </div>
                         {showCustomDateRange && (
@@ -1582,7 +1701,7 @@ export default function FinancePage() {
                       </div>
 
                       {/* Transaction List */}
-                      <div className="space-y-0 max-h-[600px] overflow-y-auto">
+                      <div className="space-y-2 max-h-[600px] overflow-y-auto">
                         {isLoading ? (
                           <div className="text-center py-10 text-gray-500 dark:text-gray-400">Loading...</div>
                         ) : filteredTransactions.length === 0 ? (
@@ -1594,48 +1713,69 @@ export default function FinancePage() {
                             </p>
                           </div>
                         ) : (
-                          filteredTransactions.map((tx, index) => (
-                            <div
-                              key={tx.id}
-                              className={`flex items-center justify-between p-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors ${
-                                index === filteredTransactions.length - 1 ? 'border-b-0' : ''
-                              }`}
-                            >
-                              <div className="flex-1 min-w-0 mr-4">
-                                <div className="flex items-center gap-3 mb-1.5">
-                                  <span className="font-semibold text-gray-900 dark:text-white truncate text-base">
-                                    {tx.description || '—'}
-                                  </span>
-                                  <span className="text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 px-2 py-0.5 rounded-md whitespace-nowrap">
-                                    {tx.category || 'Uncategorized'}
-                                  </span>
-                                </div>
-                                <div className="text-xs text-gray-500 dark:text-gray-400">
-                                  {formatDisplayDate(tx.date)}
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-3 flex-shrink-0">
-                                {(() => {
-                                  const txType = (tx.type || '').toLowerCase()
-                                  const amount = Number(tx.amount) || 0
-                                  
-                                  // Determine if income or expense: prioritize type field, then check amount sign
-                                  let isIncome: boolean
-                                  if (txType === 'income') {
-                                    isIncome = true
-                                  } else if (txType === 'expense') {
-                                    isIncome = false
-                                  } else {
-                                    // If type not set, use amount sign: positive = income, negative = expense
-                                    isIncome = amount >= 0
-                                  }
-                                  
-                                  // Display amount: if expense with positive amount, show as negative
-                                  const displayAmount = !isIncome && amount > 0 ? -amount : amount
-                                  
-                                  return (
+                          filteredTransactions.map((tx) => {
+                            const txType = (tx.type || '').toLowerCase()
+                            const amount = Number(tx.amount) || 0
+                            
+                            // Determine if income or expense: prioritize type field, then check amount sign
+                            let isIncome: boolean
+                            if (txType === 'income') {
+                              isIncome = true
+                            } else if (txType === 'expense') {
+                              isIncome = false
+                            } else {
+                              // If type not set, use amount sign: positive = income, negative = expense
+                              isIncome = amount >= 0
+                            }
+                            
+                            // Display amount: if expense with positive amount, show as negative
+                            const displayAmount = !isIncome && amount > 0 ? -amount : amount
+                            
+                            // Clean description - remove card/account info if it's in the description
+                            let cleanDescription = tx.description || '—'
+                            if (cleanDescription.includes('POS:') || cleanDescription.match(/\d{4}\s+\d{2}\*\*/)) {
+                              // Extract merchant name if it exists after card info
+                              const parts = cleanDescription.split(',').map(p => p.trim())
+                              const merchantPart = parts.find(p => !p.includes('POS:') && !p.match(/\d{4}\s+\d{2}\*\*/))
+                              if (merchantPart) {
+                                cleanDescription = merchantPart
+                              } else {
+                                // Just use the first part that's not card info
+                                cleanDescription = parts.find(p => !p.includes('POS:') && !p.match(/\d{4}\s+\d{2}\*\*/)) || cleanDescription
+                              }
+                            }
+                            
+                            return (
+                              <div
+                                key={tx.id}
+                                className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-all"
+                              >
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-start gap-3 mb-2">
+                                      <div className="flex-1 min-w-0">
+                                        <h3 className="font-semibold text-gray-900 dark:text-white text-base mb-1 truncate">
+                                          {cleanDescription}
+                                        </h3>
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                                            {formatDisplayDate(tx.date)}
+                                          </span>
+                                          {tx.category && (
+                                            <>
+                                              <span className="text-gray-400 dark:text-gray-500">•</span>
+                                              <span className="text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-md">
+                                                {tx.category}
+                                              </span>
+                                            </>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-3 flex-shrink-0">
                                     <span
-                                      className={`text-lg font-bold font-mono tabular-nums ${
+                                      className={`text-xl font-bold font-mono tabular-nums ${
                                         isIncome
                                           ? 'text-green-600 dark:text-green-400'
                                           : 'text-red-600 dark:text-red-400'
@@ -1643,25 +1783,27 @@ export default function FinancePage() {
                                     >
                                       {formatCurrency(displayAmount)}
                                     </span>
-                                  )
-                                })()}
-                                <button
-                                  type="button"
-                                  onClick={() => handleEdit(tx as FinanceTransaction & { id: string })}
-                                  className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDelete(tx.id!)}
-                                  className="px-3 py-1.5 text-xs font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                                >
-                                  Delete
-                                </button>
+                                    <div className="flex gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleEdit(tx as FinanceTransaction & { id: string })}
+                                        className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                      >
+                                        Edit
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDelete(tx.id!)}
+                                        className="px-3 py-1.5 text-xs font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                                      >
+                                        Delete
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
                               </div>
-                            </div>
-                          ))
+                            )
+                          })
                         )}
                       </div>
                     </div>
