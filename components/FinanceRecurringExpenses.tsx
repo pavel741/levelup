@@ -71,16 +71,44 @@ export function FinanceRecurringExpenses({ transactions, months = 6 }: Props) {
 
       // Sort by date
       txs.sort((a, b) => {
-        const dateA = typeof a.date === 'string' ? new Date(a.date) : (a.date as Date)
-        const dateB = typeof b.date === 'string' ? new Date(b.date) : (b.date as Date)
+        // Handle different date types: string, Date, or Timestamp
+        const dateAValue = a.date
+        const dateBValue = b.date
+        
+        const dateA = typeof dateAValue === 'string' 
+          ? new Date(dateAValue) 
+          : (dateAValue as any)?.toDate 
+            ? (dateAValue as any).toDate() 
+            : (dateAValue as Date)
+        
+        const dateB = typeof dateBValue === 'string' 
+          ? new Date(dateBValue) 
+          : (dateBValue as any)?.toDate 
+            ? (dateBValue as any).toDate() 
+            : (dateBValue as Date)
+        
         return dateA.getTime() - dateB.getTime()
       })
 
       // Calculate intervals between transactions
       const intervals: number[] = []
       for (let i = 1; i < txs.length; i++) {
-        const dateA = typeof txs[i - 1].date === 'string' ? new Date(txs[i - 1].date) : (txs[i - 1].date as Date)
-        const dateB = typeof txs[i].date === 'string' ? new Date(txs[i].date) : (txs[i].date as Date)
+        // Handle different date types: string, Date, or Timestamp
+        const dateAValue = txs[i - 1].date
+        const dateBValue = txs[i].date
+        
+        const dateA = typeof dateAValue === 'string' 
+          ? new Date(dateAValue) 
+          : (dateAValue as any)?.toDate 
+            ? (dateAValue as any).toDate() 
+            : (dateAValue as Date)
+        
+        const dateB = typeof dateBValue === 'string' 
+          ? new Date(dateBValue) 
+          : (dateBValue as any)?.toDate 
+            ? (dateBValue as any).toDate() 
+            : (dateBValue as Date)
+        
         const days = differenceInDays(dateB, dateA)
         if (days > 0) {
           intervals.push(days)
@@ -91,9 +119,12 @@ export function FinanceRecurringExpenses({ transactions, months = 6 }: Props) {
 
       const avgInterval = intervals.reduce((sum, val) => sum + val, 0) / intervals.length
       const amount = Math.abs(Number(txs[0].amount) || 0)
-      const lastDate = typeof txs[txs.length - 1].date === 'string' 
-        ? new Date(txs[txs.length - 1].date) 
-        : (txs[txs.length - 1].date as Date)
+      const lastDateValue = txs[txs.length - 1].date
+      const lastDate = typeof lastDateValue === 'string' 
+        ? new Date(lastDateValue) 
+        : (lastDateValue as any)?.toDate 
+          ? (lastDateValue as any).toDate() 
+          : (lastDateValue as Date)
 
       // Determine frequency
       let frequency: 'monthly' | 'bi-weekly' | 'weekly' | 'irregular' = 'irregular'

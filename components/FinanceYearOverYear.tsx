@@ -113,14 +113,12 @@ export function FinanceYearOverYear({ transactions, months = 12 }: Props) {
         {
           label: `${new Date().getFullYear() - 1} Income`,
           data: previousYearData.map((d) => d.income),
-          backgroundColor: '#86efac',
-          borderDash: [5, 5],
+          backgroundColor: 'rgba(134, 239, 172, 0.6)', // Light green with 60% opacity
         },
         {
           label: `${new Date().getFullYear() - 1} Expenses`,
           data: previousYearData.map((d) => d.expenses),
-          backgroundColor: '#fca5a5',
-          borderDash: [5, 5],
+          backgroundColor: 'rgba(252, 165, 165, 0.6)', // Light red with 60% opacity
         },
       ],
     }

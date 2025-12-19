@@ -112,7 +112,8 @@ export function FinanceExpenseDistribution({ transactions, bins = 20 }: Props) {
             callback: function(value, index) {
               // Show every nth label to avoid crowding
               const showEvery = Math.ceil(bins / 10)
-              return index % showEvery === 0 ? this.getLabelForValue(value) : ''
+              const numValue = typeof value === 'number' ? value : parseFloat(value.toString())
+              return index % showEvery === 0 ? this.getLabelForValue(numValue) : ''
             },
           },
         },

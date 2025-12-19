@@ -24,7 +24,7 @@ export function FinanceCashFlowCalendar({ transactions, months = 3, view = 'net'
     const calendars: Array<{
       month: string
       year: number
-      weeks: Array<Array<{ day: number; amount: number; date: Date | null }>>
+      weeks: Array<Array<DayData>>
     }> = []
 
     for (let i = 0; i < months; i++) {

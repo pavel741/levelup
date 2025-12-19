@@ -229,7 +229,17 @@ export const updateTransaction = async (
     // Convert date if present
     const updateData: any = { ...updates }
     if (updates.date) {
-      updateData.date = updates.date instanceof Date ? updates.date : new Date(updates.date)
+      // Handle different date types: string, Date, or Timestamp
+      if (updates.date instanceof Date) {
+        updateData.date = updates.date
+      } else if (typeof updates.date === 'string') {
+        updateData.date = new Date(updates.date)
+      } else if ((updates.date as any)?.toDate) {
+        // Firestore Timestamp
+        updateData.date = (updates.date as any).toDate()
+      } else {
+        updateData.date = new Date(updates.date as any)
+      }
     }
     updateData.updatedAt = new Date()
 
@@ -343,7 +353,8 @@ export const subscribeToCategories = (
 
     try {
       const collection = await getCategoriesCollection(userId)
-      const doc = await collection.findOne({ userId, _id: 'categories' })
+      // MongoDB allows custom _id values, but TypeScript types are strict - use type assertion
+      const doc = await collection.findOne({ userId, _id: 'categories' as any })
       
       if (doc) {
         const categories = convertMongoData(doc) as any
@@ -377,7 +388,8 @@ export const subscribeToCategories = (
 export const getCategories = async (userId: string): Promise<FinanceCategories> => {
   try {
     const collection = await getCategoriesCollection(userId)
-    const doc = await collection.findOne({ userId, _id: 'categories' })
+    // MongoDB allows custom _id values, but TypeScript types are strict - use type assertion
+    const doc = await collection.findOne({ userId, _id: 'categories' as any })
     
     if (doc) {
       const categories = convertMongoData(doc) as any
@@ -398,8 +410,9 @@ export const saveCategories = async (
 ): Promise<void> => {
   try {
     const collection = await getCategoriesCollection(userId)
+    // MongoDB allows custom _id values, but TypeScript types are strict - use type assertion
     await collection.updateOne(
-      { userId, _id: 'categories' },
+      { userId, _id: 'categories' as any },
       { $set: { userId, ...categories, updatedAt: new Date() } },
       { upsert: true }
     )
@@ -414,7 +427,8 @@ export const saveCategories = async (
 export const getFinanceSettings = async (userId: string): Promise<FinanceSettings | null> => {
   try {
     const collection = await getSettingsCollection(userId)
-    const doc = await collection.findOne({ userId, _id: 'settings' })
+    // MongoDB allows custom _id values, but TypeScript types are strict - use type assertion
+    const doc = await collection.findOne({ userId, _id: 'settings' as any })
     
     if (doc) {
       const settings = convertMongoData(doc) as any
@@ -436,7 +450,7 @@ export const saveFinanceSettings = async (
   try {
     const collection = await getSettingsCollection(userId)
     await collection.updateOne(
-      { userId, _id: 'settings' },
+      { userId, _id: 'settings' as any },
       { $set: { userId, ...settings, updatedAt: new Date() } },
       { upsert: true }
     )
@@ -451,7 +465,8 @@ export const saveFinanceSettings = async (
 export const getBudgetGoals = async (userId: string): Promise<FinanceBudgetGoals | null> => {
   try {
     const collection = await getSettingsCollection(userId)
-    const doc = await collection.findOne({ userId, _id: 'budgetGoals' })
+    // MongoDB allows custom _id values, but TypeScript types are strict - use type assertion
+    const doc = await collection.findOne({ userId, _id: 'budgetGoals' as any })
     
     if (doc) {
       const goals = convertMongoData(doc) as any
@@ -473,7 +488,7 @@ export const saveBudgetGoals = async (
   try {
     const collection = await getSettingsCollection(userId)
     await collection.updateOne(
-      { userId, _id: 'budgetGoals' },
+      { userId, _id: 'budgetGoals' as any },
       { $set: { userId, ...goals, updatedAt: new Date() } },
       { upsert: true }
     )
@@ -598,7 +613,7 @@ export const saveLastReconciliation = async (
   try {
     const collection = await getSettingsCollection(userId)
     await collection.updateOne(
-      { userId, _id: 'lastReconciliation' },
+      { userId, _id: 'lastReconciliation' as any },
       { $set: { userId, ...record, updatedAt: new Date() } },
       { upsert: true }
     )
@@ -706,7 +721,17 @@ export const updateRecurringTransaction = async (
     const collection = await getRecurringTransactionsCollection(userId)
     const updateData: any = { ...updates }
     if (updates.nextDate) {
-      updateData.nextDate = updates.nextDate instanceof Date ? updates.nextDate : new Date(updates.nextDate)
+      // Handle different date types: string, Date, or Timestamp
+      if (updates.nextDate instanceof Date) {
+        updateData.nextDate = updates.nextDate
+      } else if (typeof updates.nextDate === 'string') {
+        updateData.nextDate = new Date(updates.nextDate)
+      } else if ((updates.nextDate as any)?.toDate) {
+        // Firestore Timestamp
+        updateData.nextDate = (updates.nextDate as any).toDate()
+      } else {
+        updateData.nextDate = new Date(updates.nextDate as any)
+      }
     }
     updateData.updatedAt = new Date()
 
