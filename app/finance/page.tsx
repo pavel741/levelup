@@ -654,13 +654,25 @@ export default function FinancePage() {
           // POS: prefix should be categorized as Card Payment
           const shouldBeCardPayment = hasPosInCategory && currentCategory !== 'Card Payment'
           
+          // Reference number (viitenumber) should be categorized as Bills
+          // If transaction has a reference number but isn't already Bills (and isn't a card payment), recategorize
+          const hasReferenceNumber = tx.referenceNumber && tx.referenceNumber.trim().length > 0
+          const shouldBeBills = hasReferenceNumber && 
+            currentCategory !== 'Bills' && 
+            !hasPosInDescription && 
+            !hasAtmInDescription &&
+            !hasPsd2Klix &&
+            !hasLoanPattern &&
+            !hasUtilityPattern
+          
           const isWrongCategory = 
             (hasPosInDescription && currentCategory !== 'Card Payment' && currentCategory !== 'ATM Withdrawal' && currentCategory !== 'Bills' && currentCategory !== 'ESTO' && currentCategory !== 'Kodulaen' && currentCategory !== 'Kommunaalid') ||
             (hasAtmInDescription && currentCategory !== 'ATM Withdrawal') ||
             (hasPsd2Klix && currentCategory !== 'ESTO') ||
             (hasLoanPattern && currentCategory !== 'Kodulaen') ||
             (hasUtilityPattern && currentCategory !== 'Kommunaalid') ||
-            (hasOtherPaymentRef && currentCategory !== 'Bills' && currentCategory !== 'Card Payment' && currentCategory !== 'ATM Withdrawal' && currentCategory !== 'ESTO' && currentCategory !== 'Kodulaen' && currentCategory !== 'Kommunaalid')
+            (hasOtherPaymentRef && currentCategory !== 'Bills' && currentCategory !== 'Card Payment' && currentCategory !== 'ATM Withdrawal' && currentCategory !== 'ESTO' && currentCategory !== 'Kodulaen' && currentCategory !== 'Kommunaalid') ||
+            shouldBeBills
           
           const needsRecategorization = 
             (!currentCategory || currentCategory === 'Other') ||
@@ -673,11 +685,13 @@ export default function FinancePage() {
             shouldBeKommunaalid ||
             shouldBeAtm ||
             shouldBeCardPayment ||
+            shouldBeBills || // Reference number should be Bills
             (hasPosInDescription && !suggestedCategory) || // If description has POS but no category, try to categorize
             (hasAtmInDescription && !suggestedCategory) || // If description has ATM but no category, try to categorize
             (hasLoanPattern && !suggestedCategory) || // If description has loan pattern but no category, try to categorize
             (hasUtilityPattern && !suggestedCategory) || // If description has utility pattern but no category, try to categorize
-            (hasPsd2Klix && !suggestedCategory) // If description has PSD2/KLIX but no category, try to categorize
+            (hasPsd2Klix && !suggestedCategory) || // If description has PSD2/KLIX but no category, try to categorize
+            (hasReferenceNumber && !suggestedCategory) // If has reference number but no category, try to categorize
           
           // Override suggested category based on prefix detection
           let finalCategory = suggestedCategory
@@ -691,6 +705,8 @@ export default function FinancePage() {
             finalCategory = 'ATM Withdrawal'
           } else if (shouldBeCardPayment) {
             finalCategory = 'Card Payment'
+          } else if (shouldBeBills) {
+            finalCategory = 'Bills'
           }
           
           if (needsRecategorization && finalCategory && finalCategory !== currentCategory) {
