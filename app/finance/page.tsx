@@ -14,6 +14,7 @@ import {
   subscribeToCategories,
   getCategories,
   batchAddTransactions,
+  batchDeleteTransactions,
 } from '@/lib/financeFirestore'
 import type { FinanceTransaction, FinanceCategories } from '@/types/finance'
 import { CSVImportService } from '@/lib/csvImport'
@@ -348,6 +349,31 @@ export default function FinancePage() {
     } catch (error) {
       console.error('Error deleting transaction:', error)
       alert('Error deleting transaction. Please try again.')
+    }
+  }
+
+  // Handle delete all transactions
+  const handleDeleteAll = async () => {
+    if (!user?.id || transactions.length === 0) return
+    
+    const confirmed = confirm(
+      `Are you sure you want to delete ALL ${transactions.length} transactions? This action cannot be undone.`
+    )
+    
+    if (!confirmed) return
+
+    setIsSubmitting(true)
+    try {
+      const transactionIds = transactions.map((tx) => tx.id!).filter((id) => id)
+      if (transactionIds.length > 0) {
+        await batchDeleteTransactions(user.id, transactionIds)
+        alert(`Successfully deleted ${transactionIds.length} transactions`)
+      }
+    } catch (error) {
+      console.error('Error deleting all transactions:', error)
+      alert('Error deleting transactions. Please try again.')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -927,6 +953,14 @@ export default function FinancePage() {
                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
                       <div className="flex justify-between items-center mb-6">
                         <h2 className="text-xl font-bold text-gray-900 dark:text-white">Recent Transactions</h2>
+                        <button
+                          type="button"
+                          onClick={handleDeleteAll}
+                          disabled={transactions.length === 0 || isSubmitting}
+                          className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Delete All
+                        </button>
                       </div>
 
                       {/* Date Range Filter */}
