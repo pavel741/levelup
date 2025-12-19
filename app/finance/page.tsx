@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
 import AuthGuard from '@/components/AuthGuard'
 import Sidebar from '@/components/Sidebar'
@@ -124,7 +124,7 @@ export default function FinancePage() {
   }, [user?.id])
 
   // Load ALL transactions for summary calculations (no limit)
-  const loadAllTransactionsForSummary = async () => {
+  const loadAllTransactionsForSummary = useCallback(async () => {
     if (!user?.id) return
     setIsLoadingSummary(true)
     try {
@@ -135,12 +135,12 @@ export default function FinancePage() {
     } finally {
       setIsLoadingSummary(false)
     }
-  }
+  }, [user?.id])
 
   useEffect(() => {
     if (!user?.id) return
     loadAllTransactionsForSummary()
-  }, [user?.id])
+  }, [user?.id, loadAllTransactionsForSummary])
 
   // Reload summary transactions when regular transactions change significantly
   useEffect(() => {
@@ -150,7 +150,7 @@ export default function FinancePage() {
       loadAllTransactionsForSummary()
     }, 2000)
     return () => clearTimeout(timeoutId)
-  }, [user?.id, transactions.length])
+  }, [user?.id, transactions.length, loadAllTransactionsForSummary])
 
   // Initialize categories if they don't exist
   useEffect(() => {
@@ -749,7 +749,8 @@ export default function FinancePage() {
         }
       )
 
-      setCsvImportStatus(`Successfully imported ${result.success} transactions${result.errors > 0 ? ` (${result.errors} errors)` : ''}`)
+      const errorText = result.errors > 0 ? ` (${result.errors} errors)` : ''
+      setCsvImportStatus(`Successfully imported ${result.success} transactions${errorText}`)
       setCsvImportProgress(100)
       
       // Reload all transactions for summary calculations
@@ -772,8 +773,6 @@ export default function FinancePage() {
       setIsSubmitting(false)
     }
   }
-
-  const summary = summaryView === 'monthly' ? monthlySummary : allTimeSummary
 
   return (
     <AuthGuard>
@@ -899,7 +898,7 @@ export default function FinancePage() {
                             <DollarSign className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                           </div>
                           <div className="text-2xl font-bold text-blue-600 dark:text-blue-400 font-mono tabular-nums">
-                            {formatCurrency(summary.balance)}
+                            {formatCurrency((summaryView === 'monthly' ? monthlySummary : allTimeSummary).balance)}
                           </div>
                         </div>
                         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 transition-all hover:shadow-xl">
@@ -910,7 +909,7 @@ export default function FinancePage() {
                             <TrendingUp className="w-5 h-5 text-green-600 dark:text-green-400" />
                           </div>
                           <div className="text-2xl font-bold text-green-600 dark:text-green-400 font-mono tabular-nums">
-                            {formatCurrency(summary.income)}
+                            {formatCurrency((summaryView === 'monthly' ? monthlySummary : allTimeSummary).income)}
                           </div>
                         </div>
                         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 transition-all hover:shadow-xl">
@@ -921,7 +920,7 @@ export default function FinancePage() {
                             <TrendingDown className="w-5 h-5 text-red-600 dark:text-red-400" />
                           </div>
                           <div className="text-2xl font-bold text-red-600 dark:text-red-400 font-mono tabular-nums">
-                            {formatCurrency(summary.expenses)}
+                            {formatCurrency((summaryView === 'monthly' ? monthlySummary : allTimeSummary).expenses)}
                           </div>
                         </div>
                       </div>
