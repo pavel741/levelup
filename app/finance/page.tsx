@@ -13,8 +13,10 @@ import {
   deleteTransaction,
   subscribeToCategories,
   getCategories,
+  batchAddTransactions,
 } from '@/lib/financeFirestore'
 import type { FinanceTransaction, FinanceCategories } from '@/types/finance'
+import { CSVImportService } from '@/lib/csvImport'
 
 export const dynamic = 'force-dynamic'
 
@@ -51,6 +53,15 @@ export default function FinancePage() {
   const [customDateFrom, setCustomDateFrom] = useState('')
   const [customDateTo, setCustomDateTo] = useState('')
   const [showCustomDateRange, setShowCustomDateRange] = useState(false)
+  
+  // CSV Import state
+  const [csvFile, setCsvFile] = useState<File | null>(null)
+  const [csvImportStatus, setCsvImportStatus] = useState<string>('')
+  const [csvImportProgress, setCsvImportProgress] = useState(0)
+  const [showCsvMapping, setShowCsvMapping] = useState(false)
+  const [csvColumnMapping, setCsvColumnMapping] = useState<any>(null)
+  const [csvParsedData, setCsvParsedData] = useState<any[]>([])
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([])
   
   // Load transactions
   useEffect(() => {
@@ -399,6 +410,79 @@ export default function FinancePage() {
     return `${monthNames[month - 1]} ${year}`
   }
 
+  // CSV Import handlers
+  const handleCsvFileSelect = async (file: File) => {
+    try {
+      const text = await file.text()
+      const csvService = new CSVImportService()
+      
+      try {
+        const result = csvService.parseCSV(text)
+        setCsvParsedData(result.transactions)
+        setCsvColumnMapping(result.columnMapping)
+        setCsvHeaders(result.columnMapping._allHeaders || [])
+        setShowCsvMapping(true)
+        setCsvImportStatus(`Found ${result.transactions.length} transactions`)
+      } catch (error: any) {
+        setCsvImportStatus(`Error parsing CSV: ${error.message}`)
+        setShowCsvMapping(false)
+      }
+    } catch (error: any) {
+      setCsvImportStatus(`Error reading file: ${error.message}`)
+    }
+  }
+
+  const handleCsvImport = async () => {
+    if (!user?.id || !csvFile || csvParsedData.length === 0) return
+    
+    if (!csvColumnMapping?.amount && csvColumnMapping?.amount !== 0) {
+      setCsvImportStatus('Error: Amount column mapping is required')
+      return
+    }
+
+    setIsSubmitting(true)
+    setCsvImportStatus('Importing transactions...')
+    setCsvImportProgress(0)
+
+    try {
+      const transactionsToImport = csvParsedData.map((tx) => ({
+        type: tx.type || 'expense',
+        description: tx.description || 'Imported transaction',
+        amount: tx.amount || 0,
+        category: tx.category || 'Other',
+        date: tx.date || new Date().toISOString().split('T')[0],
+      }))
+
+      const result = await batchAddTransactions(
+        user.id,
+        transactionsToImport,
+        (current, total) => {
+          const progress = Math.round((current / total) * 100)
+          setCsvImportProgress(progress)
+        }
+      )
+
+      setCsvImportStatus(`Successfully imported ${result.success} transactions${result.errors > 0 ? ` (${result.errors} errors)` : ''}`)
+      setCsvImportProgress(100)
+      
+      // Reset after 3 seconds
+      setTimeout(() => {
+        setShowCsvMapping(false)
+        setCsvFile(null)
+        setCsvColumnMapping(null)
+        setCsvHeaders([])
+        setCsvParsedData([])
+        setCsvImportStatus('')
+        setCsvImportProgress(0)
+      }, 3000)
+    } catch (error: any) {
+      setCsvImportStatus(`Error importing: ${error.message}`)
+      setCsvImportProgress(0)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   const summary = summaryView === 'monthly' ? monthlySummary : allTimeSummary
 
   return (
@@ -577,7 +661,7 @@ export default function FinancePage() {
                         <div className="flex items-center justify-between mb-2">
                           <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
                             Total Expenses
-                          </h3>
+                    </h3>
                           <TrendingDown className="w-5 h-5 text-red-600 dark:text-red-400" />
                         </div>
                         <div className="text-2xl font-bold text-red-600 dark:text-red-400 font-mono tabular-nums">
@@ -719,6 +803,122 @@ export default function FinancePage() {
                           )}
                         </div>
                       </form>
+                      
+                      {/* CSV Import Section */}
+                      <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                        <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">Import from CSV</h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                          Upload a CSV file and select which columns to import
+                        </p>
+                        <div className="flex gap-2 mb-4">
+                          <input
+                            type="file"
+                            id="csvFileInput"
+                            accept=".csv"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0]
+                              if (file) {
+                                setCsvFile(file)
+                                handleCsvFileSelect(file)
+                              }
+                            }}
+                            className="hidden"
+                          />
+                          <label
+                            htmlFor="csvFileInput"
+                            className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                          >
+                            Choose CSV File
+                          </label>
+                        </div>
+                        
+                        {csvImportStatus && (
+                          <div className={`text-sm mb-2 ${csvImportStatus.includes('Error') ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                            {csvImportStatus}
+                          </div>
+                        )}
+                        
+                        {csvImportProgress > 0 && csvImportProgress < 100 && (
+                          <div className="mb-2">
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-gradient-to-r from-blue-600 to-purple-600 transition-all duration-300"
+                                  style={{ width: `${csvImportProgress}%` }}
+                                />
+                              </div>
+                              <span className="text-xs text-gray-600 dark:text-gray-400 min-w-[40px] text-right">
+                                {csvImportProgress}%
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {showCsvMapping && csvHeaders.length > 0 && (
+                          <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                            <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Map CSV Fields</h4>
+                            <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
+                              Select which CSV column maps to each transaction field:
+                            </p>
+                            <div className="space-y-2 mb-4">
+                              {[
+                                { key: 'type', label: 'Type' },
+                                { key: 'description', label: 'Description' },
+                                { key: 'amount', label: 'Amount (required)' },
+                                { key: 'category', label: 'Category' },
+                                { key: 'date', label: 'Date' },
+                              ].map((field) => (
+                                <div key={field.key}>
+                                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    {field.label}:
+                                  </label>
+                                  <select
+                                    value={csvColumnMapping?.[field.key] ?? ''}
+                                    onChange={(e) => {
+                                      setCsvColumnMapping({
+                                        ...csvColumnMapping,
+                                        [field.key]: e.target.value === '' ? null : parseInt(e.target.value),
+                                      })
+                                    }}
+                                    className="w-full px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  >
+                                    <option value="">-- Select column --</option>
+                                    {csvHeaders.map((header, index) => (
+                                      <option key={index} value={index}>
+                                        {header}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={handleCsvImport}
+                                disabled={!csvColumnMapping?.amount && csvColumnMapping?.amount !== 0}
+                                className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg text-sm font-medium hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                Import Selected Fields
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowCsvMapping(false)
+                                  setCsvFile(null)
+                                  setCsvColumnMapping(null)
+                                  setCsvHeaders([])
+                                  setCsvParsedData([])
+                                  setCsvImportStatus('')
+                                }}
+                                className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
 
