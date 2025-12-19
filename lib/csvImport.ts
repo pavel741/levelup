@@ -481,6 +481,8 @@ export class CSVImportService {
       throw new Error('CSV file is empty')
     }
 
+    console.log(`📊 CSV parsing: Found ${lines.length} total lines (including header)`)
+
     const delimiter = this.detectDelimiter(lines[0])
     const headers = this.parseCSVLine(lines[0], delimiter)
     const normalizedHeaders = headers.map((h) => {
@@ -508,9 +510,11 @@ export class CSVImportService {
       recipientName?: string
     }> = []
 
+    let skippedRows = 0
     for (let i = 1; i < lines.length; i++) {
       const values = this.parseCSVLine(lines[i], delimiter)
       if (values.length === 0 || values.every((v) => !v.trim())) {
+        skippedRows++
         continue
       }
 
@@ -523,6 +527,8 @@ export class CSVImportService {
 
       rows.push(this.mapRowToTransaction(row, columnMap))
     }
+
+    console.log(`✅ CSV parsing complete: ${rows.length} transactions parsed, ${skippedRows} empty rows skipped`)
 
     this._debugLogged = false
 

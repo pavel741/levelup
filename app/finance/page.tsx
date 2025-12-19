@@ -90,13 +90,19 @@ export default function FinancePage() {
         await waitForFirebaseInit()
         
         setIsLoading(true)
+        // Load transactions (limited to 1000 due to Firestore query limits)
+        // For larger datasets, we'd need pagination
         unsubscribe = subscribeToTransactions(
           user.id,
           (txs) => {
             setTransactions(txs)
             setIsLoading(false)
+            // Log how many transactions are loaded
+            if (txs.length > 0) {
+              console.log(`📊 Loaded ${txs.length} transactions (most recent)`)
+            }
           },
-          { limitCount: 500 }
+          { limitCount: 1000 } // Firestore max per query is 1000
         )
       } catch (error) {
         console.error('Failed to initialize Firebase:', error)
@@ -717,8 +723,13 @@ export default function FinancePage() {
   const handleCsvFileSelect = async (file: File) => {
     try {
       const text = await file.text()
+      console.log(`📁 File loaded: ${(text.length / 1024).toFixed(2)} KB, ${text.split('\n').length} lines`)
+      
       const csvService = new CSVImportService()
       const result = csvService.parseCSV(text)
+      
+      console.log(`📊 Parsed ${result.transactions.length} transactions from CSV`)
+      
       setCsvParsedData(result.transactions)
       setCsvColumnMapping(result.columnMapping)
       setCsvHeaders(result.columnMapping._allHeaders || [])
@@ -767,7 +778,13 @@ export default function FinancePage() {
       )
 
       const errorSuffix = result.errors > 0 ? ` (${result.errors} errors)` : ''
-      const successMessage = 'Successfully imported ' + result.success + ' transactions' + errorSuffix
+      const successMessage = `Successfully imported ${result.success} of ${transactionsToImport.length} transactions${errorSuffix}`
+      
+      // Warn if not all transactions were imported
+      if (result.success < transactionsToImport.length) {
+        console.warn(`⚠️ Only imported ${result.success} out of ${transactionsToImport.length} transactions`)
+      }
+      
       setCsvImportStatus(successMessage)
       setCsvImportProgress(100)
       
