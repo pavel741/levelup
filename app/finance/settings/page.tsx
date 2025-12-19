@@ -77,6 +77,7 @@ export default function FinanceSettingsPage() {
   const [usePaydayPeriod, setUsePaydayPeriod] = useState(false)
   const [periodStartDay, setPeriodStartDay] = useState(1)
   const [periodEndDay, setPeriodEndDay] = useState<number | null>(null)
+  const [capDateRangesToData, setCapDateRangesToData] = useState(true)
   const [isSavingPeriod, setIsSavingPeriod] = useState(false)
 
   useEffect(() => {
@@ -113,6 +114,7 @@ export default function FinanceSettingsPage() {
           setUsePaydayPeriod(settings.usePaydayPeriod || false)
           setPeriodStartDay(settings.periodStartDay ?? 1)
           setPeriodEndDay(settings.periodEndDay ?? null)
+          setCapDateRangesToData(settings.capDateRangesToData !== false) // Default to true
         }
         
         if (lastRec) {
@@ -238,6 +240,7 @@ export default function FinanceSettingsPage() {
         usePaydayPeriod,
         periodStartDay,
         periodEndDay,
+        capDateRangesToData,
       }
       await saveFinanceSettings(user.id, settings)
     } catch (e: any) {
@@ -567,6 +570,26 @@ export default function FinanceSettingsPage() {
                         />
                       </div>
                     </div>
+                  </div>
+                  
+                  {/* Cap Date Ranges to Data Setting */}
+                  <div className="mb-4">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={capDateRangesToData}
+                        onChange={(e) => setCapDateRangesToData(e.target.checked)}
+                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                      />
+                      <div>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">
+                          Cap date ranges to actual transaction data
+                        </span>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          When enabled, date ranges (e.g., "This Month") will be capped to the latest transaction date instead of the full calendar period. This prevents showing empty future dates in analytics.
+                        </p>
+                      </div>
+                    </label>
                   </div>
                   
                   <div className="flex justify-end">

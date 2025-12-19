@@ -22,8 +22,8 @@ import { FinanceCategoryForecast } from '@/components/FinanceCategoryForecast'
 import { FinanceSpendingAlerts } from '@/components/FinanceSpendingAlerts'
 import { FinanceRecurringExpenses } from '@/components/FinanceRecurringExpenses'
 import { FinanceVerificationPanel } from '@/components/FinanceVerificationPanel'
-import { subscribeToTransactions } from '@/lib/financeApi'
-import type { FinanceTransaction } from '@/types/finance'
+import { subscribeToTransactions, getFinanceSettings } from '@/lib/financeApi'
+import type { FinanceTransaction, FinanceSettings } from '@/types/finance'
 import { BarChart3, ArrowLeft, TrendingUp, TrendingDown, DollarSign, Percent } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
@@ -34,6 +34,7 @@ export default function FinanceAnalyticsPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [transactions, setTransactions] = useState<FinanceTransaction[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [financeSettings, setFinanceSettings] = useState<FinanceSettings | null>(null)
   const [timeRange, setTimeRange] = useState<'today' | 'week' | 'month' | '6months' | '12months' | 'year' | 'all' | 'custom'>('month')
   const [customDateFrom, setCustomDateFrom] = useState('')
   const [customDateTo, setCustomDateTo] = useState('')
@@ -43,6 +44,13 @@ export default function FinanceAnalyticsPage() {
     if (!user?.id) return
 
     setIsLoading(true)
+
+    // Load finance settings
+    getFinanceSettings(user.id).then(settings => {
+      setFinanceSettings(settings)
+    }).catch(err => {
+      console.error('Error loading finance settings:', err)
+    })
 
     const unsubscribe = subscribeToTransactions(
       user.id,
@@ -66,40 +74,61 @@ export default function FinanceAnalyticsPage() {
     let startDate: Date | null = null
     let endDate: Date | null = null
 
+    // Get latest transaction date if we should cap ranges to data
+    const capToData = financeSettings?.capDateRangesToData !== false // Default to true
+    let latestTransactionDate: Date | null = null
+    if (capToData && transactions.length > 0) {
+      transactions.forEach((tx) => {
+        const txDate = typeof tx.date === 'string' ? new Date(tx.date) : (tx.date as Date)
+        if (!latestTransactionDate || txDate > latestTransactionDate) {
+          latestTransactionDate = txDate
+        }
+      })
+    }
+
+    // Helper function to cap end date to latest transaction
+    const capEndDate = (calculatedEndDate: Date): Date => {
+      if (capToData && latestTransactionDate !== null && calculatedEndDate > latestTransactionDate) {
+        return latestTransactionDate
+      }
+      return calculatedEndDate
+    }
+
     switch (timeRange) {
       case 'today':
         startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
+        endDate = capEndDate(new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59))
         break
       case 'week':
         const weekStart = new Date(now)
         weekStart.setDate(now.getDate() - now.getDay()) // Start of week (Sunday)
         weekStart.setHours(0, 0, 0, 0)
         startDate = weekStart
-        endDate = now
+        endDate = capEndDate(now)
         break
       case 'month':
         startDate = new Date(now.getFullYear(), now.getMonth(), 1)
-        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
+        endDate = capEndDate(new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59))
         break
       case 'year':
         startDate = new Date(now.getFullYear(), 0, 1)
-        endDate = new Date(now.getFullYear(), 11, 31, 23, 59, 59)
+        endDate = capEndDate(new Date(now.getFullYear(), 11, 31, 23, 59, 59))
         break
       case '6months':
         startDate = new Date(now.getFullYear(), now.getMonth() - 6, 1)
-        endDate = now
+        endDate = capEndDate(now)
         break
       case '12months':
         startDate = new Date(now.getFullYear(), now.getMonth() - 12, 1)
-        endDate = now
+        endDate = capEndDate(now)
         break
       case 'custom':
         if (customDateFrom && customDateTo) {
           startDate = new Date(customDateFrom)
           startDate.setHours(0, 0, 0, 0)
-          endDate = new Date(customDateTo)
-          endDate.setHours(23, 59, 59, 999)
+          const customEndDate = new Date(customDateTo)
+          customEndDate.setHours(23, 59, 59, 999)
+          endDate = capEndDate(customEndDate)
         }
         break
       case 'all':
@@ -113,7 +142,7 @@ export default function FinanceAnalyticsPage() {
       const txDate = typeof tx.date === 'string' ? new Date(tx.date) : (tx.date as Date)
       return txDate >= startDate! && txDate <= endDate!
     })
-  }, [transactions, timeRange, customDateFrom, customDateTo])
+  }, [transactions, timeRange, customDateFrom, customDateTo, financeSettings])
 
   // Calculate date range info for verification panel
   const dateRangeInfo = useMemo(() => {
@@ -122,10 +151,30 @@ export default function FinanceAnalyticsPage() {
     let endDate: Date | null = null
     let label = ''
 
+    // Get latest transaction date if we should cap ranges to data
+    const capToData = financeSettings?.capDateRangesToData !== false // Default to true
+    let latestTransactionDate: Date | null = null
+    if (capToData && transactions.length > 0) {
+      transactions.forEach((tx) => {
+        const txDate = typeof tx.date === 'string' ? new Date(tx.date) : (tx.date as Date)
+        if (!latestTransactionDate || txDate > latestTransactionDate) {
+          latestTransactionDate = txDate
+        }
+      })
+    }
+
+    // Helper function to cap end date to latest transaction
+    const capEndDate = (calculatedEndDate: Date): Date => {
+      if (capToData && latestTransactionDate !== null && calculatedEndDate > latestTransactionDate) {
+        return latestTransactionDate
+      }
+      return calculatedEndDate
+    }
+
     switch (timeRange) {
       case 'today':
         startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
+        endDate = capEndDate(new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59))
         label = 'Today'
         break
       case 'week':
@@ -133,35 +182,36 @@ export default function FinanceAnalyticsPage() {
         weekStart.setDate(now.getDate() - now.getDay())
         weekStart.setHours(0, 0, 0, 0)
         startDate = weekStart
-        endDate = now
+        endDate = capEndDate(now)
         label = 'This Week'
         break
       case 'month':
         startDate = new Date(now.getFullYear(), now.getMonth(), 1)
-        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
+        endDate = capEndDate(new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59))
         label = 'This Month'
         break
       case 'year':
         startDate = new Date(now.getFullYear(), 0, 1)
-        endDate = new Date(now.getFullYear(), 11, 31, 23, 59, 59)
+        endDate = capEndDate(new Date(now.getFullYear(), 11, 31, 23, 59, 59))
         label = 'This Year'
         break
       case '6months':
         startDate = new Date(now.getFullYear(), now.getMonth() - 6, 1)
-        endDate = now
+        endDate = capEndDate(now)
         label = 'Last 6 Months'
         break
       case '12months':
         startDate = new Date(now.getFullYear(), now.getMonth() - 12, 1)
-        endDate = now
+        endDate = capEndDate(now)
         label = 'Last 12 Months'
         break
       case 'custom':
         if (customDateFrom && customDateTo) {
           startDate = new Date(customDateFrom)
           startDate.setHours(0, 0, 0, 0)
-          endDate = new Date(customDateTo)
-          endDate.setHours(23, 59, 59, 999)
+          const customEndDate = new Date(customDateTo)
+          customEndDate.setHours(23, 59, 59, 999)
+          endDate = capEndDate(customEndDate)
           label = 'Custom Range'
         } else {
           label = 'All Time'
@@ -174,7 +224,7 @@ export default function FinanceAnalyticsPage() {
     }
 
     return { start: startDate, end: endDate, label }
-  }, [timeRange, customDateFrom, customDateTo])
+  }, [timeRange, customDateFrom, customDateTo, financeSettings, transactions])
 
   // Calculate summary stats based on filtered transactions
   const summaryStats = useMemo(() => {
