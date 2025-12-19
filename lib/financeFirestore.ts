@@ -289,6 +289,7 @@ export const batchAddTransactions = async (
     throw new Error('Firestore is not initialized')
   }
 
+  const dbInstance = db // Store in const so TypeScript knows it's defined
   const batchSize = 500
   let successCount = 0
   let errorCount = 0
@@ -299,7 +300,7 @@ export const batchAddTransactions = async (
 
     try {
       await retryOperation(async () => {
-        const batch = writeBatch(db)
+        const batch = writeBatch(dbInstance)
         const transactionsRef = getTransactionsRef(userId)
 
         chunk.forEach((tx) => {
@@ -329,13 +330,14 @@ export const batchDeleteTransactions = async (
     throw new Error('Firestore is not initialized')
   }
 
+  const dbInstance = db // Store in const so TypeScript knows it's defined
   const batchSize = 500
 
   for (let i = 0; i < transactionIds.length; i += batchSize) {
     const chunk = transactionIds.slice(i, i + batchSize)
 
     await retryOperation(async () => {
-      const batch = writeBatch(db)
+      const batch = writeBatch(dbInstance)
       chunk.forEach((id) => {
         const ref = doc(getTransactionsRef(userId), id)
         batch.delete(ref)
