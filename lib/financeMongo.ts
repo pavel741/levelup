@@ -277,23 +277,86 @@ export const deleteTransaction = async (
   }
 }
 
+/**
+ * Check for existing transactions by archiveId
+ * Returns a Set of archiveIds that already exist in the database
+ */
+export const checkExistingArchiveIds = async (
+  userId: string,
+  archiveIds: string[]
+): Promise<Set<string>> => {
+  try {
+    const collection = await getTransactionsCollection(userId)
+    // Filter out empty/null archiveIds
+    const validArchiveIds = archiveIds.filter(id => id && id.trim().length > 0)
+    
+    if (validArchiveIds.length === 0) {
+      return new Set()
+    }
+    
+    // Query for transactions with matching archiveIds
+    const existingDocs = await collection.find({
+      userId,
+      archiveId: { $in: validArchiveIds }
+    }).toArray()
+    
+    // Return Set of existing archiveIds
+    return new Set(existingDocs.map(doc => doc.archiveId).filter(Boolean))
+  } catch (error) {
+    console.error('Error checking existing archiveIds:', error)
+    // On error, return empty set (will import all to be safe)
+    return new Set()
+  }
+}
+
 export const batchAddTransactions = async (
   userId: string,
   transactions: Omit<FinanceTransaction, 'id'>[],
-  progressCallback?: (current: number, total: number) => void
-): Promise<{ success: number; errors: number }> => {
+  progressCallback?: (current: number, total: number) => void,
+  options?: { skipDuplicates?: boolean }
+): Promise<{ success: number; errors: number; skipped: number }> => {
   try {
     const collection = await getTransactionsCollection(userId)
     let successCount = 0
     let errorCount = 0
-    const total = transactions.length
+    let skippedCount = 0
+    
+    // Check for duplicates if skipDuplicates option is enabled
+    let existingArchiveIds = new Set<string>()
+    if (options?.skipDuplicates) {
+      const archiveIds = transactions
+        .map(tx => (tx as any).archiveId)
+        .filter((id): id is string => Boolean(id && typeof id === 'string'))
+      
+      if (archiveIds.length > 0) {
+        console.log(`🔍 Checking for duplicates: ${archiveIds.length} transactions with archiveId`)
+        existingArchiveIds = await checkExistingArchiveIds(userId, archiveIds)
+        console.log(`✅ Found ${existingArchiveIds.size} existing transactions (will skip duplicates)`)
+      }
+    }
+    
+    // Filter out duplicates if skipDuplicates is enabled
+    let transactionsToImport = transactions
+    if (options?.skipDuplicates && existingArchiveIds.size > 0) {
+      transactionsToImport = transactions.filter(tx => {
+        const archiveId = (tx as any).archiveId
+        if (archiveId && existingArchiveIds.has(archiveId)) {
+          skippedCount++
+          return false
+        }
+        return true
+      })
+      console.log(`📊 Filtered: ${skippedCount} duplicates skipped, ${transactionsToImport.length} to import`)
+    }
+    
+    const total = transactionsToImport.length
 
     // MongoDB can handle large batches efficiently - no quota limits!
     // Using 1000 per batch for optimal performance
     const batchSize = 1000
 
-    for (let i = 0; i < transactions.length; i += batchSize) {
-      const chunk = transactions.slice(i, i + batchSize)
+    for (let i = 0; i < transactionsToImport.length; i += batchSize) {
+      const chunk = transactionsToImport.slice(i, i + batchSize)
 
       try {
         // Convert dates and prepare documents with userId
@@ -334,7 +397,7 @@ export const batchAddTransactions = async (
       }
     }
 
-    return { success: successCount, errors: errorCount }
+    return { success: successCount, errors: errorCount, skipped: skippedCount }
   } catch (error) {
     console.error('Error in batchAddTransactions MongoDB:', error)
     throw error

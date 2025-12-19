@@ -1021,21 +1021,36 @@ export default function FinancePage() {
         ),
       }))
 
+      // Check how many transactions have archiveId for duplicate detection
+      const transactionsWithArchiveId = transactionsToImport.filter(tx => (tx as any).archiveId)
+      const enableDuplicateCheck = transactionsWithArchiveId.length > 0
+      
+      if (enableDuplicateCheck) {
+        setCsvImportStatus(`Checking for duplicates... Found ${transactionsWithArchiveId.length} transactions with archiveId`)
+      }
+
       const result = await batchAddTransactions(
         user.id,
         transactionsToImport,
         (current, total) => {
           const progress = Math.round((current / total) * 100)
           setCsvImportProgress(progress)
-        }
+        },
+        { skipDuplicates: enableDuplicateCheck }
       )
 
       const errorSuffix = result.errors > 0 ? ` (${result.errors} errors)` : ''
-      const successMessage = `Successfully imported ${result.success} of ${transactionsToImport.length} transactions${errorSuffix}`
+      const skippedSuffix = result.skipped > 0 ? ` (${result.skipped} duplicates skipped)` : ''
+      const successMessage = `Successfully imported ${result.success} of ${transactionsToImport.length} transactions${skippedSuffix}${errorSuffix}`
+      
+      // Log duplicate detection results
+      if (result.skipped > 0) {
+        console.log(`✅ Duplicate detection: Skipped ${result.skipped} transactions that already exist (matched by archiveId)`)
+      }
       
       // Warn if not all transactions were imported
-      if (result.success < transactionsToImport.length) {
-        console.warn(`⚠️ Only imported ${result.success} out of ${transactionsToImport.length} transactions`)
+      if (result.success < transactionsToImport.length - result.skipped) {
+        console.warn(`⚠️ Only imported ${result.success} out of ${transactionsToImport.length - result.skipped} new transactions`)
       }
       
       setCsvImportStatus(successMessage)
