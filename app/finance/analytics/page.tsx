@@ -21,6 +21,7 @@ import { FinanceCashFlowCalendar } from '@/components/FinanceCashFlowCalendar'
 import { FinanceCategoryForecast } from '@/components/FinanceCategoryForecast'
 import { FinanceSpendingAlerts } from '@/components/FinanceSpendingAlerts'
 import { FinanceRecurringExpenses } from '@/components/FinanceRecurringExpenses'
+import { FinanceVerificationPanel } from '@/components/FinanceVerificationPanel'
 import { subscribeToTransactions } from '@/lib/financeApi'
 import type { FinanceTransaction } from '@/types/finance'
 import { BarChart3, ArrowLeft, TrendingUp, TrendingDown, DollarSign, Percent } from 'lucide-react'
@@ -113,6 +114,67 @@ export default function FinanceAnalyticsPage() {
       return txDate >= startDate! && txDate <= endDate!
     })
   }, [transactions, timeRange, customDateFrom, customDateTo])
+
+  // Calculate date range info for verification panel
+  const dateRangeInfo = useMemo(() => {
+    const now = new Date()
+    let startDate: Date | null = null
+    let endDate: Date | null = null
+    let label = ''
+
+    switch (timeRange) {
+      case 'today':
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
+        label = 'Today'
+        break
+      case 'week':
+        const weekStart = new Date(now)
+        weekStart.setDate(now.getDate() - now.getDay())
+        weekStart.setHours(0, 0, 0, 0)
+        startDate = weekStart
+        endDate = now
+        label = 'This Week'
+        break
+      case 'month':
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1)
+        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
+        label = 'This Month'
+        break
+      case 'year':
+        startDate = new Date(now.getFullYear(), 0, 1)
+        endDate = new Date(now.getFullYear(), 11, 31, 23, 59, 59)
+        label = 'This Year'
+        break
+      case '6months':
+        startDate = new Date(now.getFullYear(), now.getMonth() - 6, 1)
+        endDate = now
+        label = 'Last 6 Months'
+        break
+      case '12months':
+        startDate = new Date(now.getFullYear(), now.getMonth() - 12, 1)
+        endDate = now
+        label = 'Last 12 Months'
+        break
+      case 'custom':
+        if (customDateFrom && customDateTo) {
+          startDate = new Date(customDateFrom)
+          startDate.setHours(0, 0, 0, 0)
+          endDate = new Date(customDateTo)
+          endDate.setHours(23, 59, 59, 999)
+          label = 'Custom Range'
+        } else {
+          label = 'All Time'
+        }
+        break
+      case 'all':
+      default:
+        label = 'All Time'
+        break
+    }
+
+    return { start: startDate, end: endDate, label }
+  }, [timeRange, customDateFrom, customDateTo])
 
   // Calculate summary stats based on filtered transactions
   const summaryStats = useMemo(() => {
@@ -394,6 +456,13 @@ export default function FinanceAnalyticsPage() {
                     </p>
                   </div>
                 </div>
+
+                {/* Verification Panel */}
+                <FinanceVerificationPanel
+                  transactions={transactions}
+                  filteredTransactions={filteredTransactions}
+                  dateRange={dateRangeInfo}
+                />
 
                 {/* Charts Grid */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
