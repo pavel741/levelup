@@ -215,7 +215,7 @@ export const addTransaction = async (
       console.log('📝 Saving transaction with selgitus:', {
         description: transaction.description?.substring(0, 50),
         selgitus: (transaction as any).selgitus?.substring(0, 50),
-        hasSelgitus: !!txData.selgitus
+        hasSelgitus: !!(txData as any).selgitus
       })
     }
 
