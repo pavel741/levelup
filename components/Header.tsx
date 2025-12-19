@@ -59,14 +59,32 @@ export default function Header({ onMenuToggle, isMenuOpen }: HeaderProps) {
               <p className="text-sm font-medium text-gray-900 dark:text-white">{user?.name}</p>
               <p className="text-xs text-gray-500 dark:text-gray-400">Level {user?.level}</p>
             </div>
-            <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold">
-              {user?.name.charAt(0).toUpperCase() || 'U'}
-            </div>
+            {user?.avatar ? (
+              <img
+                src={user.avatar}
+                alt={user?.name || 'User avatar'}
+                className="w-10 h-10 rounded-full object-cover border border-gray-200 dark:border-gray-700"
+              />
+            ) : (
+              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold">
+                {user?.name?.charAt(0).toUpperCase() || 'U'}
+              </div>
+            )}
           </div>
 
           {/* Avatar only on mobile */}
-          <div className="sm:hidden w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">
-            {user?.name.charAt(0).toUpperCase() || 'U'}
+          <div className="sm:hidden">
+            {user?.avatar ? (
+              <img
+                src={user.avatar}
+                alt={user?.name || 'User avatar'}
+                className="w-8 h-8 rounded-full object-cover border border-gray-200 dark:border-gray-700"
+              />
+            ) : (
+              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                {user?.name?.charAt(0).toUpperCase() || 'U'}
+              </div>
+            )}
           </div>
 
           <button

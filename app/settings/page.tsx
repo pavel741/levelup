@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, ChangeEvent } from 'react'
+import Image from 'next/image'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
 export const dynamic = 'force-dynamic'
 import AuthGuard from '@/components/AuthGuard'
@@ -9,6 +10,7 @@ import Header from '@/components/Header'
 import { User, Bell, Shield, Moon, CheckCircle2 } from 'lucide-react'
 import { useTheme } from '@/components/ThemeProvider'
 import { requestNotificationPermission } from '@/lib/notifications'
+import { uploadAvatar } from '@/lib/storage'
 
 export default function SettingsPage() {
   const { user, updateUserPreference } = useFirestoreStore()
@@ -17,6 +19,10 @@ export default function SettingsPage() {
   const [emailSummaryEnabled, setEmailSummaryEnabled] = useState(user?.emailSummaryEnabled || false)
   const [isUpdatingEmail, setIsUpdatingEmail] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [name, setName] = useState(user?.name || '')
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(user?.avatar || null)
+  const [isSavingProfile, setIsSavingProfile] = useState(false)
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
 
   useEffect(() => {
     if ('Notification' in window) {
@@ -27,12 +33,14 @@ export default function SettingsPage() {
   useEffect(() => {
     if (user) {
       setEmailSummaryEnabled(user.emailSummaryEnabled || false)
+      setName(user.name || '')
+      setAvatarPreview(user.avatar || null)
     }
   }, [user])
 
   const handleToggleEmailSummary = async () => {
     if (!user) return
-    
+
     setIsUpdatingEmail(true)
     try {
       const newValue = !emailSummaryEnabled
@@ -47,9 +55,55 @@ export default function SettingsPage() {
   }
 
   const handleRequestNotificationPermission = async () => {
-    const granted = await requestNotificationPermission()
+    await requestNotificationPermission()
     if ('Notification' in window) {
       setNotificationPermission(Notification.permission)
+    }
+  }
+
+  const handleSaveProfile = async () => {
+    if (!user) return
+    const trimmedName = name.trim()
+    if (!trimmedName) return
+
+    setIsSavingProfile(true)
+    try {
+      await updateUserPreference('name', trimmedName)
+    } catch (error) {
+      console.error('Error saving profile:', error)
+    } finally {
+      setIsSavingProfile(false)
+    }
+  }
+
+  const handleAvatarChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    if (!user) return
+
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    if (!file.type.startsWith('image/')) {
+      console.error('Please select an image file')
+      return
+    }
+
+    const maxSizeMb = 5
+    if (file.size > maxSizeMb * 1024 * 1024) {
+      console.error('Image too large (max 5MB)')
+      return
+    }
+
+    setIsUploadingAvatar(true)
+    try {
+      const url = await uploadAvatar(user.id, file)
+      await updateUserPreference('avatar', url)
+      setAvatarPreview(url)
+    } catch (error) {
+      console.error('Error uploading avatar:', error)
+    } finally {
+      setIsUploadingAvatar(false)
+      // Reset input so the same file can be selected again if needed
+      event.target.value = ''
     }
   }
 
@@ -75,25 +129,77 @@ export default function SettingsPage() {
                     <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Profile</h2>
                   </div>
                 </div>
-                <div className="p-6 space-y-4">
+                <div className="p-6 space-y-6">
+                  {/* Avatar */}
+                  <div className="flex items-center gap-4">
+                    {avatarPreview ? (
+                      <div className="relative w-16 h-16 rounded-full overflow-hidden border border-gray-200 dark:border-gray-700">
+                        <Image
+                          src={avatarPreview}
+                          alt={user?.name || 'User avatar'}
+                          fill
+                          className="object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold text-xl">
+                        {user?.name?.charAt(0).toUpperCase() || 'U'}
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Profile picture
+                      </label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleAvatarChange}
+                        disabled={isUploadingAvatar || !user}
+                        className="text-sm text-gray-600 dark:text-gray-300"
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        JPG/PNG, up to 5MB.
+                      </p>
+                      {isUploadingAvatar && (
+                        <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                          Uploading...
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Name */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Name</label>
                     <input
                       type="text"
-                      defaultValue={user?.name}
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
                       className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     />
                   </div>
+
+                  {/* Email (read-only for now) */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Email</label>
                     <input
                       type="email"
-                      defaultValue={user?.email}
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      value={user?.email || ''}
+                      disabled
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
                     />
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Email changes require updating your Firebase Auth account; this field is read-only for now.
+                    </p>
                   </div>
-                  <button className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
-                    Save Changes
+
+                  <button
+                    onClick={handleSaveProfile}
+                    disabled={isSavingProfile || !user}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {isSavingProfile ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
               </div>

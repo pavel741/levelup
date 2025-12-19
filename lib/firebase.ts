@@ -2,6 +2,7 @@ import { initializeApp, getApps, FirebaseApp } from 'firebase/app'
 import { getAuth, Auth, setPersistence, browserLocalPersistence } from 'firebase/auth'
 import { getFirestore, Firestore } from 'firebase/firestore'
 import { getAnalytics, Analytics } from 'firebase/analytics'
+import { getStorage, FirebaseStorage } from 'firebase/storage'
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -52,6 +53,7 @@ let app: FirebaseApp | undefined
 let auth: Auth | undefined
 let db: Firestore | undefined
 let analytics: Analytics | null = null
+let storage: FirebaseStorage | undefined
 let firebaseInitialized = false
 let firebaseInitPromise: Promise<void> | null = null
 
@@ -90,7 +92,7 @@ The variables must be present BEFORE the build runs.`
       try {
         app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]
         auth = getAuth(app)
-        
+
         // Explicitly set persistence to local storage (persists across browser sessions)
         // This ensures users stay logged in after page refresh
         try {
@@ -99,9 +101,10 @@ The variables must be present BEFORE the build runs.`
         } catch (persistenceError) {
           console.warn('⚠️ Could not set auth persistence (may already be set):', persistenceError)
         }
-        
+
         db = getFirestore(app)
-        
+        storage = getStorage(app)
+
         console.log('✅ Firebase initialized successfully')
         console.log('Project ID:', firebaseConfig.projectId)
         console.log('Auth Domain:', firebaseConfig.authDomain)
@@ -187,6 +190,6 @@ export const waitForFirebaseInit = async (): Promise<void> => {
 }
 
 // Export with type assertions - these will only be used client-side
-export { auth, db, analytics }
+export { auth, db, analytics, storage }
 export default app!
 
