@@ -109,12 +109,13 @@ export const deleteTransaction = async (
 export const batchAddTransactions = async (
   userId: string,
   transactions: Omit<FinanceTransaction, 'id'>[],
-  progressCallback?: (current: number, total: number) => void
-): Promise<{ success: number; errors: number }> => {
+  progressCallback?: (current: number, total: number) => void,
+  options?: { skipDuplicates?: boolean }
+): Promise<{ success: number; errors: number; skipped: number }> => {
   const response = await fetch('/api/finance/transactions/batch', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, transactions }),
+    body: JSON.stringify({ userId, transactions, options }),
   })
   
   if (!response.ok) {

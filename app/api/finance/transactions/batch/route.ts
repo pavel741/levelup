@@ -4,7 +4,7 @@ import { batchAddTransactions, batchDeleteTransactions } from '@/lib/financeMong
 // POST - Batch add transactions
 export async function POST(request: NextRequest) {
   try {
-    const { userId, transactions } = await request.json()
+    const { userId, transactions, options } = await request.json()
     
     if (!userId) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 401 })
@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
 
     // Create a progress callback that sends Server-Sent Events
     // For now, we'll just return the result
-    const result = await batchAddTransactions(userId, transactions)
+    const result = await batchAddTransactions(userId, transactions, undefined, options)
     
     return NextResponse.json(result)
   } catch (error: any) {
