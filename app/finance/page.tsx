@@ -655,12 +655,15 @@ export default function FinancePage() {
           const shouldBeCardPayment = hasPosInCategory && currentCategory !== 'Card Payment'
           
           // Reference number (viitenumber) should be categorized as Bills
+          // BUT: POS: transactions can also have reference numbers, so POS: takes priority
           // If transaction has a reference number but isn't already Bills (and isn't a card payment), recategorize
           const hasReferenceNumber = tx.referenceNumber && tx.referenceNumber.trim().length > 0
           const shouldBeBills = hasReferenceNumber && 
             currentCategory !== 'Bills' && 
-            !hasPosInDescription && 
+            !hasPosInDescription && // POS: takes priority over reference number
+            !hasPosInCategory && // Check category field too
             !hasAtmInDescription &&
+            !hasAtmInCategory &&
             !hasPsd2Klix &&
             !hasLoanPattern &&
             !hasUtilityPattern
