@@ -16,7 +16,6 @@ import {
   batchAddTransactions,
   batchDeleteTransactions,
   getFinanceSettings,
-  getAllTransactionsForSummary,
 } from '@/lib/financeFirestore'
 import type { FinanceTransaction, FinanceCategories, FinanceSettings } from '@/types/finance'
 import { getPeriodDates } from '@/lib/financeDateUtils'
@@ -32,7 +31,6 @@ export default function FinancePage() {
   const [categories, setCategories] = useState<FinanceCategories | null>(null)
   const [financeSettings, setFinanceSettings] = useState<FinanceSettings | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isLoadingSummary, setIsLoadingSummary] = useState(true)
   
   // Dashboard state
   const [summaryView, setSummaryView] = useState<'monthly' | 'alltime'>('monthly')
@@ -83,28 +81,61 @@ export default function FinancePage() {
   useEffect(() => {
     if (!user?.id) return
 
-    setIsLoading(true)
-    const unsubscribe = subscribeToTransactions(
-      user.id,
-      (txs) => {
-        setTransactions(txs)
+    let unsubscribe: (() => void) | null = null
+    
+    const loadTransactions = async () => {
+      try {
+        // Wait for Firebase to initialize
+        const { waitForFirebaseInit } = await import('@/lib/firebase')
+        await waitForFirebaseInit()
+        
+        setIsLoading(true)
+        unsubscribe = subscribeToTransactions(
+          user.id,
+          (txs) => {
+            setTransactions(txs)
+            setIsLoading(false)
+          },
+          { limitCount: 500 }
+        )
+      } catch (error) {
+        console.error('Failed to initialize Firebase:', error)
         setIsLoading(false)
-      },
-      { limitCount: 500 }
-    )
+      }
+    }
 
-    return () => unsubscribe()
+    loadTransactions()
+    
+    return () => {
+      if (unsubscribe) unsubscribe()
+    }
   }, [user?.id])
 
   // Load categories
   useEffect(() => {
     if (!user?.id) return
 
-    const unsubscribe = subscribeToCategories(user.id, (cats) => {
-      setCategories(cats)
-    })
+    let unsubscribe: (() => void) | null = null
+    
+    const loadCategories = async () => {
+      try {
+        // Wait for Firebase to initialize
+        const { waitForFirebaseInit } = await import('@/lib/firebase')
+        await waitForFirebaseInit()
+        
+        unsubscribe = subscribeToCategories(user.id, (cats) => {
+          setCategories(cats)
+        })
+      } catch (error) {
+        console.error('Failed to initialize Firebase:', error)
+      }
+    }
 
-    return () => unsubscribe()
+    loadCategories()
+    
+    return () => {
+      if (unsubscribe) unsubscribe()
+    }
   }, [user?.id])
 
   // Load finance settings (for period configuration)
@@ -113,6 +144,10 @@ export default function FinancePage() {
 
     const loadSettings = async () => {
       try {
+        // Wait for Firebase to initialize
+        const { waitForFirebaseInit } = await import('@/lib/firebase')
+        await waitForFirebaseInit()
+        
         const settings = await getFinanceSettings(user.id)
         setFinanceSettings(settings)
       } catch (e) {
@@ -123,34 +158,14 @@ export default function FinancePage() {
     loadSettings()
   }, [user?.id])
 
-  // Load ALL transactions for summary calculations (no limit)
-  const loadAllTransactionsForSummary = useCallback(async () => {
-    if (!user?.id) return
-    setIsLoadingSummary(true)
-    try {
-      const allTxs = await getAllTransactionsForSummary(user.id)
-      setAllTransactionsForSummary(allTxs)
-    } catch (e) {
-      console.error('Error loading all transactions for summary:', e)
-    } finally {
-      setIsLoadingSummary(false)
-    }
-  }, [user?.id])
-
+  // Use already-loaded transactions for summary calculations
+  // This avoids hitting Firestore quota limits by not loading all transactions
   useEffect(() => {
-    if (!user?.id) return
-    loadAllTransactionsForSummary()
-  }, [user?.id, loadAllTransactionsForSummary])
-
-  // Reload summary transactions when regular transactions change significantly
-  useEffect(() => {
-    if (!user?.id || transactions.length === 0) return
-    // Debounce reload to avoid too many calls
-    const timeoutId = setTimeout(() => {
-      loadAllTransactionsForSummary()
-    }, 2000)
-    return () => clearTimeout(timeoutId)
-  }, [user?.id, transactions.length, loadAllTransactionsForSummary])
+    // Use the transactions that are already loaded (limited to 500)
+    // For accurate summaries, we'll use these transactions
+    // Note: This means "All Time" summary will be based on the most recent 500 transactions
+    setAllTransactionsForSummary(transactions)
+  }, [transactions])
 
   // Initialize categories if they don't exist
   useEffect(() => {
@@ -339,7 +354,7 @@ export default function FinancePage() {
     return filtered
   }, [transactions, currentFilter, dateRange, searchQuery, customDateFrom, customDateTo, filterMinAmount, filterMaxAmount, filterCategories])
 
-  // Calculate summary for selected month (using ALL transactions)
+  // Calculate summary for selected month (using loaded transactions)
   const monthlySummary = useMemo(() => {
     // Use period settings if available, otherwise default to calendar month
     let startDate: Date
@@ -381,12 +396,12 @@ export default function FinancePage() {
         const amount = Number(tx.amount) || 0
         const type = (tx.type || '').toLowerCase()
         if (type === 'income') {
-          income += amount
+          income += Math.abs(amount) // Always positive
         } else if (type === 'expense') {
-          expenses += amount
+          expenses += Math.abs(amount) // Always positive
         } else {
           if (amount < 0) expenses += Math.abs(amount)
-          else income += amount
+          else income += Math.abs(amount)
         }
       }
     })
@@ -400,7 +415,7 @@ export default function FinancePage() {
     }
   }, [allTransactionsForSummary, selectedMonth, financeSettings])
 
-  // Calculate all-time summary (using ALL transactions)
+  // Calculate all-time summary (using loaded transactions - most recent 500)
   const allTimeSummary = useMemo(() => {
     let income = 0
     let expenses = 0
@@ -409,12 +424,12 @@ export default function FinancePage() {
       const amount = Number(tx.amount) || 0
       const type = (tx.type || '').toLowerCase()
       if (type === 'income') {
-        income += amount
+        income += Math.abs(amount) // Always positive
       } else if (type === 'expense') {
-        expenses += amount
+        expenses += Math.abs(amount) // Always positive
       } else {
         if (amount < 0) expenses += Math.abs(amount)
-        else income += amount
+        else income += Math.abs(amount)
       }
     })
 
@@ -729,7 +744,8 @@ export default function FinancePage() {
     }
 
     setIsSubmitting(true)
-    setCsvImportStatus('Importing transactions...')
+    const estimatedMinutes = Math.ceil(csvParsedData.length / 20 * 3 / 60)
+    setCsvImportStatus(`Importing ${csvParsedData.length} transactions... This may take ~${estimatedMinutes} minute${estimatedMinutes !== 1 ? 's' : ''} (free tier rate limits).`)
     setCsvImportProgress(0)
 
     try {
@@ -755,8 +771,8 @@ export default function FinancePage() {
       setCsvImportStatus(successMessage)
       setCsvImportProgress(100)
       
-      // Reload all transactions for summary calculations
-      await loadAllTransactionsForSummary()
+      // Transactions will be reloaded automatically via the subscription
+      // No need to manually reload - the subscribeToTransactions will update
       
       // Reset after 3 seconds
       setTimeout(() => {
@@ -769,7 +785,16 @@ export default function FinancePage() {
         setCsvImportProgress(0)
       }, 3000)
     } catch (error: any) {
-      setCsvImportStatus(`Error importing: ${error.message}`)
+      let errorMessage = error.message || 'Unknown error'
+      
+      // Provide user-friendly message for quota errors
+      if (errorMessage.includes('quota') || errorMessage.includes('resource-exhausted')) {
+        errorMessage = `Firestore quota exceeded. ${errorMessage.includes('after') ? errorMessage : 
+          'Firestore free tier has daily write limits (~20k writes/day). ' +
+          'Please wait a few minutes and try importing the remaining transactions, or upgrade to a paid plan for higher limits.'}`
+      }
+      
+      setCsvImportStatus(`Error importing: ${errorMessage}`)
       setCsvImportProgress(0)
     } finally {
       setIsSubmitting(false)
@@ -869,7 +894,7 @@ export default function FinancePage() {
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-900 dark:text-white text-sm bg-white dark:bg-gray-800 px-1 whitespace-nowrap z-10">
                               {getEstonianMonth(selectedMonth)}
                             </span>
-                          </div>
+                  </div>
                           {summaryView === 'monthly' && monthlySummary.startDate && monthlySummary.endDate && (
                             <div className="text-xs text-gray-500 dark:text-gray-400">
                               {monthlySummary.startDate.toLocaleDateString()} - {monthlySummary.endDate.toLocaleDateString()}
@@ -897,7 +922,7 @@ export default function FinancePage() {
                           <div className="flex items-center justify-between mb-2">
                             <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
                               Monthly Balance
-                            </h3>
+                    </h3>
                             <DollarSign className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                           </div>
                           <div className="text-2xl font-bold text-blue-600 dark:text-blue-400 font-mono tabular-nums">
@@ -1122,9 +1147,20 @@ export default function FinancePage() {
                       {/* CSV Import Section */}
                       <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
                         <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">Import from CSV</h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                           Upload a CSV file and select which columns to import
                         </p>
+                        {csvParsedData.length > 1000 && (
+                          <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                            <p className="text-xs text-yellow-800 dark:text-yellow-200">
+                              ⚠️ <strong>Large import detected ({csvParsedData.length} transactions)</strong>
+                              <br />
+                              Free tier has daily limits (~20k writes/day). This import will take ~{Math.ceil(csvParsedData.length / 20 * 3 / 60)} minutes.
+                              <br />
+                              Consider splitting into smaller files if you hit quota errors.
+                            </p>
+                          </div>
+                        )}
                         <div className="flex gap-2 mb-4">
                           <input
                             type="file"
@@ -1160,8 +1196,8 @@ export default function FinancePage() {
                         {csvImportStatus && (
                           <div className={`text-sm mb-2 ${csvImportStatus.includes('Error') ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
                             {csvImportStatus}
-                          </div>
-                        )}
+                  </div>
+                )}
                         
                         {csvImportProgress > 0 && csvImportProgress < 100 && (
                           <div className="mb-2">

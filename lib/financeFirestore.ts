@@ -339,10 +339,15 @@ export const batchAddTransactions = async (
   }
 
   const dbInstance = db // Store in const so TypeScript knows it's defined
-  const batchSize = 500
+  // Very small batch size to avoid quota limits (Firestore free tier has strict limits)
+  // Free tier: ~20k writes/day, ~1 write/second sustained
+  // Using conservative settings: 20 transactions per batch, 3 seconds between batches
+  const batchSize = 20
   let successCount = 0
   let errorCount = 0
   const total = transactions.length
+  let consecutiveQuotaErrors = 0
+  const maxConsecutiveQuotaErrors = 3
 
   for (let i = 0; i < transactions.length; i += batchSize) {
     const chunk = transactions.slice(i, i + batchSize)
@@ -358,13 +363,71 @@ export const batchAddTransactions = async (
         })
 
         await batch.commit()
-      })
+      }, 1, 2000) // Reduced retries, longer initial delay
 
       successCount += chunk.length
+      consecutiveQuotaErrors = 0 // Reset on success
       progressCallback?.(Math.min(i + chunk.length, total), total)
-    } catch (error) {
+      
+      // Add delay between batches to avoid hitting rate limits
+      // Only delay if there are more batches to process
+      if (i + batchSize < transactions.length) {
+        // Wait 3 seconds between batches to respect Firestore free tier limits
+        // Free tier allows ~1 write/second sustained, so we need longer delays
+        await new Promise(resolve => setTimeout(resolve, 3000))
+      }
+    } catch (error: any) {
       console.error('Error in finance batchAddTransactions chunk:', error)
-      errorCount += chunk.length
+      
+      // If quota exceeded, wait longer before retrying
+      if (error?.code === 'resource-exhausted') {
+        consecutiveQuotaErrors++
+        
+        if (consecutiveQuotaErrors >= maxConsecutiveQuotaErrors) {
+          console.error(`Too many consecutive quota errors (${consecutiveQuotaErrors}). Stopping import.`)
+          throw new Error(
+            `Firestore quota exceeded. Import stopped after ${successCount} transactions. ` +
+            `Please wait a few hours (quota resets daily) and try importing the remaining ${total - successCount} transactions. ` +
+            `Free tier limit: ~20k writes/day shared across all users. ` +
+            `Tip: Split your CSV into smaller files (500-1000 transactions each) and import over multiple days.`
+          )
+        }
+        
+        // Exponential backoff: wait longer with each consecutive error
+        const waitTime = Math.min(5000 * Math.pow(2, consecutiveQuotaErrors - 1), 30000) // Max 30 seconds
+        console.warn(`Firestore quota exceeded (${consecutiveQuotaErrors}/${maxConsecutiveQuotaErrors}). Waiting ${waitTime/1000} seconds...`)
+        await new Promise(resolve => setTimeout(resolve, waitTime))
+        
+        // Retry this chunk once more with longer delay
+        try {
+          await new Promise(resolve => setTimeout(resolve, 2000)) // Extra delay before retry
+          await retryOperation(async () => {
+            const batch = writeBatch(dbInstance)
+            const transactionsRef = getTransactionsRef(userId)
+
+            chunk.forEach((tx) => {
+              const docRef = doc(transactionsRef)
+              batch.set(docRef, tx as any)
+            })
+
+            await batch.commit()
+          }, 1, 3000)
+          successCount += chunk.length
+          consecutiveQuotaErrors = 0 // Reset on successful retry
+          progressCallback?.(Math.min(i + chunk.length, total), total)
+        } catch (retryError: any) {
+          console.error('Retry failed for chunk:', retryError)
+          if (retryError?.code === 'resource-exhausted') {
+            // Still quota error, increment counter
+            errorCount += chunk.length
+          } else {
+            errorCount += chunk.length
+          }
+        }
+      } else {
+        errorCount += chunk.length
+        consecutiveQuotaErrors = 0 // Reset on non-quota error
+      }
     }
   }
 
