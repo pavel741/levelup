@@ -337,7 +337,7 @@ export default function FinancePage() {
     })
 
     return filtered
-  }, [transactions, currentFilter, dateRange, searchQuery, customDateFrom, customDateTo])
+  }, [transactions, currentFilter, dateRange, searchQuery, customDateFrom, customDateTo, filterMinAmount, filterMaxAmount, filterCategories])
 
   // Calculate summary for selected month (using ALL transactions)
   const monthlySummary = useMemo(() => {
@@ -421,11 +421,12 @@ export default function FinancePage() {
     return { income, expenses, balance: income - expenses }
   }, [allTransactionsForSummary])
 
-  const formatCurrency = (amount: number) =>
-    new Intl.NumberFormat('et-EE', {
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('et-EE', {
       style: 'currency',
       currency: 'EUR',
     }).format(amount)
+  }
 
   const formatDate = (value: any) => {
     if (!value) return ''
@@ -702,20 +703,20 @@ export default function FinancePage() {
     try {
       const text = await file.text()
       const csvService = new CSVImportService()
-      
-      try {
-        const result = csvService.parseCSV(text)
-        setCsvParsedData(result.transactions)
-        setCsvColumnMapping(result.columnMapping)
-        setCsvHeaders(result.columnMapping._allHeaders || [])
-        setShowCsvMapping(true)
-        setCsvImportStatus(`Found ${result.transactions.length} transactions`)
-      } catch (error: any) {
-        setCsvImportStatus(`Error parsing CSV: ${error.message}`)
-        setShowCsvMapping(false)
-      }
+      const result = csvService.parseCSV(text)
+      setCsvParsedData(result.transactions)
+      setCsvColumnMapping(result.columnMapping)
+      setCsvHeaders(result.columnMapping._allHeaders || [])
+      setShowCsvMapping(true)
+      setCsvImportStatus(`Found ${result.transactions.length} transactions`)
     } catch (error: any) {
-      setCsvImportStatus(`Error reading file: ${error.message}`)
+      const errorMessage = error?.message || 'Unknown error'
+      if (errorMessage.includes('parsing')) {
+        setCsvImportStatus(`Error parsing CSV: ${errorMessage}`)
+      } else {
+        setCsvImportStatus(`Error reading file: ${errorMessage}`)
+      }
+      setShowCsvMapping(false)
     }
   }
 
@@ -749,8 +750,9 @@ export default function FinancePage() {
         }
       )
 
-      const errorText = result.errors > 0 ? ` (${result.errors} errors)` : ''
-      setCsvImportStatus(`Successfully imported ${result.success} transactions${errorText}`)
+      const errorSuffix = result.errors > 0 ? ` (${result.errors} errors)` : ''
+      const successMessage = 'Successfully imported ' + result.success + ' transactions' + errorSuffix
+      setCsvImportStatus(successMessage)
       setCsvImportProgress(100)
       
       // Reload all transactions for summary calculations
@@ -773,6 +775,8 @@ export default function FinancePage() {
       setIsSubmitting(false)
     }
   }
+
+  const summary = summaryView === 'monthly' ? monthlySummary : allTimeSummary
 
   return (
     <AuthGuard>
@@ -871,7 +875,6 @@ export default function FinancePage() {
                               {monthlySummary.startDate.toLocaleDateString()} - {monthlySummary.endDate.toLocaleDateString()}
                             </div>
                           )}
-                          </div>
                           <button
                             type="button"
                             onClick={() => navigateMonth(1)}
