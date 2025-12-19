@@ -706,20 +706,27 @@ export default function FinancePage() {
           // Override suggested category based on prefix detection
           // IMPORTANT: Order matters - POS: and ATM: must come BEFORE Bills
           let finalCategory = suggestedCategory
-          if (shouldBeKommunaalid) {
+          
+          // First check: If suggested category is already Card Payment or ATM Withdrawal, keep it
+          // (This handles cases where categorizer correctly identified POS:/ATM:)
+          if (suggestedCategory === 'Card Payment' && hasPosPattern) {
+            finalCategory = 'Card Payment'
+          } else if (suggestedCategory === 'ATM Withdrawal' && hasAtmPattern) {
+            finalCategory = 'ATM Withdrawal'
+          } else if (shouldBeKommunaalid) {
             finalCategory = 'Kommunaalid'
           } else if (shouldBeKodulaen) {
             finalCategory = 'Kodulaen'
           } else if (shouldBeEsto) {
             finalCategory = 'ESTO'
-          } else if (shouldBeCardPayment) {
-            // POS: takes priority over Bills
+          } else if (shouldBeCardPayment || hasPosPattern) {
+            // POS: takes priority over Bills - check both shouldBeCardPayment and hasPosPattern
             finalCategory = 'Card Payment'
-          } else if (shouldBeAtm) {
-            // ATM: takes priority over Bills
+          } else if (shouldBeAtm || hasAtmPattern) {
+            // ATM: takes priority over Bills - check both shouldBeAtm and hasAtmPattern
             finalCategory = 'ATM Withdrawal'
-          } else if (shouldBeBills) {
-            // Bills only if no POS: or ATM: patterns
+          } else if (shouldBeBills && !hasPosPattern && !hasAtmPattern) {
+            // Bills only if no POS: or ATM: patterns detected
             finalCategory = 'Bills'
           }
           

@@ -31,8 +31,14 @@ export function categorizeTransaction(
   // 2. Reference number (viitenumber) - if present and not empty, it's Bills
   // 3. Other patterns (loans, utilities, etc.)
   
+  // IMPORTANT: Check POS: and ATM: in description AND combined text (which includes recipient)
+  // This ensures we catch POS: even if it's in different parts of the transaction data
+  const hasPosPattern = posPattern.test(desc) || posPattern.test(combinedText)
+  const hasCardPattern = cardPattern.test(desc)
+  const hasAtmPattern = /^atm\s*:/i.test(desc) || /^atm\s+/i.test(desc) || /atm\s*:/i.test(combinedText)
+  
   // Check for POS: prefix → Card Payment (highest priority for card payments)
-  if (posPattern.test(desc)) {
+  if (hasPosPattern) {
     return {
       category: 'Card Payment',
       confidence: 'high',
@@ -41,7 +47,7 @@ export function categorizeTransaction(
   }
 
   // Check for card number patterns → Card Payment
-  if (cardPattern.test(desc)) {
+  if (hasCardPattern) {
     return {
       category: 'Card Payment',
       confidence: 'high',
@@ -50,7 +56,7 @@ export function categorizeTransaction(
   }
 
   // Check for ATM: prefix → ATM Withdrawal
-  if (/^atm\s*:/i.test(desc) || /^atm\s+/i.test(desc)) {
+  if (hasAtmPattern) {
     return {
       category: 'ATM Withdrawal',
       confidence: 'high',
@@ -60,18 +66,22 @@ export function categorizeTransaction(
 
   // 1. Check for reference number (viitenumber) → Bills
   // Rule: If viitenumber is not null/empty, it's a Bills transaction
-  // This takes priority over other patterns (except card payment patterns above)
+  // BUT: Only if NO POS: or ATM: patterns were found above
   if (refNum && refNum.trim().length > 0) {
     // Clean the reference number (remove spaces)
     const cleanRefNum = refNum.replace(/\s+/g, '').trim()
     
     // If reference number exists and is not empty, it's a bill
     // Only validate it looks like a reference number (contains digits)
+    // BUT: Double-check that we don't have POS: or ATM: patterns (should have been caught above)
     if (cleanRefNum.length > 0 && /\d/.test(cleanRefNum)) {
-      return {
-        category: 'Bills',
-        confidence: 'high',
-        reason: 'Reference number (viitenumber) detected',
+      // Final safety check: make sure we didn't miss POS: or ATM: patterns
+      if (!hasPosPattern && !hasAtmPattern && !hasCardPattern) {
+        return {
+          category: 'Bills',
+          confidence: 'high',
+          reason: 'Reference number (viitenumber) detected',
+        }
       }
     }
   }
