@@ -22,6 +22,7 @@ import {
 import type { FinanceTransaction, FinanceCategories, FinanceSettings } from '@/types/finance'
 import { getPeriodDates } from '@/lib/financeDateUtils'
 import { CSVImportService } from '@/lib/csvImport'
+import { ESTONIAN_BANK_PROFILES } from '@/lib/bankProfiles'
 import { getSuggestedCategory } from '@/lib/transactionCategorizer'
 
 export const dynamic = 'force-dynamic'
@@ -79,6 +80,8 @@ export default function FinancePage() {
   const [csvColumnMapping, setCsvColumnMapping] = useState<any>(null)
   const [csvParsedData, setCsvParsedData] = useState<any[]>([])
   const [csvHeaders, setCsvHeaders] = useState<string[]>([])
+  const [csvDetectedBank, setCsvDetectedBank] = useState<string | null>(null)
+  const [csvSelectedBank, setCsvSelectedBank] = useState<string | null>(null)
   
   // Load transactions
   useEffect(() => {
@@ -966,7 +969,12 @@ export default function FinancePage() {
       const text = await file.text()
       console.log(`📁 File loaded: ${(text.length / 1024).toFixed(2)} KB, ${text.split('\n').length} lines`)
       
+      // Reset bank selection for new file
+      setCsvSelectedBank(null)
+      setCsvDetectedBank(null)
+      
       const csvService = new CSVImportService()
+      // Auto-detect bank for new file
       const result = csvService.parseCSV(text)
       
       console.log(`📊 Parsed ${result.transactions.length} transactions from CSV`)
@@ -974,8 +982,14 @@ export default function FinancePage() {
       setCsvParsedData(result.transactions)
       setCsvColumnMapping(result.columnMapping)
       setCsvHeaders(result.columnMapping._allHeaders || [])
+      setCsvDetectedBank(result.detectedBank?.id || null)
+      // Auto-select detected bank
+      if (result.detectedBank) {
+        setCsvSelectedBank(result.detectedBank.id)
+      }
       setShowCsvMapping(true)
-      setCsvImportStatus(`Found ${result.transactions.length} transactions`)
+      const bankInfo = result.detectedBank ? ` (${result.detectedBank.displayName})` : ''
+      setCsvImportStatus(`Found ${result.transactions.length} transactions${bankInfo}`)
     } catch (error: any) {
       const errorMessage = error?.message || 'Unknown error'
       if (errorMessage.includes('parsing')) {
@@ -984,6 +998,27 @@ export default function FinancePage() {
         setCsvImportStatus(`Error reading file: ${errorMessage}`)
       }
       setShowCsvMapping(false)
+    }
+  }
+
+  // Re-parse CSV when bank selection changes
+  const handleBankSelectionChange = async (bankId: string) => {
+    setCsvSelectedBank(bankId)
+    if (csvFile) {
+      // Re-parse with new bank profile
+      try {
+        const text = await csvFile.text()
+        const csvService = new CSVImportService()
+        const result = csvService.parseCSV(text, bankId)
+        
+        setCsvParsedData(result.transactions)
+        setCsvColumnMapping(result.columnMapping)
+        setCsvHeaders(result.columnMapping._allHeaders || [])
+        setCsvDetectedBank(result.detectedBank?.id || null)
+        setCsvImportStatus(`Re-parsed ${result.transactions.length} transactions using ${ESTONIAN_BANK_PROFILES.find(b => b.id === bankId)?.displayName || 'selected bank'} profile`)
+      } catch (error: any) {
+        setCsvImportStatus(`Error re-parsing CSV: ${error?.message || 'Unknown error'}`)
+      }
     }
   }
 
@@ -1002,6 +1037,11 @@ export default function FinancePage() {
     setCsvImportProgress(0)
 
     try {
+      // Get bank name for source tracking
+      const bankName = csvSelectedBank || csvDetectedBank
+        ? ESTONIAN_BANK_PROFILES.find(b => b.id === (csvSelectedBank || csvDetectedBank))?.displayName || null
+        : null
+
       const transactionsToImport = csvParsedData.map((tx) => ({
         type: tx.type || 'expense',
         description: tx.description || 'Imported transaction',
@@ -1013,6 +1053,8 @@ export default function FinancePage() {
         ...(tx.recipientName && { recipientName: tx.recipientName }),
         ...(tx.archiveId && { archiveId: tx.archiveId }),
         ...(tx.selgitus && { selgitus: tx.selgitus }),
+        // Add bank source for imported transactions
+        ...(bankName && { sourceBank: bankName }),
         // Include any other fields that might be present
         ...Object.fromEntries(
           Object.entries(tx).filter(([key]) => 
@@ -1025,36 +1067,105 @@ export default function FinancePage() {
       const transactionsWithArchiveId = transactionsToImport.filter(tx => (tx as any).archiveId)
       const enableDuplicateCheck = transactionsWithArchiveId.length > 0
       
+      let finalTransactionsToImport = transactionsToImport
+      let skippedCount = 0
+      
       if (enableDuplicateCheck) {
-        setCsvImportStatus(`Checking for duplicates... Found ${transactionsWithArchiveId.length} transactions with archiveId`)
+        setCsvImportStatus(`🔍 Checking for duplicates... Found ${transactionsWithArchiveId.length} transactions with archiveId`)
+        setCsvImportProgress(5) // Show initial progress
+        
+        // Force UI update
+        await new Promise(resolve => setTimeout(resolve, 50))
+        
+        try {
+          // Call API to check for duplicates
+          const archiveIds = transactionsWithArchiveId.map(tx => (tx as any).archiveId).filter(Boolean)
+          setCsvImportProgress(10)
+          
+          const checkResponse = await fetch('/api/finance/transactions/check-duplicates', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user.id, archiveIds }),
+          })
+          
+          if (checkResponse.ok) {
+            const { existingArchiveIds } = await checkResponse.json()
+            setCsvImportProgress(15)
+            
+            // Filter out duplicates
+            finalTransactionsToImport = transactionsToImport.filter(tx => {
+              const archiveId = (tx as any).archiveId
+              if (archiveId && existingArchiveIds.includes(archiveId)) {
+                skippedCount++
+                return false
+              }
+              return true
+            })
+            
+            setCsvImportProgress(20)
+            setCsvImportStatus(`✅ Found ${existingArchiveIds.length} duplicates - ${finalTransactionsToImport.length} new transactions to import`)
+          } else {
+            console.warn('Failed to check duplicates, proceeding with import')
+            setCsvImportStatus(`⚠️ Could not check duplicates, importing all transactions...`)
+          }
+        } catch (error) {
+          console.error('Error checking duplicates:', error)
+          setCsvImportStatus(`⚠️ Error checking duplicates, importing all transactions...`)
+        }
+      } else {
+        setCsvImportStatus(`⚠️ No archiveId found - duplicate detection disabled. All transactions will be imported.`)
+        setCsvImportProgress(0)
       }
+
+      // Add a small delay to ensure UI updates
+      await new Promise(resolve => setTimeout(resolve, 100))
 
       const result = await batchAddTransactions(
         user.id,
-        transactionsToImport,
+        finalTransactionsToImport,
         (current, total) => {
           const progress = Math.round((current / total) * 100)
-          setCsvImportProgress(progress)
+          // Start progress from 20% if duplicate check was done, otherwise from 0%
+          const adjustedProgress = enableDuplicateCheck 
+            ? 20 + Math.round((progress * 0.8)) // 20-100% range
+            : progress
+          setCsvImportProgress(adjustedProgress)
         },
-        { skipDuplicates: enableDuplicateCheck }
+        { skipDuplicates: false } // Already filtered duplicates, don't check again
       )
+      
+      // Add skipped count to result
+      result.skipped = skippedCount
 
       const errorSuffix = result.errors > 0 ? ` (${result.errors} errors)` : ''
-      const skippedSuffix = result.skipped > 0 ? ` (${result.skipped} duplicates skipped)` : ''
+      let skippedSuffix = ''
+      if (result.skipped > 0) {
+        skippedSuffix = ` ✅ ${result.skipped} duplicates skipped (already imported)`
+      }
       const successMessage = `Successfully imported ${result.success} of ${transactionsToImport.length} transactions${skippedSuffix}${errorSuffix}`
       
       // Log duplicate detection results
       if (result.skipped > 0) {
         console.log(`✅ Duplicate detection: Skipped ${result.skipped} transactions that already exist (matched by archiveId)`)
+        console.log(`💡 Tip: You can safely re-import the same file - duplicates will be automatically skipped`)
       }
+      
+      setCsvImportProgress(100)
       
       // Warn if not all transactions were imported
       if (result.success < transactionsToImport.length - result.skipped) {
         console.warn(`⚠️ Only imported ${result.success} out of ${transactionsToImport.length - result.skipped} new transactions`)
       }
       
-      setCsvImportStatus(successMessage)
-      setCsvImportProgress(100)
+      // Special message if all were duplicates
+      if (result.skipped === transactionsToImport.length && result.success === 0) {
+        setCsvImportStatus(`✅ All ${result.skipped} transactions already exist - no duplicates imported. Safe to re-import anytime!`)
+      } else {
+        setCsvImportStatus(successMessage)
+      }
+      
+      // Force a small delay to ensure UI updates
+      await new Promise(resolve => setTimeout(resolve, 100))
       
       // Transactions will be reloaded automatically via the subscription
       // No need to manually reload - the subscribeToTransactions will update
@@ -1066,12 +1177,16 @@ export default function FinancePage() {
         setCsvColumnMapping(null)
         setCsvHeaders([])
         setCsvParsedData([])
+        setCsvDetectedBank(null)
+        setCsvSelectedBank(null)
         setCsvImportStatus('')
         setCsvImportProgress(0)
       }, 3000)
     } catch (error: any) {
+      console.error('❌ CSV Import Error:', error)
       let errorMessage = error.message || 'Unknown error'
       
+      setCsvImportProgress(0)
       // Provide user-friendly message for quota errors
       if (errorMessage.includes('quota') || errorMessage.includes('resource-exhausted')) {
         errorMessage = `Firestore quota exceeded. ${errorMessage.includes('after') ? errorMessage : 
@@ -1433,7 +1548,7 @@ export default function FinancePage() {
                       <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
                         <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">Import from CSV</h3>
                         <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                          Upload a CSV file and select which columns to import
+                          Upload a CSV file and select which columns to import. You can safely re-import the same file - duplicates will be automatically skipped using archiveId.
                         </p>
                         {csvParsedData.length > 1000 && (
                           <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
@@ -1500,6 +1615,34 @@ export default function FinancePage() {
                         
                         {showCsvMapping && csvHeaders.length > 0 && (
                           <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                            {/* Bank Selection */}
+                            <div className="mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
+                              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Select Your Bank:
+                              </label>
+                              <select
+                                value={csvSelectedBank || ''}
+                                onChange={(e) => handleBankSelectionChange(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              >
+                                <option value="">Auto-detect (Recommended)</option>
+                                {ESTONIAN_BANK_PROFILES.map((bank) => (
+                                  <option key={bank.id} value={bank.id}>
+                                    {bank.displayName}
+                                    {csvDetectedBank === bank.id ? ' (Auto-detected)' : ''}
+                                  </option>
+                                ))}
+                              </select>
+                              {csvDetectedBank && (
+                                <p className="text-xs text-green-600 dark:text-green-400 mt-2">
+                                  ✓ Auto-detected: {ESTONIAN_BANK_PROFILES.find(b => b.id === csvDetectedBank)?.displayName}
+                                </p>
+                              )}
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                Selecting your bank will automatically map columns. You can still adjust mappings below if needed.
+                              </p>
+                            </div>
+                            
                             <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Map CSV Fields</h4>
                             <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
                               Select which CSV column maps to each transaction field:
@@ -1553,6 +1696,8 @@ export default function FinancePage() {
                                   setCsvColumnMapping(null)
                                   setCsvHeaders([])
                                   setCsvParsedData([])
+                                  setCsvDetectedBank(null)
+                                  setCsvSelectedBank(null)
                                   setCsvImportStatus('')
                                 }}
                                 className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
@@ -1862,6 +2007,14 @@ export default function FinancePage() {
                                               <span className="text-gray-400 dark:text-gray-500">•</span>
                                               <span className="text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-md">
                                                 {tx.category}
+                                              </span>
+                                            </>
+                                          )}
+                                          {(tx as any).sourceBank && (
+                                            <>
+                                              <span className="text-gray-400 dark:text-gray-500">•</span>
+                                              <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                {(tx as any).sourceBank}
                                               </span>
                                             </>
                                           )}

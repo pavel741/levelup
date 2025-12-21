@@ -280,6 +280,7 @@ export const deleteTransaction = async (
 /**
  * Check for existing transactions by archiveId
  * Returns a Set of archiveIds that already exist in the database
+ * Optimized to only fetch archiveId field and batch large queries
  */
 export const checkExistingArchiveIds = async (
   userId: string,
@@ -294,14 +295,41 @@ export const checkExistingArchiveIds = async (
       return new Set()
     }
     
-    // Query for transactions with matching archiveIds
-    const existingDocs = await collection.find({
-      userId,
-      archiveId: { $in: validArchiveIds }
-    }).toArray()
+    const existingArchiveIds = new Set<string>()
     
-    // Return Set of existing archiveIds
-    return new Set(existingDocs.map(doc => doc.archiveId).filter(Boolean))
+    // MongoDB $in can handle large arrays, but we'll batch for very large imports (10k+)
+    // This prevents potential query size limits and improves performance
+    const batchSize = 10000
+    const startTime = Date.now()
+    
+    for (let i = 0; i < validArchiveIds.length; i += batchSize) {
+      const batch = validArchiveIds.slice(i, i + batchSize)
+      
+      // Only fetch archiveId field (projection) - much faster than fetching full documents
+      const existingDocs = await collection.find(
+        {
+          userId,
+          archiveId: { $in: batch }
+        },
+        {
+          projection: { archiveId: 1, _id: 0 } // Only fetch archiveId, not entire documents
+        }
+      ).toArray()
+      
+      // Add found archiveIds to the set
+      existingDocs.forEach(doc => {
+        if (doc.archiveId) {
+          existingArchiveIds.add(doc.archiveId)
+        }
+      })
+    }
+    
+    const duration = Date.now() - startTime
+    if (duration > 1000) {
+      console.log(`⏱️ Duplicate check took ${(duration / 1000).toFixed(1)}s for ${validArchiveIds.length} archiveIds`)
+    }
+    
+    return existingArchiveIds
   } catch (error) {
     console.error('Error checking existing archiveIds:', error)
     // On error, return empty set (will import all to be safe)
@@ -330,8 +358,15 @@ export const batchAddTransactions = async (
       
       if (archiveIds.length > 0) {
         console.log(`🔍 Checking for duplicates: ${archiveIds.length} transactions with archiveId`)
+        const checkStartTime = Date.now()
         existingArchiveIds = await checkExistingArchiveIds(userId, archiveIds)
-        console.log(`✅ Found ${existingArchiveIds.size} existing transactions (will skip duplicates)`)
+        const checkDuration = Date.now() - checkStartTime
+        console.log(`✅ Found ${existingArchiveIds.size} existing transactions (will skip duplicates) - took ${checkDuration}ms`)
+        
+        // If check took more than 2 seconds, log a warning
+        if (checkDuration > 2000) {
+          console.warn(`⚠️ Duplicate check took ${(checkDuration / 1000).toFixed(1)}s - consider adding MongoDB index on userId + archiveId`)
+        }
       }
     }
     

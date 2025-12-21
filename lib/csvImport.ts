@@ -1,5 +1,7 @@
 // CSV Import Utility - TypeScript version
 
+import { detectBankProfile, createColumnMappingFromProfile, ESTONIAN_BANK_PROFILES, type BankProfile } from './bankProfiles'
+
 type ColumnMapping = {
   type: number | null
   description: number | null
@@ -17,6 +19,7 @@ type ColumnMapping = {
 
 export class CSVImportService {
   private _debugLogged = false
+  private _detectedBank: BankProfile | null = null
 
   /**
    * Detect CSV delimiter (comma or semicolon)
@@ -285,7 +288,8 @@ export class CSVImportService {
    */
   mapRowToTransaction(
     row: Record<string, string>,
-    columnMap: ColumnMapping
+    columnMap: ColumnMapping,
+    bankProfile?: BankProfile | null
   ): {
     type: string
     description: string
@@ -318,7 +322,10 @@ export class CSVImportService {
     const selgitus = columnMap._selgitus !== undefined ? getValue(columnMap._selgitus) : null
     let date = getValue(columnMap.date)
 
-    // Normalize type
+    // Check if bank uses D/C indicator (all amounts positive, D/C column indicates type)
+    const usesDebitCreditIndicator = bankProfile?.hasDebitCreditIndicator === true
+
+    // Normalize type - prioritize D/C indicator if bank uses it
     if (type) {
       type = type.toLowerCase().trim()
       if (
@@ -345,10 +352,12 @@ export class CSVImportService {
       ) {
         type = 'expense'
       } else {
+        // If type column exists but value doesn't match known patterns, infer from amount
         const amountNum = parseFloat(amount || '0')
         type = amountNum >= 0 ? 'income' : 'expense'
       }
     } else {
+      // No type column - infer from amount sign
       const amountNum = parseFloat(amount || '0')
       type = amountNum >= 0 ? 'income' : 'expense'
     }
@@ -442,16 +451,28 @@ export class CSVImportService {
         amountNum = 0
       }
       
-      // If amount is negative or has negative indicator, ensure type is expense
-      if (amountNum < 0 || isNegative) {
-        type = 'expense'
-        // Keep negative sign for expenses
-        if (amountNum > 0 && isNegative) {
-          amountNum = -amountNum
+      // Handle banks with D/C indicator (all amounts positive, D/C determines sign)
+      if (usesDebitCreditIndicator) {
+        // All amounts are positive in CSV, apply sign based on D/C indicator
+        if (type === 'expense') {
+          // Debit (D) = expense, make negative
+          amountNum = -Math.abs(amountNum)
+        } else if (type === 'income') {
+          // Credit (C) = income, keep positive
+          amountNum = Math.abs(amountNum)
         }
-      } else if (amountNum > 0 && !type) {
-        // If positive and no type specified, default to income
-        type = 'income'
+      } else {
+        // Standard handling: negative amounts indicate expenses
+        if (amountNum < 0 || isNegative) {
+          type = 'expense'
+          // Keep negative sign for expenses
+          if (amountNum > 0 && isNegative) {
+            amountNum = -amountNum
+          }
+        } else if (amountNum > 0 && !type) {
+          // If positive and no type specified, default to income
+          type = 'income'
+        }
       }
     }
 
@@ -493,7 +514,7 @@ export class CSVImportService {
   /**
    * Parse CSV file content
    */
-  parseCSV(csvText: string): {
+  parseCSV(csvText: string, bankProfileId?: string): {
     transactions: Array<{
       type: string
       description: string
@@ -506,6 +527,7 @@ export class CSVImportService {
       selgitus?: string
     }>
     columnMapping: ColumnMapping
+    detectedBank: BankProfile | null
   } {
     const lines = csvText.split('\n').filter((line) => line.trim())
     if (lines.length === 0) {
@@ -514,7 +536,16 @@ export class CSVImportService {
 
     console.log(`📊 CSV parsing: Found ${lines.length} total lines (including header)`)
 
-    const delimiter = this.detectDelimiter(lines[0])
+    // Detect or use specified bank profile
+    let bankProfile: BankProfile | null = null
+    if (bankProfileId) {
+      bankProfile = ESTONIAN_BANK_PROFILES.find(p => p.id === bankProfileId) || null
+      if (bankProfile) {
+        console.log(`🏦 Using bank profile: ${bankProfile.displayName}`)
+      }
+    }
+
+    const delimiter = bankProfile?.delimiter || this.detectDelimiter(lines[0])
     const headers = this.parseCSVLine(lines[0], delimiter)
     const normalizedHeaders = headers.map((h) => {
       let header = h.trim()
@@ -522,9 +553,29 @@ export class CSVImportService {
       return header.toLowerCase()
     })
 
-    const columnMap = this.mapColumns(headers)
-    columnMap._normalizedHeaders = normalizedHeaders
-    columnMap._allHeaders = headers
+    // Try to detect bank if not specified
+    if (!bankProfile) {
+      bankProfile = detectBankProfile(headers)
+      if (bankProfile) {
+        console.log(`🏦 Auto-detected bank: ${bankProfile.displayName}`)
+        this._detectedBank = bankProfile
+      }
+    } else {
+      this._detectedBank = bankProfile
+    }
+
+    // Use bank profile mapping if available, otherwise fall back to generic mapping
+    let columnMap: ColumnMapping
+    if (bankProfile) {
+      columnMap = createColumnMappingFromProfile(headers, bankProfile)
+      columnMap._normalizedHeaders = normalizedHeaders
+      columnMap._allHeaders = headers
+      console.log(`✅ Mapped columns using ${bankProfile.displayName} profile: ${columnMap._foundColumns.join(', ')}`)
+    } else {
+      columnMap = this.mapColumns(headers)
+      columnMap._normalizedHeaders = normalizedHeaders
+      columnMap._allHeaders = headers
+    }
 
     if (columnMap.amount === null) {
       throw new Error(`Could not find amount column. Found columns: ${headers.join(', ')}`)
@@ -556,7 +607,7 @@ export class CSVImportService {
         row[header] = value
       })
 
-      rows.push(this.mapRowToTransaction(row, columnMap))
+      rows.push(this.mapRowToTransaction(row, columnMap, bankProfile || this._detectedBank))
     }
 
     console.log(`✅ CSV parsing complete: ${rows.length} transactions parsed, ${skippedRows} empty rows skipped`)
@@ -566,7 +617,15 @@ export class CSVImportService {
     return {
       transactions: rows,
       columnMapping: columnMap,
+      detectedBank: this._detectedBank,
     }
+  }
+
+  /**
+   * Get detected bank profile
+   */
+  getDetectedBank(): BankProfile | null {
+    return this._detectedBank
   }
 }
 
