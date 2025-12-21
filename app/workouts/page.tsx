@@ -12,7 +12,7 @@ import ActiveWorkoutView from '@/components/ActiveWorkoutView'
 import WorkoutHistory from '@/components/WorkoutHistory'
 import AIRoutineGenerator from '@/components/AIRoutineGenerator'
 import { ROUTINE_TEMPLATES } from '@/lib/routineTemplates'
-import { subscribeToRoutines, saveRoutine, deleteRoutine, subscribeToWorkoutLogs, deleteWorkoutLog } from '@/lib/workoutMongo'
+import { subscribeToRoutines, saveRoutine, deleteRoutine, subscribeToWorkoutLogs, deleteWorkoutLog } from '@/lib/workoutApi'
 import type { Routine, WorkoutLog } from '@/types/workout'
 
 export const dynamic = 'force-dynamic'
@@ -222,9 +222,9 @@ export default function WorkoutsPage() {
                                       </button>
                                       <button
                                         onClick={async () => {
-                                          if (confirm('Delete this routine?')) {
+                                          if (confirm('Delete this routine?') && user?.id) {
                                             try {
-                                              await deleteRoutine(routine.id)
+                                              await deleteRoutine(routine.id, user.id)
                                             } catch (error) {
                                               console.error('Error deleting routine:', error)
                                               alert('Failed to delete routine.')
@@ -413,8 +413,9 @@ export default function WorkoutsPage() {
                       <WorkoutHistory
                         logs={workoutLogs}
                         onDelete={async (logId) => {
+                          if (!user?.id) return
                           try {
-                            await deleteWorkoutLog(logId)
+                            await deleteWorkoutLog(logId, user.id)
                           } catch (error) {
                             console.error('Error deleting workout log:', error)
                             alert('Failed to delete workout.')

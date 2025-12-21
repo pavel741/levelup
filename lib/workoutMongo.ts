@@ -49,74 +49,40 @@ const getWorkoutLogsCollection = async () => {
 
 // ---------- Routines ----------
 
-export const subscribeToRoutines = (
-  userId: string,
-  callback: (routines: Routine[]) => void
-): (() => void) => {
-  // MongoDB doesn't have real-time subscriptions like Firestore
-  // We'll use polling instead (optimized with data comparison)
-  let isActive = true
-  let lastDataHash: string | null = null
+// Server-side only functions - use workoutApi.ts on client side
+export const getRoutinesByUserId = async (userId: string): Promise<Routine[]> => {
+  try {
+    const collection = await getRoutinesCollection()
+    const routines = await collection
+      .find({ userId })
+      .sort({ updatedAt: -1 })
+      .toArray()
 
-  const hashData = (routines: Routine[]): string => {
-    if (routines.length === 0) return 'empty'
-    return JSON.stringify(routines.map((r) => ({ id: r.id, updatedAt: r.updatedAt })))
-  }
-
-  const fetchRoutines = async () => {
-    if (!isActive) return
-
-    try {
-      const collection = await getRoutinesCollection()
-      const routines = await collection
-        .find({ userId })
-        .sort({ updatedAt: -1 })
-        .toArray()
-
-      const convertedRoutines = routines.map((doc) => {
-        const data = convertMongoData(doc)
-        return {
-          ...data,
-          createdAt: data.createdAt instanceof Date ? data.createdAt : new Date(data.createdAt),
-          updatedAt: data.updatedAt instanceof Date ? data.updatedAt : new Date(data.updatedAt),
-        } as Routine
-      })
-
-      const currentHash = hashData(convertedRoutines)
-      if (currentHash !== lastDataHash) {
-        lastDataHash = currentHash
-        callback(convertedRoutines)
-      }
-    } catch (error) {
-      console.error('Error fetching routines from MongoDB:', error)
-      callback([])
-    }
-  }
-
-  // Initial fetch
-  fetchRoutines()
-
-  // Poll every 5 seconds
-  const intervalId = setInterval(() => {
-    if (isActive) {
-      fetchRoutines()
-    }
-  }, 5000)
-
-  // Return unsubscribe function
-  return () => {
-    isActive = false
-    clearInterval(intervalId)
+    return routines.map((doc) => {
+      const data = convertMongoData(doc)
+      return {
+        ...data,
+        createdAt: data.createdAt instanceof Date ? data.createdAt : new Date(data.createdAt),
+        updatedAt: data.updatedAt instanceof Date ? data.updatedAt : new Date(data.updatedAt),
+      } as Routine
+    })
+  } catch (error) {
+    console.error('Error fetching routines from MongoDB:', error)
+    return []
   }
 }
 
 export const saveRoutine = async (routine: Routine): Promise<void> => {
   try {
+    if (!routine.userId) {
+      throw new Error('Cannot save routine: userId is required')
+    }
+
     const collection = await getRoutinesCollection()
     
     const routineData: any = {
       ...routine,
-      userId: routine.userId,
+      userId: routine.userId, // Ensure userId is set
       createdAt: routine.createdAt instanceof Date ? routine.createdAt : new Date(routine.createdAt),
       updatedAt: routine.updatedAt instanceof Date ? routine.updatedAt : new Date(routine.updatedAt),
     }
@@ -128,14 +94,27 @@ export const saveRoutine = async (routine: Routine): Promise<void> => {
       }
     })
 
+    console.log('💾 Saving routine to MongoDB:', {
+      id: routineData.id,
+      userId: routineData.userId,
+      name: routineData.name,
+      sessionsCount: routineData.sessions?.length || 0,
+    })
+
     // Use upsert to update if exists, insert if not
-    await collection.updateOne(
+    const result = await collection.updateOne(
       { id: routine.id, userId: routine.userId },
       { $set: routineData },
       { upsert: true }
     )
+    
+    console.log('✅ Routine saved successfully:', {
+      matched: result.matchedCount,
+      modified: result.modifiedCount,
+      upserted: result.upsertedCount,
+    })
   } catch (error) {
-    console.error('Error saving routine to MongoDB:', error)
+    console.error('❌ Error saving routine to MongoDB:', error)
     throw error
   }
 }
@@ -182,62 +161,27 @@ export const deleteRoutine = async (routineId: string, userId: string): Promise<
 
 // ---------- Workout Logs ----------
 
-export const subscribeToWorkoutLogs = (
-  userId: string,
-  callback: (logs: WorkoutLog[]) => void
-): (() => void) => {
-  let isActive = true
-  let lastDataHash: string | null = null
+// Server-side only functions - use workoutApi.ts on client side
+export const getWorkoutLogsByUserId = async (userId: string): Promise<WorkoutLog[]> => {
+  try {
+    const collection = await getWorkoutLogsCollection()
+    const logs = await collection
+      .find({ userId })
+      .sort({ date: -1 })
+      .toArray()
 
-  const hashData = (logs: WorkoutLog[]): string => {
-    if (logs.length === 0) return 'empty'
-    return JSON.stringify(logs.map((l) => ({ id: l.id, date: l.date })))
-  }
-
-  const fetchLogs = async () => {
-    if (!isActive) return
-
-    try {
-      const collection = await getWorkoutLogsCollection()
-      const logs = await collection
-        .find({ userId })
-        .sort({ date: -1 })
-        .toArray()
-
-      const convertedLogs = logs.map((doc) => {
-        const data = convertMongoData(doc)
-        return {
-          ...data,
-          date: data.date instanceof Date ? data.date : new Date(data.date),
-          startTime: data.startTime instanceof Date ? data.startTime : new Date(data.startTime),
-          endTime: data.endTime ? (data.endTime instanceof Date ? data.endTime : new Date(data.endTime)) : undefined,
-        } as WorkoutLog
-      })
-
-      const currentHash = hashData(convertedLogs)
-      if (currentHash !== lastDataHash) {
-        lastDataHash = currentHash
-        callback(convertedLogs)
-      }
-    } catch (error) {
-      console.error('Error fetching workout logs from MongoDB:', error)
-      callback([])
-    }
-  }
-
-  // Initial fetch
-  fetchLogs()
-
-  // Poll every 5 seconds
-  const intervalId = setInterval(() => {
-    if (isActive) {
-      fetchLogs()
-    }
-  }, 5000)
-
-  return () => {
-    isActive = false
-    clearInterval(intervalId)
+    return logs.map((doc) => {
+      const data = convertMongoData(doc)
+      return {
+        ...data,
+        date: data.date instanceof Date ? data.date : new Date(data.date),
+        startTime: data.startTime instanceof Date ? data.startTime : new Date(data.startTime),
+        endTime: data.endTime ? (data.endTime instanceof Date ? data.endTime : new Date(data.endTime)) : undefined,
+      } as WorkoutLog
+    })
+  } catch (error) {
+    console.error('Error fetching workout logs from MongoDB:', error)
+    return []
   }
 }
 

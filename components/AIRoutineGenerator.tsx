@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Sparkles, Loader2, X, Save } from 'lucide-react'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
-import { saveRoutine } from '@/lib/workoutMongo'
+import { saveRoutine } from '@/lib/workoutApi'
 import type { Routine } from '@/types/workout'
 import { EXERCISE_DATABASE } from '@/lib/exerciseDatabase'
 
@@ -93,22 +93,46 @@ export default function AIRoutineGenerator({ onRoutineGenerated, onClose }: AIRo
           const routineToSave: Routine = {
             ...data.routine,
             id: `routine_${Date.now()}`,
-            userId: user.id,
+            userId: user.id, // Ensure userId is set
             createdAt: new Date(),
             updatedAt: new Date(),
             isTemplate: false,
             isPublic: false,
             createdBy: user.id,
           }
-          console.log('Auto-saving routine:', routineToSave)
+          console.log('💾 Auto-saving routine with userId:', user.id)
+          console.log('📋 Routine details:', {
+            id: routineToSave.id,
+            name: routineToSave.name,
+            userId: routineToSave.userId,
+            sessionsCount: routineToSave.sessions?.length || 0,
+            exercisesCount: routineToSave.sessions?.reduce((sum, s) => sum + (s.exercises?.length || 0), 0) || 0,
+            sessions: routineToSave.sessions?.map(s => ({
+              name: s.name,
+              exerciseCount: s.exercises?.length || 0,
+              exercises: s.exercises?.map(e => e.exerciseId)
+            }))
+          })
           await saveRoutine(routineToSave)
-          console.log('Routine saved successfully!')
+          console.log('✅ Routine saved successfully to MongoDB!')
+          
+          // Update the generated routine with the saved version (with userId)
+          setGeneratedRoutine(routineToSave)
+          return // Don't set the original routine without userId
         } catch (saveError) {
-          console.error('Error auto-saving routine:', saveError)
-          // Don't throw - still show the routine so user can manually save
+          console.error('❌ Error auto-saving routine:', saveError)
+          // Still show the routine so user can manually save
+          // But set userId so manual save works
+          const routineWithUserId = {
+            ...data.routine,
+            userId: user.id,
+          }
+          setGeneratedRoutine(routineWithUserId)
+          return
         }
       }
       
+      // If no user, still show the routine but with empty userId
       setGeneratedRoutine(data.routine)
       onRoutineGenerated?.(data.routine)
     } catch (err: any) {
