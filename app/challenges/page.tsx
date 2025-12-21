@@ -325,13 +325,24 @@ export default function ChallengesPage() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Type</label>
                   <select
                     value={newChallenge.type}
-                    onChange={(e) => setNewChallenge({ ...newChallenge, type: e.target.value as any })}
+                    onChange={(e) => {
+                      const newType = e.target.value as any
+                      setNewChallenge({ 
+                        ...newChallenge, 
+                        type: newType,
+                        // Reset finance fields when switching away from finance type
+                        financeGoalType: newType === 'finance' ? newChallenge.financeGoalType : undefined,
+                        financeTarget: newType === 'finance' ? newChallenge.financeTarget : undefined,
+                        financeTargetPercentage: newType === 'finance' ? newChallenge.financeTargetPercentage : undefined,
+                      })
+                    }}
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   >
                     <option value="habit">Habit</option>
                     <option value="distraction">Distraction</option>
                     <option value="goal">Goal</option>
                     <option value="community">Community</option>
+                    <option value="finance">Finance</option>
                   </select>
                 </div>
                 <div>
