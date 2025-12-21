@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus, X, GripVertical, Trash2, Save, ArrowUp, ArrowDown } from 'lucide-react'
 import { EXERCISE_DATABASE, getExerciseById } from '@/lib/exerciseDatabase'
 import ExerciseLibrary from './ExerciseLibrary'
@@ -20,6 +20,18 @@ export default function RoutineBuilder({ onSave, onCancel, initialRoutine }: Rou
   const [routineDifficulty, setRoutineDifficulty] = useState<Routine['difficulty']>(initialRoutine?.difficulty || 'medium')
   const [exercises, setExercises] = useState<RoutineExercise[]>(initialRoutine?.exercises || [])
   const [editingExerciseIndex, setEditingExerciseIndex] = useState<number | null>(null)
+
+  // Load initial routine data when it changes
+  useEffect(() => {
+    if (initialRoutine) {
+      if (initialRoutine.name) setRoutineName(initialRoutine.name)
+      if (initialRoutine.description) setRoutineDescription(initialRoutine.description)
+      if (initialRoutine.goal) setRoutineGoal(initialRoutine.goal)
+      if (initialRoutine.difficulty) setRoutineDifficulty(initialRoutine.difficulty)
+      if (initialRoutine.exercises) setExercises(initialRoutine.exercises)
+    }
+  }, [initialRoutine])
+
 
   const handleAddExercise = (exercise: Exercise) => {
     const newExercise: RoutineExercise = {
