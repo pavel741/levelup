@@ -28,7 +28,8 @@ export interface Routine {
   name: string
   description: string
   goal: 'cutting' | 'bulking' | 'maintenance' | 'strength' | 'endurance' | 'custom'
-  exercises: RoutineExercise[]
+  exercises: RoutineExercise[] // Deprecated - use sessions instead
+  sessions: RoutineSession[] // Workout days/sessions
   estimatedDuration: number // minutes
   difficulty: 'easy' | 'medium' | 'hard'
   isTemplate: boolean
@@ -39,6 +40,14 @@ export interface Routine {
   timesUsed?: number // How many times used
   createdAt: Date
   updatedAt: Date
+}
+
+export interface RoutineSession {
+  id: string
+  name: string // e.g., "Push Day", "Pull Day", "Leg Day", "Upper Body", "Lower Body"
+  order: number
+  exercises: RoutineExercise[]
+  estimatedDuration: number // minutes for this session
 }
 
 export interface RoutineExercise {

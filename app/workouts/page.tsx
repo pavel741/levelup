@@ -136,12 +136,21 @@ export default function WorkoutsPage() {
                                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                                     {routine.description}
                                   </p>
-                                  <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-                                    <span>{routine.exercises.length} exercises</span>
+                                  <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 mb-2">
+                                    <span>{routine.sessions?.length || routine.exercises.length} {routine.sessions ? 'days' : 'exercises'}</span>
                                     <span>~{routine.estimatedDuration} min</span>
                                     <span className="capitalize">{routine.difficulty}</span>
                                     <span className="capitalize">{routine.goal}</span>
                                   </div>
+                                  {routine.sessions && routine.sessions.length > 0 && (
+                                    <div className="text-xs text-gray-600 dark:text-gray-300 space-y-1 mb-2">
+                                      {routine.sessions.map((session, idx) => (
+                                        <div key={idx}>
+                                          <span className="font-medium">{session.name}:</span> {session.exercises.length} exercises (~{session.estimatedDuration} min)
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -188,11 +197,20 @@ export default function WorkoutsPage() {
                               <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
                                 {template.description}
                               </p>
-                              <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-                                <span>{template.exercises.length} exercises</span>
+                              <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 mb-3">
+                                <span>{template.sessions?.length || template.exercises.length} {template.sessions ? 'days' : 'exercises'}</span>
                                 <span>~{template.estimatedDuration} min</span>
                                 <span className="capitalize">{template.goal}</span>
                               </div>
+                              {template.sessions && template.sessions.length > 0 && (
+                                <div className="mb-3 space-y-1">
+                                  {template.sessions.map((session, sessionIndex) => (
+                                    <div key={sessionIndex} className="text-xs text-gray-600 dark:text-gray-300">
+                                      <span className="font-medium">{session.name}:</span> {session.exercises.length} exercises (~{session.estimatedDuration} min)
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                               <div className="mt-3 flex flex-wrap gap-1">
                                 {template.tags.slice(0, 3).map((tag, tagIndex) => (
                                   <span
