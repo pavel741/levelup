@@ -505,6 +505,9 @@ export default function ChallengesPage() {
                   </button>
                 </div>
               </div>
+              
+              {/* Habit Linking - only show for non-finance challenges */}
+              {newChallenge.type !== 'finance' && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Link Habits <span className="text-xs text-gray-500 dark:text-gray-400">(optional)</span>
@@ -548,6 +551,7 @@ export default function ChallengesPage() {
                   </p>
                 )}
               </div>
+              )}
               <div className="flex gap-3 pt-4">
                 <button
                   onClick={() => setShowAddModal(false)}
