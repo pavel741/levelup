@@ -278,13 +278,24 @@ export const saveChallenge = async (challenge: Challenge): Promise<void> => {
   }
   
   try {
-    await setDoc(doc(db, 'challenges', challenge.id), {
+    // Remove undefined values - Firestore doesn't accept undefined
+    const challengeData: any = {
       ...challenge,
       startDate: Timestamp.fromDate(challenge.startDate),
       endDate: Timestamp.fromDate(challenge.endDate),
+    }
+    
+    // Remove undefined fields
+    Object.keys(challengeData).forEach(key => {
+      if (challengeData[key] === undefined) {
+        delete challengeData[key]
+      }
     })
+    
+    await setDoc(doc(db, 'challenges', challenge.id), challengeData)
   } catch (error) {
     console.error('Error saving challenge:', error)
+    throw error
   }
 }
 
@@ -302,9 +313,18 @@ export const updateChallenge = async (challengeId: string, updates: Partial<Chal
     if (updates.endDate) {
       updateData.endDate = Timestamp.fromDate(updates.endDate)
     }
+    
+    // Remove undefined fields - Firestore doesn't accept undefined
+    Object.keys(updateData).forEach(key => {
+      if (updateData[key] === undefined) {
+        delete updateData[key]
+      }
+    })
+    
     await updateDoc(challengeRef, updateData)
   } catch (error) {
     console.error('Error updating challenge:', error)
+    throw error
   }
 }
 
