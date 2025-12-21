@@ -20,7 +20,7 @@ import {
   getFinanceSettings,
 } from '@/lib/financeApi'
 import type { FinanceTransaction, FinanceCategories, FinanceSettings } from '@/types/finance'
-import { getPeriodDates } from '@/lib/financeDateUtils'
+import { getPeriodDates, parseTransactionDate } from '@/lib/financeDateUtils'
 import { CSVImportService } from '@/lib/csvImport'
 import { ESTONIAN_BANK_PROFILES } from '@/lib/bankProfiles'
 import { getSuggestedCategory } from '@/lib/transactionCategorizer'
@@ -83,7 +83,7 @@ export default function FinancePage() {
   const [csvDetectedBank, setCsvDetectedBank] = useState<string | null>(null)
   const [csvSelectedBank, setCsvSelectedBank] = useState<string | null>(null)
   
-  // Load transactions
+  // Load transactions with optimized polling
   useEffect(() => {
     if (!user?.id) return
 
@@ -91,16 +91,15 @@ export default function FinancePage() {
     
     const loadTransactions = async () => {
       try {
-        // MongoDB doesn't need Firebase initialization
-        // But we still need user to be authenticated (Firebase Auth)
         setIsLoading(true)
         unsubscribe = subscribeToTransactions(
           user.id,
           (txs) => {
+            // Only update state if transactions actually changed (handled by subscription)
             setTransactions(txs)
             setIsLoading(false)
-            // Log how many transactions are loaded
-            if (txs.length > 0) {
+            // Reduced logging for performance
+            if (txs.length > 0 && txs.length % 1000 === 0) {
               console.log(`📊 Loaded ${txs.length} transactions from MongoDB`)
             }
           },
@@ -306,18 +305,7 @@ export default function FinancePage() {
 
     if (startDate && endDate) {
       filtered = filtered.filter((tx) => {
-        let txDate: Date
-        if (typeof tx.date === 'string') {
-          txDate = new Date(tx.date)
-        } else if (tx.date && typeof tx.date === 'object' && 'toDate' in tx.date && typeof (tx.date as any).toDate === 'function') {
-          // Firestore Timestamp
-          txDate = (tx.date as any).toDate()
-        } else if (tx.date instanceof Date) {
-          txDate = tx.date
-        } else {
-          // Fallback: try to convert
-          txDate = new Date(tx.date as any)
-        }
+        const txDate = parseTransactionDate(tx.date)
         return txDate >= startDate! && txDate <= endDate!
       })
     }
@@ -352,23 +340,10 @@ export default function FinancePage() {
       filtered = filtered.filter((tx) => filterCategories.includes(tx.category || ''))
     }
 
-    // Sort by date descending
+    // Sort by date descending (using optimized date parser)
     filtered.sort((a, b) => {
-      const getDate = (date: string | Date | any): Date => {
-        if (typeof date === 'string') {
-          return new Date(date)
-        } else if (date && typeof date === 'object' && 'toDate' in date && typeof date.toDate === 'function') {
-          // Firestore Timestamp
-          return date.toDate()
-        } else if (date instanceof Date) {
-          return date
-        } else {
-          // Fallback: try to convert
-          return new Date(date)
-        }
-      }
-      const dateA = getDate(a.date)
-      const dateB = getDate(b.date)
+      const dateA = parseTransactionDate(a.date)
+      const dateB = parseTransactionDate(b.date)
       return dateB.getTime() - dateA.getTime()
     })
 
@@ -401,18 +376,7 @@ export default function FinancePage() {
     let expenses = 0
 
     allTransactionsForSummary.forEach((tx) => {
-      let txDate: Date
-      if (typeof tx.date === 'string') {
-        txDate = new Date(tx.date)
-      } else if (tx.date && typeof tx.date === 'object' && 'toDate' in tx.date && typeof (tx.date as any).toDate === 'function') {
-        // Firestore Timestamp
-        txDate = (tx.date as any).toDate()
-      } else if (tx.date instanceof Date) {
-        txDate = tx.date
-      } else {
-        // Fallback: try to convert
-        txDate = new Date(tx.date as any)
-      }
+      const txDate = parseTransactionDate(tx.date)
       if (txDate >= startDate && txDate <= endDate) {
         const amount = Number(tx.amount) || 0
         const type = (tx.type || '').toLowerCase()

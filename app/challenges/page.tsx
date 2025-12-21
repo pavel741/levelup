@@ -10,9 +10,13 @@ import ChallengeCard from '@/components/ChallengeCard'
 import { Trophy, Plus, X } from 'lucide-react'
 import { Challenge } from '@/types'
 import { format } from 'date-fns'
+import { useFinanceChallengeUpdater } from '@/hooks/useFinanceChallengeUpdater'
 
 export default function ChallengesPage() {
   const { challenges, activeChallenges, addChallenge, updateChallenge, user, habits } = useFirestoreStore()
+  
+  // Auto-update finance challenge progress when transactions change
+  useFinanceChallengeUpdater()
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editingChallenge, setEditingChallenge] = useState<Challenge | null>(null)
@@ -20,7 +24,7 @@ export default function ChallengesPage() {
   const [newChallenge, setNewChallenge] = useState({
     title: '',
     description: '',
-    type: 'habit' as 'habit' | 'distraction' | 'goal' | 'community',
+    type: 'habit' as 'habit' | 'distraction' | 'goal' | 'community' | 'finance',
     difficulty: 'medium' as 'easy' | 'medium' | 'hard',
     xpReward: 100,
     duration: 7,
@@ -28,6 +32,11 @@ export default function ChallengesPage() {
     habitIds: [] as string[], // Selected habit IDs to link to challenge
     startDate: format(new Date(), 'yyyy-MM-dd'), // Default to today
     endDate: format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'), // Default to 7 days from today
+    // Finance-specific fields
+    financeGoalType: undefined as 'savings_rate' | 'spending_limit' | 'savings_amount' | 'no_spend_days' | undefined,
+    financeTarget: undefined as number | undefined,
+    financeTargetPercentage: undefined as number | undefined,
+    financePeriod: 'challenge_duration' as 'daily' | 'weekly' | 'monthly' | 'challenge_duration',
   })
   const availableChallenges = challenges.filter(
     (c) => !activeChallenges.some((ac) => ac.id === c.id)
@@ -70,6 +79,11 @@ export default function ChallengesPage() {
       startDate,
       endDate,
       isActive: true,
+      // Finance-specific fields
+      financeGoalType: newChallenge.financeGoalType,
+      financeTarget: newChallenge.financeTarget,
+      financeTargetPercentage: newChallenge.financeTargetPercentage,
+      financePeriod: newChallenge.financePeriod,
     }
 
     addChallenge(challenge)
@@ -731,6 +745,126 @@ export default function ChallengesPage() {
                   </button>
                 </div>
               </div>
+              
+              {/* Finance Challenge Fields */}
+              {newChallenge.type === 'finance' && (
+                <div className="space-y-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Finance Goal Settings</h3>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Goal Type
+                    </label>
+                    <select
+                      value={newChallenge.financeGoalType || ''}
+                      onChange={(e) => setNewChallenge({ 
+                        ...newChallenge, 
+                        financeGoalType: e.target.value as any || undefined 
+                      })}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    >
+                      <option value="">Select goal type...</option>
+                      <option value="savings_rate">Savings Rate (%)</option>
+                      <option value="spending_limit">Spending Limit</option>
+                      <option value="savings_amount">Savings Amount</option>
+                      <option value="no_spend_days">No-Spend Days</option>
+                    </select>
+                  </div>
+
+                  {newChallenge.financeGoalType === 'savings_rate' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Target Savings Rate (%)
+                      </label>
+                      <input
+                        type="number"
+                        value={newChallenge.financeTargetPercentage || ''}
+                        onChange={(e) => {
+                          const value = e.target.value === '' ? undefined : parseFloat(e.target.value)
+                          setNewChallenge({ ...newChallenge, financeTargetPercentage: value })
+                        }}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        placeholder="e.g., 15 for 15%"
+                        min="0"
+                        max="100"
+                      />
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        Target percentage of income to save (e.g., 15 = save 15% of income)
+                      </p>
+                    </div>
+                  )}
+
+                  {(newChallenge.financeGoalType === 'spending_limit' || newChallenge.financeGoalType === 'savings_amount') && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Target Amount (€)
+                        </label>
+                        <input
+                          type="number"
+                          value={newChallenge.financeTarget || ''}
+                          onChange={(e) => {
+                            const value = e.target.value === '' ? undefined : parseFloat(e.target.value)
+                            setNewChallenge({ ...newChallenge, financeTarget: value })
+                          }}
+                          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          placeholder="e.g., 1000"
+                          min="0"
+                          step="0.01"
+                        />
+                      </div>
+                      {newChallenge.financeGoalType === 'spending_limit' && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Period
+                          </label>
+                          <select
+                            value={newChallenge.financePeriod}
+                            onChange={(e) => setNewChallenge({ 
+                              ...newChallenge, 
+                              financePeriod: e.target.value as any 
+                            })}
+                            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          >
+                            <option value="daily">Daily</option>
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly">Monthly</option>
+                            <option value="challenge_duration">Entire Challenge</option>
+                          </select>
+                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            Spending limit applies per selected period
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {newChallenge.financeGoalType === 'no_spend_days' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Target No-Spend Days
+                      </label>
+                      <input
+                        type="number"
+                        value={newChallenge.financeTarget || ''}
+                        onChange={(e) => {
+                          const value = e.target.value === '' ? undefined : parseInt(e.target.value)
+                          setNewChallenge({ ...newChallenge, financeTarget: value })
+                        }}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        placeholder="e.g., 10"
+                        min="1"
+                      />
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        Number of days with zero expenses during the challenge
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Habit Linking - only show for non-finance challenges */}
+              {newChallenge.type !== 'finance' && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Link Habits <span className="text-xs text-gray-500 dark:text-gray-400">(optional)</span>
@@ -774,6 +908,7 @@ export default function ChallengesPage() {
                   </p>
                 )}
               </div>
+              )}
             </div>
             <div className="flex gap-3 pt-4 mt-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
               <button

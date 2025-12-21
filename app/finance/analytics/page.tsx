@@ -79,7 +79,7 @@ export default function FinanceAnalyticsPage() {
     let latestTransactionDate: Date | null = null
     if (capToData && transactions.length > 0) {
       transactions.forEach((tx) => {
-        const txDate = typeof tx.date === 'string' ? new Date(tx.date) : (tx.date as Date)
+        const txDate = parseTransactionDate(tx.date)
         if (!latestTransactionDate || txDate > latestTransactionDate) {
           latestTransactionDate = txDate
         }
@@ -139,7 +139,7 @@ export default function FinanceAnalyticsPage() {
     if (!startDate || !endDate) return transactions
 
     return transactions.filter((tx) => {
-      const txDate = typeof tx.date === 'string' ? new Date(tx.date) : (tx.date as Date)
+      const txDate = parseTransactionDate(tx.date)
       return txDate >= startDate! && txDate <= endDate!
     })
   }, [transactions, timeRange, customDateFrom, customDateTo, financeSettings])
@@ -156,7 +156,7 @@ export default function FinanceAnalyticsPage() {
     let latestTransactionDate: Date | null = null
     if (capToData && transactions.length > 0) {
       transactions.forEach((tx) => {
-        const txDate = typeof tx.date === 'string' ? new Date(tx.date) : (tx.date as Date)
+        const txDate = parseTransactionDate(tx.date)
         if (!latestTransactionDate || txDate > latestTransactionDate) {
           latestTransactionDate = txDate
         }

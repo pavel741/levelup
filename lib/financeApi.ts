@@ -11,6 +11,14 @@ export const subscribeToTransactions = (
 ): (() => void) => {
   const limitCount = options.limitCount !== undefined && options.limitCount !== null ? options.limitCount : 0
   let isActive = true
+  let lastDataHash: string | null = null // Track data hash to avoid unnecessary callbacks
+
+  // Simple hash function to detect data changes
+  const hashData = (transactions: FinanceTransaction[]): string => {
+    if (transactions.length === 0) return 'empty'
+    // Use first and last transaction IDs + count as hash (fast comparison)
+    return `${transactions.length}-${transactions[0]?.id || ''}-${transactions[transactions.length - 1]?.id || ''}`
+  }
 
   const loadTransactions = async () => {
     if (!isActive) return
@@ -29,10 +37,17 @@ export const subscribeToTransactions = (
       if (!response.ok) throw new Error('Failed to fetch transactions')
       
       const data = await response.json()
-      callback(data.transactions || [], {
-        hasMore: false,
-        lastDoc: null,
-      })
+      const transactions = data.transactions || []
+      
+      // Only call callback if data actually changed
+      const newHash = hashData(transactions)
+      if (newHash !== lastDataHash) {
+        lastDataHash = newHash
+        callback(transactions, {
+          hasMore: false,
+          lastDoc: null,
+        })
+      }
     } catch (error) {
       console.error('Error loading transactions:', error)
       callback([], { hasMore: false, lastDoc: null })
@@ -42,12 +57,14 @@ export const subscribeToTransactions = (
   // Load immediately
   loadTransactions()
 
-  // Poll every 2 seconds for updates
+  // Poll every 10 seconds for updates (reduced from 2s for better performance)
+  // Only poll if there's no limit (for real-time updates) or if limitCount > 0
+  const pollInterval = limitCount === 0 ? 30000 : 10000 // 30s for unlimited, 10s for limited
   const intervalId = setInterval(() => {
     if (isActive) {
       loadTransactions()
     }
-  }, 2000)
+  }, pollInterval)
 
   return () => {
     isActive = false
@@ -313,11 +330,12 @@ export const subscribeToRecurringTransactions = (
 
   loadTransactions()
 
+  // Poll every 30 seconds for recurring transactions (less frequent updates needed)
   const intervalId = setInterval(() => {
     if (isActive) {
       loadTransactions()
     }
-  }, 3000)
+  }, 30000)
 
   return () => {
     isActive = false

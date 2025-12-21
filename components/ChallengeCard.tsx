@@ -1,9 +1,13 @@
 'use client'
 
 import { useFirestoreStore } from '@/store/useFirestoreStore'
-import { Trophy, Users, Clock, Edit2 } from 'lucide-react'
+import { Trophy, Users, Clock, Edit2, DollarSign } from 'lucide-react'
 import { Challenge } from '@/types'
 import { format, differenceInDays } from 'date-fns'
+import { calculateFinanceChallengeProgress, getFinanceChallengeStatus } from '@/lib/financeChallengeUtils'
+import { useEffect, useState } from 'react'
+import { subscribeToTransactions } from '@/lib/financeApi'
+import type { FinanceTransaction } from '@/types/finance'
 
 interface ChallengeCardProps {
   challenge: Challenge
@@ -12,11 +16,51 @@ interface ChallengeCardProps {
 
 export default function ChallengeCard({ challenge, onEdit }: ChallengeCardProps) {
   const { user, joinChallenge, habits } = useFirestoreStore()
+  const [financeTransactions, setFinanceTransactions] = useState<FinanceTransaction[]>([])
   const isParticipating = challenge.participants.includes(user?.id || '')
   const daysRemaining = differenceInDays(challenge.endDate, new Date())
-  const userProgress = user ? (challenge.progress?.[user.id] || 0) : 0
-  const progressPercentage = Math.min((userProgress / challenge.duration) * 100, 100)
-  const isCompleted = userProgress >= challenge.duration
+  
+  // Load finance transactions for finance challenges (only if participating)
+  // Note: This creates a subscription, but it's debounced and optimized in the subscription function
+  useEffect(() => {
+    if (challenge.type === 'finance' && user?.id && isParticipating) {
+      let lastHash = ''
+      const unsubscribe = subscribeToTransactions(
+        user.id,
+        (txs) => {
+          // Only update if data changed (handled by subscription, but double-check)
+          const newHash = txs.length > 0 
+            ? `${txs.length}-${txs[0]?.id || ''}-${txs[txs.length - 1]?.id || ''}`
+            : 'empty'
+          if (newHash !== lastHash) {
+            lastHash = newHash
+            setFinanceTransactions(txs)
+          }
+        },
+        { limitCount: 0 } // Load all transactions for accurate calculation
+      )
+      return () => unsubscribe()
+    }
+  }, [challenge.type, user?.id, isParticipating])
+
+  // Calculate progress based on challenge type
+  let userProgress = user ? (challenge.progress?.[user.id] || 0) : 0
+  let progressPercentage = 0
+  let isCompleted = false
+  let progressLabel = ''
+
+  if (challenge.type === 'finance' && challenge.financeGoalType) {
+    // Finance challenge: progress is percentage-based
+    userProgress = user ? calculateFinanceChallengeProgress(challenge, financeTransactions, user.id) : 0
+    progressPercentage = userProgress
+    isCompleted = userProgress >= 100
+    progressLabel = getFinanceChallengeStatus(challenge, userProgress)
+  } else {
+    // Habit challenge: progress is days-based
+    progressPercentage = Math.min((userProgress / challenge.duration) * 100, 100)
+    isCompleted = userProgress >= challenge.duration
+    progressLabel = `${userProgress} / ${challenge.duration} days`
+  }
 
   const difficultyColors = {
     easy: 'bg-green-100 text-green-700',
@@ -29,10 +73,17 @@ export default function ChallengeCard({ challenge, onEdit }: ChallengeCardProps)
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-2">
-            <Trophy className={`w-5 h-5 ${
-              challenge.difficulty === 'easy' ? 'text-green-600' :
-              challenge.difficulty === 'medium' ? 'text-yellow-600' : 'text-red-600'
-            }`} />
+            {challenge.type === 'finance' ? (
+              <DollarSign className={`w-5 h-5 ${
+                challenge.difficulty === 'easy' ? 'text-green-600' :
+                challenge.difficulty === 'medium' ? 'text-yellow-600' : 'text-red-600'
+              }`} />
+            ) : (
+              <Trophy className={`w-5 h-5 ${
+                challenge.difficulty === 'easy' ? 'text-green-600' :
+                challenge.difficulty === 'medium' ? 'text-yellow-600' : 'text-red-600'
+              }`} />
+            )}
             <h3 className="font-semibold text-gray-900 dark:text-white">{challenge.title}</h3>
             {onEdit && (
               <button
@@ -62,7 +113,7 @@ export default function ChallengeCard({ challenge, onEdit }: ChallengeCardProps)
             <div className="flex items-center justify-between text-sm">
               <span className="text-gray-600 dark:text-gray-400">Progress</span>
               <span className="font-semibold text-gray-700 dark:text-gray-300">
-                {userProgress} / {challenge.duration} days
+                {progressLabel || `${userProgress} / ${challenge.duration} days`}
                 {isCompleted && <span className="ml-2 text-green-600 dark:text-green-400">✓ Completed!</span>}
               </span>
             </div>
@@ -73,9 +124,17 @@ export default function ChallengeCard({ challenge, onEdit }: ChallengeCardProps)
                     ? 'bg-green-500' 
                     : 'bg-blue-500'
                 }`}
-                style={{ width: `${progressPercentage}%` }}
+                style={{ width: `${Math.min(progressPercentage, 100)}%` }}
               />
             </div>
+            {challenge.type === 'finance' && challenge.financeGoalType && (
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {challenge.financeGoalType === 'savings_rate' && `Target: ${challenge.financeTargetPercentage}% savings rate`}
+                {challenge.financeGoalType === 'spending_limit' && `Target: €${challenge.financeTarget?.toLocaleString()} per ${challenge.financePeriod || 'period'}`}
+                {challenge.financeGoalType === 'savings_amount' && `Target: Save €${challenge.financeTarget?.toLocaleString()}`}
+                {challenge.financeGoalType === 'no_spend_days' && `Target: ${challenge.financeTarget} no-spend days`}
+              </p>
+            )}
           </div>
         )}
         <div className="flex items-center justify-between text-sm">

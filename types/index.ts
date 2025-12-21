@@ -43,18 +43,23 @@ export interface Challenge {
   id: string
   title: string
   description: string
-  type: 'habit' | 'distraction' | 'goal' | 'community'
+  type: 'habit' | 'distraction' | 'goal' | 'community' | 'finance'
   difficulty: 'easy' | 'medium' | 'hard'
   xpReward: number
   duration: number // days
   requirements: string[]
   participants: string[]
   habitIds?: string[] // Habit IDs linked to this challenge - when these habits are completed, challenge progress updates
-  progress?: { [userId: string]: number } // Track progress per user (days completed)
+  progress?: { [userId: string]: number } // Track progress per user (days completed or percentage for finance)
   completedDates?: { [userId: string]: string[] } // Track which dates each user completed
   startDate: Date
   endDate: Date
   isActive: boolean
+  // Finance-specific fields
+  financeGoalType?: 'savings_rate' | 'spending_limit' | 'savings_amount' | 'no_spend_days' // Type of finance challenge
+  financeTarget?: number // Target amount (for savings_amount or spending_limit)
+  financeTargetPercentage?: number // Target percentage (for savings_rate, e.g., 15 for 15%)
+  financePeriod?: 'daily' | 'weekly' | 'monthly' | 'challenge_duration' // Period for finance tracking
 }
 
 export interface Achievement {
