@@ -227,20 +227,6 @@ export default function ExerciseLibrary({ onSelectExercise }: ExerciseLibraryPro
             className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow cursor-pointer"
             onClick={() => setSelectedExercise(exercise)}
           >
-            {/* Exercise Image */}
-            {exercise.imageUrl && (
-              <div className="w-full h-48 overflow-hidden bg-gray-200 dark:bg-gray-700">
-                <img
-                  src={exercise.imageUrl}
-                  alt={exercise.name}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    // Hide image if it fails to load
-                    e.currentTarget.style.display = 'none'
-                  }}
-                />
-              </div>
-            )}
             <div className="p-5">
               <div className="flex items-start justify-between mb-3">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -312,19 +298,6 @@ export default function ExerciseLibrary({ onSelectExercise }: ExerciseLibraryPro
       {selectedExercise && (
         <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-xl max-w-2xl w-full shadow-xl max-h-[90vh] overflow-y-auto">
-            {/* Exercise Image */}
-            {selectedExercise.imageUrl && (
-              <div className="w-full h-64 overflow-hidden bg-gray-200 dark:bg-gray-700">
-                <img
-                  src={selectedExercise.imageUrl}
-                  alt={selectedExercise.name}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none'
-                  }}
-                />
-              </div>
-            )}
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{selectedExercise.name}</h2>

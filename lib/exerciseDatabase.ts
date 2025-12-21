@@ -18,7 +18,6 @@ export const EXERCISE_DATABASE: Exercise[] = [
     },
     equipment: ['barbell', 'bench'],
     difficulty: 'intermediate',
-    imageUrl: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&h=600&fit=crop',
     instructions: [
       'Lie on bench with feet flat on floor',
       'Grip bar slightly wider than shoulder-width',
@@ -48,7 +47,6 @@ export const EXERCISE_DATABASE: Exercise[] = [
     },
     equipment: ['bodyweight'],
     difficulty: 'beginner',
-    imageUrl: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?w=800&h=600&fit=crop',
     instructions: [
       'Start in plank position with hands shoulder-width apart',
       'Lower body until chest nearly touches floor',
@@ -72,7 +70,6 @@ export const EXERCISE_DATABASE: Exercise[] = [
     },
     equipment: ['dumbbells', 'bench'],
     difficulty: 'intermediate',
-    imageUrl: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&h=600&fit=crop',
     instructions: [
       'Lie on bench holding dumbbells above chest',
       'Lower weights in wide arc until chest stretch',
@@ -93,7 +90,6 @@ export const EXERCISE_DATABASE: Exercise[] = [
     },
     equipment: ['barbell'],
     difficulty: 'advanced',
-    imageUrl: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&h=600&fit=crop',
     instructions: [
       'Stand with feet hip-width apart, bar over mid-foot',
       'Bend at hips and knees to grip bar',
@@ -123,7 +119,6 @@ export const EXERCISE_DATABASE: Exercise[] = [
     },
     equipment: ['bodyweight', 'pull-up-bar'],
     difficulty: 'intermediate',
-    imageUrl: 'https://images.unsplash.com/photo-1549060279-7e168fcee0c2?w=800&h=600&fit=crop',
     instructions: [
       'Hang from bar with palms facing away',
       'Pull body up until chin clears bar',
@@ -142,7 +137,6 @@ export const EXERCISE_DATABASE: Exercise[] = [
     },
     equipment: ['barbell'],
     difficulty: 'intermediate',
-    imageUrl: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&h=600&fit=crop',
     instructions: [
       'Bend at hips, knees slightly bent',
       'Grip bar shoulder-width apart',
@@ -164,7 +158,6 @@ export const EXERCISE_DATABASE: Exercise[] = [
     },
     equipment: ['barbell'],
     difficulty: 'intermediate',
-    imageUrl: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&h=600&fit=crop',
     instructions: [
       'Bar on upper back, feet shoulder-width apart',
       'Descend by bending knees and hips',
@@ -194,7 +187,6 @@ export const EXERCISE_DATABASE: Exercise[] = [
     },
     equipment: ['machine'],
     difficulty: 'beginner',
-    imageUrl: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&h=600&fit=crop',
     instructions: [
       'Sit in machine with feet on platform',
       'Lower weight by bending knees',
@@ -213,7 +205,6 @@ export const EXERCISE_DATABASE: Exercise[] = [
     },
     equipment: ['bodyweight', 'dumbbells'],
     difficulty: 'beginner',
-    imageUrl: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?w=800&h=600&fit=crop',
     instructions: [
       'Step forward into lunge position',
       'Lower back knee toward ground',
@@ -234,7 +225,6 @@ export const EXERCISE_DATABASE: Exercise[] = [
     },
     equipment: ['barbell'],
     difficulty: 'intermediate',
-    imageUrl: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&h=600&fit=crop',
     instructions: [
       'Stand with feet shoulder-width apart',
       'Grip bar at shoulder width',
@@ -254,7 +244,6 @@ export const EXERCISE_DATABASE: Exercise[] = [
     },
     equipment: ['dumbbells'],
     difficulty: 'beginner',
-    imageUrl: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&h=600&fit=crop',
     instructions: [
       'Stand holding dumbbells at sides',
       'Raise arms out to sides until parallel',
@@ -275,7 +264,6 @@ export const EXERCISE_DATABASE: Exercise[] = [
     },
     equipment: ['dumbbells', 'barbell'],
     difficulty: 'beginner',
-    imageUrl: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=800&h=600&fit=crop',
     instructions: [
       'Hold weights at sides, palms forward',
       'Curl weights up to shoulders',
@@ -294,7 +282,6 @@ export const EXERCISE_DATABASE: Exercise[] = [
     },
     equipment: ['bodyweight'],
     difficulty: 'intermediate',
-    imageUrl: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?w=800&h=600&fit=crop',
     instructions: [
       'Support body on bench or parallel bars',
       'Lower body by bending arms',
@@ -315,7 +302,6 @@ export const EXERCISE_DATABASE: Exercise[] = [
     },
     equipment: [],
     difficulty: 'beginner',
-    imageUrl: 'https://images.unsplash.com/photo-1571008887538-b36bb32f4571?w=800&h=600&fit=crop',
     instructions: [
       'Start with warm-up walk',
       'Maintain steady pace',
@@ -334,7 +320,6 @@ export const EXERCISE_DATABASE: Exercise[] = [
     },
     equipment: ['bike'],
     difficulty: 'beginner',
-    imageUrl: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=800&h=600&fit=crop',
     instructions: [
       'Adjust seat height properly',
       'Maintain steady cadence',
@@ -353,7 +338,6 @@ export const EXERCISE_DATABASE: Exercise[] = [
     },
     equipment: ['bodyweight'],
     difficulty: 'beginner',
-    imageUrl: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?w=800&h=600&fit=crop',
     instructions: [
       'Start standing with arms at sides',
       'Jump while raising arms overhead',
@@ -374,7 +358,6 @@ export const EXERCISE_DATABASE: Exercise[] = [
     },
     equipment: ['bodyweight'],
     difficulty: 'beginner',
-    imageUrl: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?w=800&h=600&fit=crop',
     instructions: [
       'Start in push-up position',
       'Hold body in straight line',
@@ -399,7 +382,6 @@ export const EXERCISE_DATABASE: Exercise[] = [
     },
     equipment: ['bodyweight'],
     difficulty: 'beginner',
-    imageUrl: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?w=800&h=600&fit=crop',
     instructions: [
       'Lie on back with knees bent',
       'Place hands behind head',
