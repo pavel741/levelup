@@ -45,6 +45,22 @@ export default function ChallengesPage() {
   const handleAddChallenge = () => {
     if (!newChallenge.title.trim() || !user) return
 
+    // Validate finance challenge fields
+    if (newChallenge.type === 'finance') {
+      if (!newChallenge.financeGoalType) {
+        alert('Please select a finance goal type')
+        return
+      }
+      if (newChallenge.financeGoalType === 'savings_rate' && (!newChallenge.financeTargetPercentage || newChallenge.financeTargetPercentage <= 0)) {
+        alert('Please enter a valid savings rate percentage (e.g., 15 for 15%)')
+        return
+      }
+      if ((newChallenge.financeGoalType === 'spending_limit' || newChallenge.financeGoalType === 'savings_amount' || newChallenge.financeGoalType === 'no_spend_days') && (!newChallenge.financeTarget || newChallenge.financeTarget <= 0)) {
+        alert(`Please enter a valid target ${newChallenge.financeGoalType === 'no_spend_days' ? 'number of days' : 'amount'}`)
+        return
+      }
+    }
+
     // Validate duration and XP reward
     const duration = newChallenge.duration && newChallenge.duration >= 1 ? newChallenge.duration : 7
     const xpReward = newChallenge.xpReward && newChallenge.xpReward >= 10 ? newChallenge.xpReward : 100
@@ -100,6 +116,10 @@ export default function ChallengesPage() {
       habitIds: [],
       startDate: format(new Date(), 'yyyy-MM-dd'),
       endDate: format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
+      financeGoalType: undefined,
+      financeTarget: undefined,
+      financeTargetPercentage: undefined,
+      financePeriod: 'challenge_duration',
     })
     setShowAddModal(false)
   }
@@ -124,6 +144,10 @@ export default function ChallengesPage() {
       habitIds: challenge.habitIds || [],
       startDate: startDate,
       endDate: endDate,
+      financeGoalType: challenge.financeGoalType,
+      financeTarget: challenge.financeTarget,
+      financeTargetPercentage: challenge.financeTargetPercentage,
+      financePeriod: challenge.financePeriod || 'challenge_duration',
     })
     setShowEditModal(true)
   }
@@ -160,6 +184,11 @@ export default function ChallengesPage() {
       habitIds: newChallenge.habitIds.length > 0 ? newChallenge.habitIds : undefined,
       startDate,
       endDate,
+      // Finance-specific fields
+      financeGoalType: newChallenge.financeGoalType,
+      financeTarget: newChallenge.financeTarget,
+      financeTargetPercentage: newChallenge.financeTargetPercentage,
+      financePeriod: newChallenge.financePeriod,
     })
 
     // Reset form
@@ -174,6 +203,10 @@ export default function ChallengesPage() {
       habitIds: [],
       startDate: format(new Date(), 'yyyy-MM-dd'),
       endDate: format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
+      financeGoalType: undefined,
+      financeTarget: undefined,
+      financeTargetPercentage: undefined,
+      financePeriod: 'challenge_duration',
     })
     setShowEditModal(false)
     setEditingChallenge(null)
@@ -544,6 +577,10 @@ export default function ChallengesPage() {
                     habitIds: [],
                     startDate: format(new Date(), 'yyyy-MM-dd'),
                     endDate: format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
+                    financeGoalType: undefined,
+                    financeTarget: undefined,
+                    financeTargetPercentage: undefined,
+                    financePeriod: 'challenge_duration',
                   })
                 }}
                 className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
@@ -577,13 +614,24 @@ export default function ChallengesPage() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Type</label>
                   <select
                     value={newChallenge.type}
-                    onChange={(e) => setNewChallenge({ ...newChallenge, type: e.target.value as any })}
+                    onChange={(e) => {
+                      const newType = e.target.value as any
+                      setNewChallenge({ 
+                        ...newChallenge, 
+                        type: newType,
+                        // Reset finance fields when switching away from finance type
+                        financeGoalType: newType === 'finance' ? newChallenge.financeGoalType : undefined,
+                        financeTarget: newType === 'finance' ? newChallenge.financeTarget : undefined,
+                        financeTargetPercentage: newType === 'finance' ? newChallenge.financeTargetPercentage : undefined,
+                      })
+                    }}
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   >
                     <option value="habit">Habit</option>
                     <option value="distraction">Distraction</option>
                     <option value="goal">Goal</option>
                     <option value="community">Community</option>
+                    <option value="finance">Finance</option>
                   </select>
                 </div>
                 <div>
@@ -926,6 +974,10 @@ export default function ChallengesPage() {
                     habitIds: [],
                     startDate: format(new Date(), 'yyyy-MM-dd'),
                     endDate: format(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd'),
+                    financeGoalType: undefined,
+                    financeTarget: undefined,
+                    financeTargetPercentage: undefined,
+                    financePeriod: 'challenge_duration',
                   })
                 }}
                 className="flex-1 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium text-sm sm:text-base"

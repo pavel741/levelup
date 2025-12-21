@@ -50,7 +50,9 @@ export function parseTransactionDate(date: string | Date | any): Date {
       // Limit cache size to prevent memory issues
       if (dateCache.size > 1000) {
         const firstKey = dateCache.keys().next().value
-        dateCache.delete(firstKey)
+        if (firstKey !== undefined) {
+          dateCache.delete(firstKey)
+        }
       }
       dateCache.set(date, parsed)
     }

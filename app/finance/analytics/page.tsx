@@ -23,6 +23,7 @@ import { FinanceSpendingAlerts } from '@/components/FinanceSpendingAlerts'
 import { FinanceRecurringExpenses } from '@/components/FinanceRecurringExpenses'
 import { FinanceVerificationPanel } from '@/components/FinanceVerificationPanel'
 import { subscribeToTransactions, getFinanceSettings } from '@/lib/financeApi'
+import { parseTransactionDate } from '@/lib/financeDateUtils'
 import type { FinanceTransaction, FinanceSettings } from '@/types/finance'
 import { BarChart3, ArrowLeft, TrendingUp, TrendingDown, DollarSign, Percent } from 'lucide-react'
 
