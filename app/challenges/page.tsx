@@ -805,14 +805,17 @@ export default function ChallengesPage() {
                 </div>
               </div>
               
-              {/* Finance Challenge Fields */}
+              {/* Finance Challenge Fields - Show immediately after Type selection */}
               {newChallenge.type === 'finance' && (
-                <div className="space-y-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Finance Goal Settings</h3>
+                <div className="space-y-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border-2 border-blue-300 dark:border-blue-700">
+                  <div className="flex items-center gap-2 mb-3">
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">💰 Finance Goal Settings</h3>
+                    <span className="text-xs text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded">Required</span>
+                  </div>
                   
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Goal Type
+                      Goal Type <span className="text-red-500">*</span>
                     </label>
                     <select
                       value={newChallenge.financeGoalType || ''}
@@ -820,14 +823,19 @@ export default function ChallengesPage() {
                         ...newChallenge, 
                         financeGoalType: e.target.value as any || undefined 
                       })}
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className="w-full px-4 py-2 border-2 border-blue-300 dark:border-blue-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     >
-                      <option value="">Select goal type...</option>
-                      <option value="savings_rate">Savings Rate (%)</option>
-                      <option value="spending_limit">Spending Limit</option>
-                      <option value="savings_amount">Savings Amount</option>
-                      <option value="no_spend_days">No-Spend Days</option>
+                      <option value="">-- Select goal type --</option>
+                      <option value="savings_rate">💵 Savings Rate (%) - Save X% of income</option>
+                      <option value="spending_limit">💸 Spending Limit - Spend less than €X per period</option>
+                      <option value="savings_amount">💰 Savings Amount - Save €X total</option>
+                      <option value="no_spend_days">🚫 No-Spend Days - X days with zero expenses</option>
                     </select>
+                    {!newChallenge.financeGoalType && (
+                      <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+                        Please select a finance goal type to continue
+                      </p>
+                    )}
                   </div>
 
                   {newChallenge.financeGoalType === 'savings_rate' && (
