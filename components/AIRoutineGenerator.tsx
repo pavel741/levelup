@@ -33,35 +33,46 @@ export default function AIRoutineGenerator({ onRoutineGenerated, onClose }: AIRo
   }
 
   const handleGenerate = async () => {
+    console.log('handleGenerate called', { weight, height, goal, experience, daysPerWeek, equipment })
+    
     if (!weight || !height) {
+      console.log('Validation failed: missing weight or height')
       setError('Please enter your weight and height')
       return
     }
 
     if (!user?.id) {
+      console.log('Validation failed: user not logged in')
       setError('You must be logged in to generate routines')
       return
     }
 
+    console.log('Starting generation...')
     setIsGenerating(true)
     setError(null)
     setGeneratedRoutine(null)
 
     try {
+      const requestBody = {
+        weight: parseFloat(weight),
+        height: parseFloat(height),
+        goal,
+        experience,
+        daysPerWeek: parseInt(daysPerWeek),
+        equipment: equipment.length > 0 ? equipment : availableEquipment,
+      }
+      
+      console.log('Sending request:', requestBody)
+      
       const response = await fetch('/api/workouts/generate-routine', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          weight: parseFloat(weight),
-          height: parseFloat(height),
-          goal,
-          experience,
-          daysPerWeek: parseInt(daysPerWeek),
-          equipment: equipment.length > 0 ? equipment : availableEquipment, // If none selected, assume all available
-        }),
+        body: JSON.stringify(requestBody),
       })
+      
+      console.log('Response status:', response.status, response.statusText)
 
       if (!response.ok) {
         const errorData = await response.json()
@@ -69,6 +80,12 @@ export default function AIRoutineGenerator({ onRoutineGenerated, onClose }: AIRo
       }
 
       const data = await response.json()
+      
+      if (!data.routine) {
+        throw new Error('No routine data received from server')
+      }
+      
+      console.log('Generated routine:', data.routine)
       setGeneratedRoutine(data.routine)
       onRoutineGenerated?.(data.routine)
     } catch (err: any) {
@@ -248,7 +265,13 @@ export default function AIRoutineGenerator({ onRoutineGenerated, onClose }: AIRo
           )}
 
           <button
-            onClick={handleGenerate}
+            type="button"
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              console.log('Button clicked')
+              handleGenerate()
+            }}
             disabled={isGenerating || !weight || !height}
             className="w-full px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >

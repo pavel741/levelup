@@ -54,10 +54,20 @@ function getExercisesForMuscleGroup(muscleGroup: string, availableExercises: typ
   return availableExercises.filter((ex) => {
     const primary = ex.muscleGroups.primary.map((m) => m.toLowerCase())
     const secondary = ex.muscleGroups.secondary.map((m) => m.toLowerCase())
-    // Match exact or partial (e.g., "chest" matches "chest")
+    // Match exact or partial
     return primary.some((m) => m === targetGroup || m.includes(targetGroup) || targetGroup.includes(m)) ||
            secondary.some((m) => m === targetGroup || m.includes(targetGroup) || targetGroup.includes(m))
   })
+}
+
+// Map session muscle groups to actual database muscle groups
+const MUSCLE_GROUP_MAP: Record<string, string[]> = {
+  'chest': ['chest'],
+  'back': ['back', 'lats', 'rhomboids', 'traps'],
+  'legs': ['legs', 'quadriceps', 'hamstrings', 'glutes', 'calves'],
+  'shoulders': ['shoulders', 'deltoids', 'delts'],
+  'arms': ['biceps', 'triceps', 'arms'],
+  'core': ['core', 'abs', 'abdominals'],
 }
 
 // Calculate sets and reps based on goal and experience
@@ -141,7 +151,28 @@ function generateSessionExercises(
   for (const muscleGroup of structure.muscleGroups) {
     if (exercises.length >= structure.exerciseCount) break
     
-    const muscleGroupExercises = getExercisesForMuscleGroup(muscleGroup, availableExercises)
+    // Get all matching exercises for this muscle group
+    let muscleGroupExercises: typeof EXERCISE_DATABASE = []
+    
+    // Try mapped muscle groups first (more comprehensive)
+    if (MUSCLE_GROUP_MAP[muscleGroup]) {
+      for (const mappedGroup of MUSCLE_GROUP_MAP[muscleGroup]) {
+        const mappedExercises = getExercisesForMuscleGroup(mappedGroup, availableExercises)
+        muscleGroupExercises = [...muscleGroupExercises, ...mappedExercises]
+      }
+    }
+    
+    // Also try direct match
+    const directMatches = getExercisesForMuscleGroup(muscleGroup, availableExercises)
+    muscleGroupExercises = [...muscleGroupExercises, ...directMatches]
+    
+    // Remove duplicates
+    muscleGroupExercises = muscleGroupExercises.filter((ex, idx, self) => 
+      idx === self.findIndex((e) => e.id === ex.id)
+    )
+    
+    // Filter out used exercises and sort
+    muscleGroupExercises = muscleGroupExercises
       .filter((ex) => !usedExerciseIds.has(ex.id))
       .sort((a, b) => {
         // Prioritize compound movements
@@ -190,6 +221,47 @@ function generateSessionExercises(
         sets,
         restTime: scheme.restTime,
         notes: isCompound ? 'Focus on form' : undefined,
+      })
+      
+      usedExerciseIds.add(exercise.id)
+    }
+  }
+  
+  // Fallback: if we don't have enough exercises, add any available exercises
+  if (exercises.length < structure.exerciseCount) {
+    const remainingExercises = availableExercises
+      .filter((ex) => !usedExerciseIds.has(ex.id))
+      .slice(0, structure.exerciseCount - exercises.length)
+    
+    for (const exercise of remainingExercises) {
+      const isCompound = isCompoundExercise(exercise.id)
+      const scheme = getSetRepScheme(goal, experience, isCompound ? 'compound' : 'isolation')
+      
+      const sets: SetConfiguration[] = []
+      
+      if (isCompound && experience !== 'beginner') {
+        sets.push({
+          setType: 'warmup',
+          targetReps: 10,
+          targetWeight: 0,
+          restAfter: 60,
+        })
+      }
+      
+      for (let i = 0; i < scheme.sets; i++) {
+        sets.push({
+          setType: 'working',
+          targetReps: scheme.reps,
+          targetWeight: 0,
+          restAfter: scheme.restTime,
+        })
+      }
+      
+      exercises.push({
+        exerciseId: exercise.id,
+        order: exercises.length,
+        sets,
+        restTime: scheme.restTime,
       })
       
       usedExerciseIds.add(exercise.id)

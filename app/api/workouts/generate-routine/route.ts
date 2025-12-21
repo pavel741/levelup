@@ -41,12 +41,18 @@ export async function POST(request: NextRequest) {
 
     // Validate generated routine
     if (!routine.sessions || routine.sessions.length === 0) {
+      console.error('Generated routine has no sessions')
       throw new Error('Generated routine has no sessions')
     }
 
     const hasExercises = routine.sessions.some((s) => s.exercises && s.exercises.length > 0)
     if (!hasExercises) {
-      throw new Error('Generated routine has no exercises')
+      console.error('Generated routine has no exercises. Sessions:', routine.sessions.map(s => ({
+        name: s.name,
+        exerciseCount: s.exercises.length,
+        exercises: s.exercises.map(e => e.exerciseId)
+      })))
+      throw new Error('Generated routine has no exercises. Please try selecting different equipment or adjusting your preferences.')
     }
 
     return NextResponse.json({ routine })
