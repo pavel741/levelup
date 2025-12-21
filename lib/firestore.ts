@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore'
 import { db } from './firebase'
 import { User, Habit, Challenge, DailyStats } from '@/types'
+import { Routine, WorkoutLog } from '@/types/workout'
 import { format } from 'date-fns'
 
 // User operations
@@ -365,6 +366,217 @@ export const saveDailyStats = async (userId: string, stats: DailyStats): Promise
     })
   } catch (error) {
     console.error('Error saving daily stats:', error)
+  }
+}
+
+// Workout operations
+export const subscribeToRoutines = (
+  userId: string,
+  callback: (routines: Routine[]) => void
+): (() => void) => {
+  if (!db) {
+    throw new Error('Firestore is not initialized')
+  }
+  
+  const routinesRef = collection(db, 'routines')
+  const q = query(routinesRef, where('userId', '==', userId))
+  
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const routines = snapshot.docs.map((doc) => {
+        const data = doc.data()
+        return {
+          id: doc.id,
+          ...data,
+          createdAt: data.createdAt?.toDate() || new Date(),
+          updatedAt: data.updatedAt?.toDate() || new Date(),
+        }
+      }) as Routine[]
+      callback(routines)
+    },
+    (error) => {
+      console.error('Error in routines subscription:', error)
+      callback([])
+    }
+  )
+}
+
+export const saveRoutine = async (routine: Routine): Promise<void> => {
+  if (!db) {
+    throw new Error('Firestore is not initialized')
+  }
+  
+  try {
+    const routineData: any = {
+      ...routine,
+      createdAt: Timestamp.fromDate(routine.createdAt),
+      updatedAt: Timestamp.fromDate(routine.updatedAt),
+    }
+    
+    // Remove undefined fields
+    Object.keys(routineData).forEach(key => {
+      if (routineData[key] === undefined) {
+        delete routineData[key]
+      }
+    })
+    
+    await setDoc(doc(db, 'routines', routine.id), routineData)
+  } catch (error) {
+    console.error('Error saving routine:', error)
+    throw error
+  }
+}
+
+export const updateRoutine = async (routineId: string, updates: Partial<Routine>): Promise<void> => {
+  if (!db) {
+    throw new Error('Firestore is not initialized')
+  }
+  
+  try {
+    const updateData: any = { ...updates }
+    if (updates.createdAt) {
+      updateData.createdAt = Timestamp.fromDate(updates.createdAt)
+    }
+    if (updates.updatedAt) {
+      updateData.updatedAt = Timestamp.fromDate(updates.updatedAt)
+    }
+    
+    // Remove undefined fields
+    Object.keys(updateData).forEach(key => {
+      if (updateData[key] === undefined) {
+        delete updateData[key]
+      }
+    })
+    
+    const routineRef = doc(db, 'routines', routineId)
+    await updateDoc(routineRef, updateData)
+  } catch (error) {
+    console.error('Error updating routine:', error)
+    throw error
+  }
+}
+
+export const deleteRoutine = async (routineId: string): Promise<void> => {
+  if (!db) {
+    throw new Error('Firestore is not initialized')
+  }
+  
+  try {
+    await deleteDoc(doc(db, 'routines', routineId))
+  } catch (error) {
+    console.error('Error deleting routine:', error)
+    throw error
+  }
+}
+
+export const subscribeToWorkoutLogs = (
+  userId: string,
+  callback: (logs: WorkoutLog[]) => void
+): (() => void) => {
+  if (!db) {
+    throw new Error('Firestore is not initialized')
+  }
+  
+  const logsRef = collection(db, 'workoutLogs')
+  const q = query(logsRef, where('userId', '==', userId))
+  
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const logs = snapshot.docs.map((doc) => {
+        const data = doc.data()
+        return {
+          id: doc.id,
+          ...data,
+          date: data.date?.toDate() || new Date(),
+          startTime: data.startTime?.toDate() || new Date(),
+          endTime: data.endTime?.toDate() || undefined,
+        }
+      }) as WorkoutLog[]
+      // Sort by date descending (most recent first)
+      logs.sort((a, b) => b.date.getTime() - a.date.getTime())
+      callback(logs)
+    },
+    (error) => {
+      console.error('Error in workout logs subscription:', error)
+      callback([])
+    }
+  )
+}
+
+export const saveWorkoutLog = async (log: WorkoutLog): Promise<void> => {
+  if (!db) {
+    throw new Error('Firestore is not initialized')
+  }
+  
+  try {
+    const logData: any = {
+      ...log,
+      date: Timestamp.fromDate(log.date),
+      startTime: Timestamp.fromDate(log.startTime),
+    }
+    
+    if (log.endTime) {
+      logData.endTime = Timestamp.fromDate(log.endTime)
+    }
+    
+    // Remove undefined fields
+    Object.keys(logData).forEach(key => {
+      if (logData[key] === undefined) {
+        delete logData[key]
+      }
+    })
+    
+    await setDoc(doc(db, 'workoutLogs', log.id), logData)
+  } catch (error) {
+    console.error('Error saving workout log:', error)
+    throw error
+  }
+}
+
+export const updateWorkoutLog = async (logId: string, updates: Partial<WorkoutLog>): Promise<void> => {
+  if (!db) {
+    throw new Error('Firestore is not initialized')
+  }
+  
+  try {
+    const updateData: any = { ...updates }
+    if (updates.date) {
+      updateData.date = Timestamp.fromDate(updates.date)
+    }
+    if (updates.startTime) {
+      updateData.startTime = Timestamp.fromDate(updates.startTime)
+    }
+    if (updates.endTime) {
+      updateData.endTime = Timestamp.fromDate(updates.endTime)
+    }
+    
+    // Remove undefined fields
+    Object.keys(updateData).forEach(key => {
+      if (updateData[key] === undefined) {
+        delete updateData[key]
+      }
+    })
+    
+    const logRef = doc(db, 'workoutLogs', logId)
+    await updateDoc(logRef, updateData)
+  } catch (error) {
+    console.error('Error updating workout log:', error)
+    throw error
+  }
+}
+
+export const deleteWorkoutLog = async (logId: string): Promise<void> => {
+  if (!db) {
+    throw new Error('Firestore is not initialized')
+  }
+  
+  try {
+    await deleteDoc(doc(db, 'workoutLogs', logId))
+  } catch (error) {
+    console.error('Error deleting workout log:', error)
+    throw error
   }
 }
 

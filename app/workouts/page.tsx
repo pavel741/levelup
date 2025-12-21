@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import AuthGuard from '@/components/AuthGuard'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
@@ -8,8 +8,12 @@ import { useFirestoreStore } from '@/store/useFirestoreStore'
 import { Dumbbell, List, Play, History, Search, Sparkles, X } from 'lucide-react'
 import ExerciseLibrary from '@/components/ExerciseLibrary'
 import RoutineBuilder from '@/components/RoutineBuilder'
+import ActiveWorkoutView from '@/components/ActiveWorkoutView'
+import WorkoutHistory from '@/components/WorkoutHistory'
+import AIRoutineGenerator from '@/components/AIRoutineGenerator'
 import { ROUTINE_TEMPLATES } from '@/lib/routineTemplates'
-import type { Routine } from '@/types/workout'
+import { subscribeToRoutines, saveRoutine, deleteRoutine, subscribeToWorkoutLogs, deleteWorkoutLog } from '@/lib/firestore'
+import type { Routine, WorkoutLog } from '@/types/workout'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,7 +26,29 @@ export default function WorkoutsPage() {
   const [showRoutineBuilder, setShowRoutineBuilder] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
   const [routines, setRoutines] = useState<Routine[]>([])
+  const [workoutLogs, setWorkoutLogs] = useState<WorkoutLog[]>([])
   const [selectedTemplate, setSelectedTemplate] = useState<Partial<Routine> | null>(null)
+  const [activeRoutine, setActiveRoutine] = useState<Routine | null>(null)
+  const [editingRoutine, setEditingRoutine] = useState<Routine | null>(null)
+  const [showAIGenerator, setShowAIGenerator] = useState(false)
+
+  // Subscribe to routines
+  useEffect(() => {
+    if (!user?.id) return
+
+    const unsubscribeRoutines = subscribeToRoutines(user.id, (routines) => {
+      setRoutines(routines)
+    })
+
+    const unsubscribeLogs = subscribeToWorkoutLogs(user.id, (logs) => {
+      setWorkoutLogs(logs)
+    })
+
+    return () => {
+      unsubscribeRoutines()
+      unsubscribeLogs()
+    }
+  }, [user?.id])
 
   const views = [
     { id: 'routines' as WorkoutView, label: 'My Routines', icon: List },
@@ -84,18 +110,31 @@ export default function WorkoutsPage() {
                     <div>
                       {showRoutineBuilder ? (
                         <RoutineBuilder
-                          initialRoutine={selectedTemplate || undefined}
-                          onSave={(routine) => {
-                            // TODO: Save to Firestore
-                            console.log('Saving routine:', routine)
-                            alert('Routine saved! (Firestore integration coming soon)')
-                            setShowRoutineBuilder(false)
-                            setSelectedTemplate(null)
-                            // After saving, reload routines
+                          initialRoutine={editingRoutine || selectedTemplate || undefined}
+                          onSave={async (routineData) => {
+                            if (!user?.id) return
+                            
+                            try {
+                              const routine: Routine = {
+                                ...routineData,
+                                id: editingRoutine?.id || `routine_${Date.now()}`,
+                                userId: user.id,
+                                createdAt: editingRoutine?.createdAt || new Date(),
+                                updatedAt: new Date(),
+                              }
+                              await saveRoutine(routine)
+                              setShowRoutineBuilder(false)
+                              setSelectedTemplate(null)
+                              setEditingRoutine(null)
+                            } catch (error) {
+                              console.error('Error saving routine:', error)
+                              alert('Failed to save routine. Please try again.')
+                            }
                           }}
                           onCancel={() => {
                             setShowRoutineBuilder(false)
                             setSelectedTemplate(null)
+                            setEditingRoutine(null)
                           }}
                         />
                       ) : (
@@ -103,6 +142,13 @@ export default function WorkoutsPage() {
                           <div className="flex items-center justify-between mb-4">
                             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">My Routines</h2>
                             <div className="flex gap-2">
+                              <button
+                                onClick={() => setShowAIGenerator(true)}
+                                className="px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-colors font-medium flex items-center gap-2"
+                              >
+                                <Sparkles className="w-4 h-4" />
+                                AI Generator
+                              </button>
                               <button
                                 onClick={() => setShowTemplates(true)}
                                 className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium flex items-center gap-2"
@@ -130,33 +176,89 @@ export default function WorkoutsPage() {
                                   key={routine.id}
                                   className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-md transition-shadow"
                                 >
-                                  <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
-                                    {routine.name}
-                                  </h3>
-                                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                                    {routine.description}
-                                  </p>
-                                  <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 mb-2">
-                                    <span>{routine.sessions?.length || routine.exercises.length} {routine.sessions ? 'days' : 'exercises'}</span>
-                                    <span>~{routine.estimatedDuration} min</span>
-                                    <span className="capitalize">{routine.difficulty}</span>
-                                    <span className="capitalize">{routine.goal}</span>
-                                  </div>
-                                  {routine.sessions && routine.sessions.length > 0 && (
-                                    <div className="text-xs text-gray-600 dark:text-gray-300 space-y-1 mb-2">
-                                      {routine.sessions.map((session, idx) => (
-                                        <div key={idx}>
-                                          <span className="font-medium">{session.name}:</span> {session.exercises.length} exercises (~{session.estimatedDuration} min)
+                                  <div className="flex items-start justify-between mb-2">
+                                    <div className="flex-1">
+                                      <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
+                                        {routine.name}
+                                      </h3>
+                                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                                        {routine.description}
+                                      </p>
+                                      <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 mb-2">
+                                        <span>{routine.sessions?.length || routine.exercises.length} {routine.sessions ? 'days' : 'exercises'}</span>
+                                        <span>~{routine.estimatedDuration} min</span>
+                                        <span className="capitalize">{routine.difficulty}</span>
+                                        <span className="capitalize">{routine.goal}</span>
+                                      </div>
+                                      {routine.sessions && routine.sessions.length > 0 && (
+                                        <div className="text-xs text-gray-600 dark:text-gray-300 space-y-1 mb-2">
+                                          {routine.sessions.map((session, idx) => (
+                                            <div key={idx}>
+                                              <span className="font-medium">{session.name}:</span> {session.exercises.length} exercises (~{session.estimatedDuration} min)
+                                            </div>
+                                          ))}
                                         </div>
-                                      ))}
+                                      )}
                                     </div>
-                                  )}
+                                    <div className="flex gap-2 ml-4">
+                                      <button
+                                        onClick={() => {
+                                          setActiveRoutine(routine)
+                                          setCurrentView('active')
+                                        }}
+                                        className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-1"
+                                      >
+                                        <Play className="w-4 h-4" />
+                                        Start
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          setEditingRoutine(routine)
+                                          setShowRoutineBuilder(true)
+                                        }}
+                                        className="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm"
+                                      >
+                                        Edit
+                                      </button>
+                                      <button
+                                        onClick={async () => {
+                                          if (confirm('Delete this routine?')) {
+                                            try {
+                                              await deleteRoutine(routine.id)
+                                            } catch (error) {
+                                              console.error('Error deleting routine:', error)
+                                              alert('Failed to delete routine.')
+                                            }
+                                          }
+                                        }}
+                                        className="px-3 py-1.5 bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/30 transition-colors text-sm"
+                                      >
+                                        <X className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  </div>
                                 </div>
                               ))}
                             </div>
                           )}
                         </div>
                       )}
+                    </div>
+                  )}
+
+                  {/* AI Generator Modal */}
+                  {showAIGenerator && (
+                    <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4">
+                      <div className="bg-white dark:bg-gray-800 rounded-xl max-w-3xl w-full shadow-xl max-h-[90vh] overflow-y-auto">
+                        <AIRoutineGenerator
+                          onRoutineGenerated={(routine) => {
+                            // Routine is already saved by AIRoutineGenerator
+                            setShowAIGenerator(false)
+                            // Refresh routines list
+                          }}
+                          onClose={() => setShowAIGenerator(false)}
+                        />
+                      </div>
                     </div>
                   )}
 
@@ -250,25 +352,71 @@ export default function WorkoutsPage() {
                   )}
 
                   {currentView === 'active' && (
-                    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-                      <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Active Workout</h2>
-                      <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                        <Play className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                        <p>No active workout. Start a routine to begin tracking!</p>
-                        <button className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
-                          Start Workout
-                        </button>
-                      </div>
+                    <div>
+                      {activeRoutine ? (
+                        <ActiveWorkoutView
+                          routine={activeRoutine}
+                          onComplete={(logId) => {
+                            setActiveRoutine(null)
+                            setCurrentView('history')
+                            // Show success message
+                          }}
+                          onCancel={() => {
+                            if (confirm('Cancel this workout? Progress will be lost.')) {
+                              setActiveRoutine(null)
+                            }
+                          }}
+                        />
+                      ) : (
+                        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+                          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Active Workout</h2>
+                          {routines.length === 0 ? (
+                            <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                              <Play className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                              <p>No routines yet. Create a routine first!</p>
+                              <button
+                                onClick={() => {
+                                  setCurrentView('routines')
+                                  setShowRoutineBuilder(true)
+                                }}
+                                className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                              >
+                                Create Routine
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                              <Play className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                              <p>Select a routine to start your workout!</p>
+                              <button
+                                onClick={() => setCurrentView('routines')}
+                                className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                              >
+                                Choose Routine
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
 
                   {currentView === 'history' && (
-                    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-                      <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Workout History</h2>
-                      <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                        <History className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                        <p>No workout history yet. Complete your first workout to see it here!</p>
+                    <div>
+                      <div className="mb-4">
+                        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Workout History</h2>
                       </div>
+                      <WorkoutHistory
+                        logs={workoutLogs}
+                        onDelete={async (logId) => {
+                          try {
+                            await deleteWorkoutLog(logId)
+                          } catch (error) {
+                            console.error('Error deleting workout log:', error)
+                            alert('Failed to delete workout.')
+                          }
+                        }}
+                      />
                     </div>
                   )}
 
