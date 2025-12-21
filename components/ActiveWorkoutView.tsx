@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Play, Pause, Check, X, Plus, Minus, Clock, RotateCcw, Save } from 'lucide-react'
 import { getExerciseById } from '@/lib/exerciseDatabase'
 import type { ActiveWorkout, ActiveWorkoutExercise, ActiveWorkoutSet, Routine, WorkoutLog } from '@/types/workout'
-import { saveWorkoutLog } from '@/lib/firestore'
+import { saveWorkoutLog } from '@/lib/workoutMongo'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
 import { format } from 'date-fns'
 

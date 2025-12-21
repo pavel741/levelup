@@ -12,7 +12,7 @@ import ActiveWorkoutView from '@/components/ActiveWorkoutView'
 import WorkoutHistory from '@/components/WorkoutHistory'
 import AIRoutineGenerator from '@/components/AIRoutineGenerator'
 import { ROUTINE_TEMPLATES } from '@/lib/routineTemplates'
-import { subscribeToRoutines, saveRoutine, deleteRoutine, subscribeToWorkoutLogs, deleteWorkoutLog } from '@/lib/firestore'
+import { subscribeToRoutines, saveRoutine, deleteRoutine, subscribeToWorkoutLogs, deleteWorkoutLog } from '@/lib/workoutMongo'
 import type { Routine, WorkoutLog } from '@/types/workout'
 
 export const dynamic = 'force-dynamic'
@@ -252,11 +252,15 @@ export default function WorkoutsPage() {
                       <div className="bg-white dark:bg-gray-800 rounded-xl max-w-3xl w-full shadow-xl max-h-[90vh] overflow-y-auto">
                         <AIRoutineGenerator
                           onRoutineGenerated={(routine) => {
-                            // Routine is already saved by AIRoutineGenerator
-                            setShowAIGenerator(false)
-                            // Refresh routines list
+                            // Routine is already saved by AIRoutineGenerator (auto-saved)
+                            console.log('Routine generated callback:', routine)
+                            // Don't close immediately - let user see the routine and optionally save again
+                            // The Firestore subscription will automatically update the routines list
                           }}
-                          onClose={() => setShowAIGenerator(false)}
+                          onClose={() => {
+                            setShowAIGenerator(false)
+                            // Routines list will auto-update via Firestore subscription
+                          }}
                         />
                       </div>
                     </div>

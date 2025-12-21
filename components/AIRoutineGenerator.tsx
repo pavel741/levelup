@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Sparkles, Loader2, X, Save } from 'lucide-react'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
-import { saveRoutine } from '@/lib/firestore'
+import { saveRoutine } from '@/lib/workoutMongo'
 import type { Routine } from '@/types/workout'
 import { EXERCISE_DATABASE } from '@/lib/exerciseDatabase'
 
@@ -86,6 +86,29 @@ export default function AIRoutineGenerator({ onRoutineGenerated, onClose }: AIRo
       }
       
       console.log('Generated routine:', data.routine)
+      
+      // Auto-save the routine if user is logged in
+      if (user?.id && data.routine) {
+        try {
+          const routineToSave: Routine = {
+            ...data.routine,
+            id: `routine_${Date.now()}`,
+            userId: user.id,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            isTemplate: false,
+            isPublic: false,
+            createdBy: user.id,
+          }
+          console.log('Auto-saving routine:', routineToSave)
+          await saveRoutine(routineToSave)
+          console.log('Routine saved successfully!')
+        } catch (saveError) {
+          console.error('Error auto-saving routine:', saveError)
+          // Don't throw - still show the routine so user can manually save
+        }
+      }
+      
       setGeneratedRoutine(data.routine)
       onRoutineGenerated?.(data.routine)
     } catch (err: any) {
@@ -111,7 +134,11 @@ export default function AIRoutineGenerator({ onRoutineGenerated, onClose }: AIRo
         createdBy: user.id,
       }
       await saveRoutine(routineToSave)
-      alert('Routine saved successfully!')
+      console.log('Routine saved manually:', routineToSave)
+      // Show success message
+      const successMsg = 'Routine saved successfully! It will appear in your routines list.'
+      alert(successMsg)
+      // Reset form
       setGeneratedRoutine(null)
       setWeight('')
       setHeight('')
@@ -119,6 +146,7 @@ export default function AIRoutineGenerator({ onRoutineGenerated, onClose }: AIRo
       setExperience('beginner')
       setDaysPerWeek('3')
       setEquipment([])
+      // Close modal - Firestore subscription will auto-update the routines list
       onClose?.()
     } catch (error) {
       console.error('Error saving routine:', error)
