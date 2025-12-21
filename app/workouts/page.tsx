@@ -6,6 +6,9 @@ import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
 import { Dumbbell, List, Play, History, Search } from 'lucide-react'
+import ExerciseLibrary from '@/components/ExerciseLibrary'
+import RoutineBuilder from '@/components/RoutineBuilder'
+import type { Routine } from '@/types/workout'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,6 +18,8 @@ export default function WorkoutsPage() {
   const { user } = useFirestoreStore()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [currentView, setCurrentView] = useState<WorkoutView>('routines')
+  const [showRoutineBuilder, setShowRoutineBuilder] = useState(false)
+  const [routines, setRoutines] = useState<Routine[]>([])
 
   const views = [
     { id: 'routines' as WorkoutView, label: 'My Routines', icon: List },
@@ -73,17 +78,59 @@ export default function WorkoutsPage() {
                 {/* Content Area */}
                 <div className="mt-6">
                   {currentView === 'routines' && (
-                    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-                      <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">My Routines</h2>
-                        <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
-                          + Create Routine
-                        </button>
-                      </div>
-                      <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                        <Dumbbell className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                        <p>No routines yet. Create your first workout routine!</p>
-                      </div>
+                    <div>
+                      {showRoutineBuilder ? (
+                        <RoutineBuilder
+                          onSave={(routine) => {
+                            // TODO: Save to Firestore
+                            console.log('Saving routine:', routine)
+                            alert('Routine saved! (Firestore integration coming soon)')
+                            setShowRoutineBuilder(false)
+                            // After saving, reload routines
+                          }}
+                          onCancel={() => setShowRoutineBuilder(false)}
+                        />
+                      ) : (
+                        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+                          <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">My Routines</h2>
+                            <button
+                              onClick={() => setShowRoutineBuilder(true)}
+                              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                            >
+                              + Create Routine
+                            </button>
+                          </div>
+                          {routines.length === 0 ? (
+                            <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                              <Dumbbell className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                              <p>No routines yet. Create your first workout routine!</p>
+                            </div>
+                          ) : (
+                            <div className="space-y-3">
+                              {routines.map((routine) => (
+                                <div
+                                  key={routine.id}
+                                  className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-md transition-shadow"
+                                >
+                                  <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
+                                    {routine.name}
+                                  </h3>
+                                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                                    {routine.description}
+                                  </p>
+                                  <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+                                    <span>{routine.exercises.length} exercises</span>
+                                    <span>~{routine.estimatedDuration} min</span>
+                                    <span className="capitalize">{routine.difficulty}</span>
+                                    <span className="capitalize">{routine.goal}</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -111,22 +158,7 @@ export default function WorkoutsPage() {
                   )}
 
                   {currentView === 'exercises' && (
-                    <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-                      <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Exercise Library</h2>
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            placeholder="Search exercises..."
-                            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                          />
-                        </div>
-                      </div>
-                      <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                        <Search className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                        <p>Exercise library coming soon!</p>
-                      </div>
-                    </div>
+                    <ExerciseLibrary />
                   )}
                 </div>
               </div>
