@@ -1,7 +1,7 @@
 'use client'
 
 import { useFirestoreStore } from '@/store/useFirestoreStore'
-import { Trophy, Users, Clock, Edit2, DollarSign } from 'lucide-react'
+import { Trophy, Users, Clock, Edit2, DollarSign, Link2 } from 'lucide-react'
 import { Challenge } from '@/types'
 import { format, differenceInDays } from 'date-fns'
 import { calculateFinanceChallengeProgress, getFinanceChallengeStatus } from '@/lib/financeChallengeUtils'
@@ -147,6 +147,13 @@ export default function ChallengeCard({ challenge, onEdit }: ChallengeCardProps)
             <span>{daysRemaining} days left</span>
           </div>
         </div>
+        {challenge.type === 'finance' && (
+          <div className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1.5 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded">
+            <Link2 className="w-3 h-3" />
+            <span className="font-medium">Linked to your finances</span>
+            <span className="text-gray-500 dark:text-gray-400">• Updates automatically</span>
+          </div>
+        )}
         {challenge.habitIds && challenge.habitIds.length > 0 && (
           <div className="text-xs text-gray-600 dark:text-gray-400">
             <span className="font-medium">Linked habits: </span>
