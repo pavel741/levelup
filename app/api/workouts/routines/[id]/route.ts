@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { updateRoutine, deleteRoutine } from '@/lib/workoutMongo'
+import { validateUserId, successResponse, handleApiError } from '@/lib/utils/api-helpers'
 
 export async function PATCH(
   request: NextRequest,
@@ -8,21 +9,13 @@ export async function PATCH(
   try {
     const { userId, updates } = await request.json()
 
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'userId is required' },
-        { status: 400 }
-      )
-    }
+    const validationError = validateUserId(userId)
+    if (validationError) return validationError
 
-    await updateRoutine(params.id, userId, updates)
-    return NextResponse.json({ success: true })
+    await updateRoutine(params.id, userId!, updates)
+    return successResponse()
   } catch (error: any) {
-    console.error('Error updating routine:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to update routine' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'PATCH /api/workouts/routines/[id]')
   }
 }
 
@@ -34,21 +27,13 @@ export async function DELETE(
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
 
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'userId is required' },
-        { status: 400 }
-      )
-    }
+    const validationError = validateUserId(userId)
+    if (validationError) return validationError
 
-    await deleteRoutine(params.id, userId)
-    return NextResponse.json({ success: true })
+    await deleteRoutine(params.id, userId!)
+    return successResponse()
   } catch (error: any) {
-    console.error('Error deleting routine:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to delete routine' },
-      { status: 500 }
-    )
+    return handleApiError(error, 'DELETE /api/workouts/routines/[id]')
   }
 }
 

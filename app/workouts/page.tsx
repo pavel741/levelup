@@ -5,19 +5,20 @@ import AuthGuard from '@/components/AuthGuard'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
-import { Dumbbell, List, Play, History, Search, Sparkles, X } from 'lucide-react'
+import { Dumbbell, List, Play, History, Search, Sparkles, X, UtensilsCrossed } from 'lucide-react'
 import ExerciseLibrary from '@/components/ExerciseLibrary'
 import RoutineBuilder from '@/components/RoutineBuilder'
 import ActiveWorkoutView from '@/components/ActiveWorkoutView'
 import WorkoutHistory from '@/components/WorkoutHistory'
 import AIRoutineGenerator from '@/components/AIRoutineGenerator'
+import MealPlanner from '@/components/MealPlanner'
 import { ROUTINE_TEMPLATES } from '@/lib/routineTemplates'
 import { subscribeToRoutines, saveRoutine, deleteRoutine, subscribeToWorkoutLogs, deleteWorkoutLog } from '@/lib/workoutApi'
 import type { Routine, WorkoutLog } from '@/types/workout'
 
 export const dynamic = 'force-dynamic'
 
-type WorkoutView = 'routines' | 'active' | 'history' | 'exercises'
+type WorkoutView = 'routines' | 'active' | 'history' | 'exercises' | 'meals'
 
 export default function WorkoutsPage() {
   const { user } = useFirestoreStore()
@@ -36,17 +37,20 @@ export default function WorkoutsPage() {
   useEffect(() => {
     if (!user?.id) return
 
-    const unsubscribeRoutines = subscribeToRoutines(user.id, (routines) => {
+    let unsubscribeRoutines: (() => void) | null = null
+    let unsubscribeLogs: (() => void) | null = null
+
+    unsubscribeRoutines = subscribeToRoutines(user.id, (routines) => {
       setRoutines(routines)
     })
 
-    const unsubscribeLogs = subscribeToWorkoutLogs(user.id, (logs) => {
+    unsubscribeLogs = subscribeToWorkoutLogs(user.id, (logs) => {
       setWorkoutLogs(logs)
     })
 
     return () => {
-      unsubscribeRoutines()
-      unsubscribeLogs()
+      if (unsubscribeRoutines) unsubscribeRoutines()
+      if (unsubscribeLogs) unsubscribeLogs()
     }
   }, [user?.id])
 
@@ -55,6 +59,7 @@ export default function WorkoutsPage() {
     { id: 'active' as WorkoutView, label: 'Active Workout', icon: Play },
     { id: 'history' as WorkoutView, label: 'History', icon: History },
     { id: 'exercises' as WorkoutView, label: 'Exercises', icon: Search },
+    { id: 'meals' as WorkoutView, label: 'Meal Planner', icon: UtensilsCrossed },
   ]
 
   return (
@@ -427,6 +432,9 @@ export default function WorkoutsPage() {
 
                   {currentView === 'exercises' && (
                     <ExerciseLibrary />
+                  )}
+                  {currentView === 'meals' && user?.id && (
+                    <MealPlanner userId={user.id} />
                   )}
                 </div>
               </div>

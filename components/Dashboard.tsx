@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
 import { format } from 'date-fns'
 import { useRouter } from 'next/navigation'
@@ -12,27 +12,23 @@ import StatsCard from './StatsCard'
 export default function Dashboard() {
   const router = useRouter()
   const { user, habits, activeChallenges, dailyStats } = useFirestoreStore()
-  const today = format(new Date(), 'yyyy-MM-dd')
-  const todayStats = dailyStats.find((s) => s.date === today) || {
-    date: today,
-    habitsCompleted: 0,
-    xpEarned: 0,
-    challengesCompleted: 0,
-    distractionsBlocked: 0,
-  }
+  
+  // Memoize expensive computations
+  const today = useMemo(() => format(new Date(), 'yyyy-MM-dd'), [])
+  const todayStats = useMemo(() => {
+    return dailyStats.find((s) => s.date === today) || {
+      date: today,
+      habitsCompleted: 0,
+      xpEarned: 0,
+      challengesCompleted: 0,
+      distractionsBlocked: 0,
+    }
+  }, [dailyStats, today])
 
-  // Debug logging
-  useEffect(() => {
-    console.log('Dashboard - User ID:', user?.id)
-    console.log('Dashboard - Total habits:', habits.length)
-    console.log('Dashboard - Habits:', habits.map(h => ({ id: h.id, name: h.name, userId: h.userId, isActive: h.isActive })))
-  }, [user, habits])
-
-  const activeHabits = habits.filter((h) => h.isActive)
-  console.log('Dashboard - Active habits:', activeHabits.length)
-  const completedToday = activeHabits.filter((h) =>
-    h.completedDates.includes(today)
-  ).length
+  const activeHabits = useMemo(() => habits.filter((h) => h.isActive), [habits])
+  const completedToday = useMemo(() => {
+    return activeHabits.filter((h) => h.completedDates.includes(today)).length
+  }, [activeHabits, today])
 
   return (
     <div className="space-y-6">

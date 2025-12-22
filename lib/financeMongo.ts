@@ -225,14 +225,7 @@ export const addTransaction = async (
       createdAt: new Date(),
     }
     
-    // Debug: Log if selgitus is present
-    if ('selgitus' in transaction) {
-      console.log('📝 Saving transaction with selgitus:', {
-        description: transaction.description?.substring(0, 50),
-        selgitus: (transaction as any).selgitus?.substring(0, 50),
-        hasSelgitus: !!(txData as any).selgitus
-      })
-    }
+    // Debug logging removed
 
     const result = await collection.insertOne(txData)
     return result.insertedId.toString()
@@ -341,7 +334,6 @@ export const checkExistingArchiveIds = async (
     
     const duration = Date.now() - startTime
     if (duration > 1000) {
-      console.log(`⏱️ Duplicate check took ${(duration / 1000).toFixed(1)}s for ${validArchiveIds.length} archiveIds`)
     }
     
     return existingArchiveIds
@@ -372,11 +364,9 @@ export const batchAddTransactions = async (
         .filter((id): id is string => Boolean(id && typeof id === 'string'))
       
       if (archiveIds.length > 0) {
-        console.log(`🔍 Checking for duplicates: ${archiveIds.length} transactions with archiveId`)
         const checkStartTime = Date.now()
         existingArchiveIds = await checkExistingArchiveIds(userId, archiveIds)
         const checkDuration = Date.now() - checkStartTime
-        console.log(`✅ Found ${existingArchiveIds.size} existing transactions (will skip duplicates) - took ${checkDuration}ms`)
         
         // If check took more than 2 seconds, log a warning
         if (checkDuration > 2000) {
@@ -396,7 +386,6 @@ export const batchAddTransactions = async (
         }
         return true
       })
-      console.log(`📊 Filtered: ${skippedCount} duplicates skipped, ${transactionsToImport.length} to import`)
     }
     
     const total = transactionsToImport.length
@@ -420,9 +409,6 @@ export const batchAddTransactions = async (
         // Debug: Log selgitus in first few transactions
         const docsWithSelgitus = docs.filter(d => 'selgitus' in d)
         if (docsWithSelgitus.length > 0 && i === 0) {
-          console.log(`📝 Batch import: ${docsWithSelgitus.length} transactions with selgitus out of ${docs.length} in first batch`)
-          const sampleSelgitus = (docsWithSelgitus[0] as any).selgitus
-          console.log('Sample selgitus:', typeof sampleSelgitus === 'string' ? sampleSelgitus.substring(0, 50) : sampleSelgitus)
         }
 
         await collection.insertMany(docs, { ordered: false }) // Continue on errors

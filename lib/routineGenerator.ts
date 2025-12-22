@@ -65,7 +65,6 @@ function getExercisesByEquipment(equipment: string[]): typeof EXERCISE_DATABASE 
   
   // Normalize user's equipment list
   const normalizedUserEquipment = equipment.map(normalizeEquipmentName)
-  console.log('🔧 User equipment (normalized):', normalizedUserEquipment)
   
   return EXERCISE_DATABASE.filter((ex) => {
     // Always include bodyweight-only exercises
@@ -105,7 +104,6 @@ function getExercisesByEquipment(equipment: string[]): typeof EXERCISE_DATABASE 
       (normalizedExerciseEquipment.includes('bodyweight') && hasBodyweight)
     
     if (!shouldInclude) {
-      console.log(`❌ Excluding "${ex.name}" - requires: [${normalizedExerciseEquipment.join(', ')}], user has: [${normalizedUserEquipment.join(', ')}]`)
     }
     
     return shouldInclude
@@ -426,9 +424,7 @@ export function generateRoutine(profile: UserProfile): Routine {
   const bmi = weight / (heightInMeters * heightInMeters)
   
   // Get available exercises - respect user's equipment selection
-  console.log('📋 Generating routine with equipment:', equipment)
   let availableExercises = getExercisesByEquipment(equipment)
-  console.log(`✅ Filtered to ${availableExercises.length} exercises from ${EXERCISE_DATABASE.length} total`)
   
   if (availableExercises.length === 0) {
     console.warn('⚠️ No exercises available with selected equipment! Including bodyweight exercises as fallback.')

@@ -3,6 +3,10 @@ import { User, Habit, Challenge, Achievement, DailyStats } from '@/types'
 import { format, parseISO } from 'date-fns'
 import { checkAndUnlockAchievements } from '@/lib/achievements'
 import { validateMissedReason } from '@/lib/missedHabitValidation'
+import { getAllTransactionsForSummary } from '@/lib/financeApi'
+import { getWorkoutLogs } from '@/lib/workoutApi'
+import type { FinanceTransaction } from '@/types/finance'
+import type { WorkoutLog } from '@/types/workout'
 import {
   subscribeToHabits,
   saveHabit,
@@ -130,7 +134,6 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
   },
 
   syncUser: async (userId: string) => {
-    console.log('syncUser called with userId:', userId)
     
     // Wait for Firestore to be initialized before proceeding
     try {
@@ -143,14 +146,12 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
     
     const userData = await getUserData(userId)
     if (userData) {
-      console.log('User data loaded:', userData.id, userData.email)
       
       // Recalculate streak based on current habits to fix any incorrect values
       const currentHabits = get().habits
       if (currentHabits.length > 0) {
         const calculatedStreak = calculateUserStreak(currentHabits)
         if (calculatedStreak !== userData.streak) {
-          console.log(`Recalculating streak: ${userData.streak} -> ${calculatedStreak}`)
           await updateUserData(userId, {
             streak: calculatedStreak,
             longestStreak: Math.max(userData.longestStreak || 0, calculatedStreak),
@@ -184,18 +185,11 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
 
     // Subscribe to real-time updates
     if (unsubscribeHabits) {
-      console.log('Unsubscribing from previous habits subscription')
       unsubscribeHabits()
     }
     if (unsubscribeChallenges) unsubscribeChallenges()
 
-    console.log('Setting up habits subscription for userId:', userId)
     unsubscribeHabits = subscribeToHabits(userId, (habits) => {
-      console.log('✅ Habits callback received:', habits.length, 'habits')
-      console.log('Habit IDs:', habits.map(h => h.id))
-      console.log('Habit userIds:', habits.map(h => h.userId))
-      console.log('Habit names:', habits.map(h => h.name))
-      
       // Check for userId mismatches
       const mismatched = habits.filter(h => h.userId !== userId)
       if (mismatched.length > 0) {
@@ -209,7 +203,6 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
       if (user && habits.length > 0) {
         const calculatedStreak = calculateUserStreak(habits)
         if (calculatedStreak !== user.streak) {
-          console.log(`Recalculating streak from habits: ${user.streak} -> ${calculatedStreak}`)
           updateUserData(user.id, {
             streak: calculatedStreak,
             longestStreak: Math.max(user.longestStreak || 0, calculatedStreak),
@@ -601,8 +594,34 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
     const habits = get().habits
     if (!user) return
 
+    // Only check achievements if user data has changed significantly
+    // Skip if recently checked (within last 30 seconds) to avoid excessive API calls
+    const lastCheckKey = `achievements_check_${user.id}`
+    const lastCheck = (globalThis as any)[lastCheckKey]
+    const now = Date.now()
+    if (lastCheck && (now - lastCheck) < 30000) {
+      return // Skip if checked recently
+    }
+    (globalThis as any)[lastCheckKey] = now
+
+    // Fetch finance transactions and workout logs for achievements
+    let transactions: FinanceTransaction[] = []
+    let workoutLogs: WorkoutLog[] = []
+    
+    try {
+      transactions = await getAllTransactionsForSummary(user.id)
+    } catch (error) {
+      console.error('Error fetching transactions for achievements:', error)
+    }
+    
+    try {
+      workoutLogs = await getWorkoutLogs(user.id)
+    } catch (error) {
+      console.error('Error fetching workout logs for achievements:', error)
+    }
+
     const existingAchievements = user.achievements || []
-    const newAchievements = checkAndUnlockAchievements(user, habits, existingAchievements)
+    const newAchievements = checkAndUnlockAchievements(user, habits, existingAchievements, transactions, workoutLogs)
     
     // Find newly unlocked achievements
     const existingIds = new Set(existingAchievements.map((a) => a.id))
@@ -621,6 +640,14 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
     })
     
     const updatedAchievements = Array.from(achievementMap.values())
+      .map((a) => {
+        // Remove undefined values to avoid Firestore errors
+        const cleaned: any = { ...a }
+        if (!cleaned.unlockedAt) {
+          delete cleaned.unlockedAt
+        }
+        return cleaned
+      })
     
     // Only update if there are changes
     if (updatedAchievements.length !== existingAchievements.length || newlyUnlocked.length > 0) {

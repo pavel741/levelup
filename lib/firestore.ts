@@ -48,7 +48,6 @@ export const createUserData = async (user: User): Promise<void> => {
       ...user,
       joinedAt: Timestamp.fromDate(user.joinedAt),
     })
-    console.log('Successfully created user data in Firestore:', user.id)
   } catch (error: any) {
     console.error('Error creating user data:', error)
     console.error('Error code:', error?.code)
@@ -105,17 +104,14 @@ export const subscribeToHabits = (
     throw new Error('Firestore is not initialized')
   }
   
-  console.log('Subscribing to habits for userId:', userId)
   const habitsRef = collection(db, 'habits')
   const q = query(habitsRef, where('userId', '==', userId))
   
   return onSnapshot(
     q,
     (snapshot) => {
-      console.log(`✅ Habits snapshot received: ${snapshot.docs.length} habits for userId: ${userId}`)
       const habits = snapshot.docs.map((doc) => {
         const data = doc.data()
-        console.log('Habit document:', doc.id, 'userId:', data.userId, 'name:', data.name)
         return {
           id: doc.id,
           ...data,
@@ -123,7 +119,6 @@ export const subscribeToHabits = (
           startDate: data.startDate?.toDate() || undefined,
         }
       }) as Habit[]
-      console.log('Parsed habits:', habits.length, habits.map(h => ({ id: h.id, name: h.name, userId: h.userId })))
       callback(habits)
     },
     (error) => {

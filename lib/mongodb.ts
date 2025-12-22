@@ -28,9 +28,6 @@ if (!cleanUri.includes('mongodb.net')) {
 // Debug: Log the URI being used (hide credentials)
 if (process.env.NODE_ENV === 'development') {
   const maskedUri = cleanUri.replace(/\/\/[^:]+:[^@]+@/, '//***:***@')
-  console.log('🔍 MongoDB URI:', maskedUri)
-  console.log('🔍 URI ends with .mongodb.net:', cleanUri.includes('.mongodb.net'))
-  console.log('🔍 URI length:', cleanUri.length)
 }
 
 // MongoDB connection options with better timeout and retry settings
@@ -56,7 +53,6 @@ if (process.env.NODE_ENV === 'development') {
 
   // Clear cached connection if URI changed (for hot reload)
   if (globalWithMongo._mongoUri && globalWithMongo._mongoUri !== cleanUri) {
-    console.log('🔄 MongoDB URI changed, clearing cached connection')
     delete globalWithMongo._mongoClientPromise
   }
 

@@ -60,14 +60,12 @@ export const signUp = async (email: string, password: string, name: string): Pro
     }
 
     await createUserData(user)
-    console.log('Created new user:', user.id)
     return user
   } catch (error: any) {
     console.error('Error signing up:', error)
     
     // If email already in use, check if it's a Google account
     if (error.code === 'auth/email-already-in-use') {
-      console.log('Email already in use, checking if it\'s a Google account')
       try {
         // Try to sign in with the provided credentials
         await signInWithEmailAndPassword(auth, email, password)
@@ -77,7 +75,6 @@ export const signUp = async (email: string, password: string, name: string): Pro
           
           // If user doesn't exist in Firestore, create it
           if (!user) {
-            console.log('Creating missing Firestore document for existing Auth user')
             user = {
               id: firebaseUser.uid,
               name,
@@ -91,7 +88,6 @@ export const signUp = async (email: string, password: string, name: string): Pro
               joinedAt: new Date(),
             }
             await createUserData(user)
-            console.log('Created missing Firestore document:', user.id)
             return user
           }
           
@@ -107,7 +103,6 @@ export const signUp = async (email: string, password: string, name: string): Pro
             // User is signed in via Google, create Firestore doc
             let user = await getUserData(currentUser.uid)
             if (!user) {
-              console.log('Creating missing Firestore document for Google-authenticated user')
               user = {
                 id: currentUser.uid,
                 name: currentUser.displayName || name,
@@ -152,7 +147,6 @@ export const signIn = async (email: string, password: string): Promise<User | nu
       
       // If user exists in Auth but not in Firestore, create Firestore document
       if (!user) {
-        console.log('User exists in Auth but not in Firestore, creating Firestore document')
         user = {
           id: firebaseUser.uid,
           name: firebaseUser.displayName || email.split('@')[0],
@@ -166,7 +160,6 @@ export const signIn = async (email: string, password: string): Promise<User | nu
           joinedAt: new Date(),
         }
         await createUserData(user)
-        console.log('Created missing Firestore document for user:', user.id)
       }
       
       return user
@@ -187,9 +180,6 @@ export const signInWithGoogle = async (): Promise<void> => {
   }
   
   try {
-    console.log('🔵 Initiating Google sign-in redirect...')
-    console.log('Current URL:', window.location.href)
-    console.log('Auth domain:', process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN)
     
     const provider = new GoogleAuthProvider()
     // Add custom parameters to ensure redirect works
@@ -198,11 +188,9 @@ export const signInWithGoogle = async (): Promise<void> => {
     
     // Set the redirect URL explicitly if needed
     // Firebase will use the current page URL as the redirect target
-    console.log('Setting up redirect to:', window.location.origin + window.location.pathname)
     
     // Use redirect instead of popup to avoid COOP issues
     await signInWithRedirect(auth, provider)
-    console.log('✅ Google sign-in redirect initiated')
     // Note: This will redirect the page, so the function won't return here
   } catch (error: any) {
     console.error('❌ Error initiating Google sign-in:', error)
@@ -251,12 +239,10 @@ export const handleGoogleRedirect = async (): Promise<User | null> => {
   }
   
   try {
-    console.log('🔵 Checking for Google redirect result...')
     const result = await getRedirectResult(auth)
     
     if (!result) {
       // No redirect result - this is normal if user hasn't been redirected
-      console.log('ℹ️ No redirect result found (user may not have been redirected yet)')
       return null
     }
 
@@ -276,15 +262,12 @@ export const handleGoogleRedirect = async (): Promise<User | null> => {
       return null
     }
 
-    console.log('✅ Google redirect successful, Firebase user:', firebaseUser.uid, firebaseUser.email)
     
     // Check if user exists in Firestore
     let user = await getUserData(firebaseUser.uid)
-    console.log('User data from Firestore:', user ? 'Found' : 'Not found')
     
     if (!user) {
       // Create new user if doesn't exist
-      console.log('Creating new user from Google sign-in')
       user = {
         id: firebaseUser.uid,
         name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
@@ -300,7 +283,6 @@ export const handleGoogleRedirect = async (): Promise<User | null> => {
       
       try {
         await createUserData(user)
-        console.log('✅ Successfully created new user in Firestore:', user.id)
       } catch (createError: any) {
         console.error('❌ Failed to create user data in Firestore:', createError)
         console.error('Create error code:', createError.code)
@@ -319,10 +301,8 @@ export const handleGoogleRedirect = async (): Promise<User | null> => {
         
         // Still return the user object even if Firestore creation fails
         // The AuthGuard will try to create it again
-        console.log('Returning user object anyway, AuthGuard will handle Firestore creation')
       }
     } else {
-      console.log('✅ Existing user found in Firestore:', user.id)
     }
 
     return user

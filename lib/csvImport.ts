@@ -534,14 +534,12 @@ export class CSVImportService {
       throw new Error('CSV file is empty')
     }
 
-    console.log(`📊 CSV parsing: Found ${lines.length} total lines (including header)`)
 
     // Detect or use specified bank profile
     let bankProfile: BankProfile | null = null
     if (bankProfileId) {
       bankProfile = ESTONIAN_BANK_PROFILES.find(p => p.id === bankProfileId) || null
       if (bankProfile) {
-        console.log(`🏦 Using bank profile: ${bankProfile.displayName}`)
       }
     }
 
@@ -557,7 +555,6 @@ export class CSVImportService {
     if (!bankProfile) {
       bankProfile = detectBankProfile(headers)
       if (bankProfile) {
-        console.log(`🏦 Auto-detected bank: ${bankProfile.displayName}`)
         this._detectedBank = bankProfile
       }
     } else {
@@ -570,7 +567,6 @@ export class CSVImportService {
       columnMap = createColumnMappingFromProfile(headers, bankProfile)
       columnMap._normalizedHeaders = normalizedHeaders
       columnMap._allHeaders = headers
-      console.log(`✅ Mapped columns using ${bankProfile.displayName} profile: ${columnMap._foundColumns.join(', ')}`)
     } else {
       columnMap = this.mapColumns(headers)
       columnMap._normalizedHeaders = normalizedHeaders
@@ -610,7 +606,6 @@ export class CSVImportService {
       rows.push(this.mapRowToTransaction(row, columnMap, bankProfile || this._detectedBank))
     }
 
-    console.log(`✅ CSV parsing complete: ${rows.length} transactions parsed, ${skippedRows} empty rows skipped`)
 
     this._debugLogged = false
 

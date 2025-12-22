@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect, memo } from 'react'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
 import { format } from 'date-fns'
 import { CheckCircle2, Circle, Trash2, X, Edit2, AlertCircle, TrendingUp } from 'lucide-react'
@@ -12,7 +12,47 @@ interface HabitCardProps {
   onEdit?: (habit: Habit) => void
 }
 
-export default function HabitCard({ habit, onEdit }: HabitCardProps) {
+function calculateStreak(completedDates: string[]): number {
+  if (completedDates.length === 0) return 0
+  
+  // Sort dates descending (most recent first)
+  const sorted = [...completedDates].sort((a, b) => {
+    const dateA = new Date(a)
+    const dateB = new Date(b)
+    return dateB.getTime() - dateA.getTime()
+  })
+  
+  // Calculate consecutive days from today backwards
+  let streak = 0
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  
+  for (let i = 0; i < sorted.length; i++) {
+    const date = new Date(sorted[i])
+    date.setHours(0, 0, 0, 0)
+    const expectedDate = new Date(today)
+    expectedDate.setDate(today.getDate() - i)
+    
+    if (date.getTime() === expectedDate.getTime()) {
+      streak++
+    } else {
+      break
+    }
+  }
+  
+  return streak
+}
+
+function checkIfHabitStarted(startDate: Date | string | undefined, todayStr: string): boolean {
+  if (!startDate) return true
+  const start = startDate instanceof Date 
+    ? startDate 
+    : new Date(startDate)
+  const startDateStr = format(start, 'yyyy-MM-dd')
+  return todayStr >= startDateStr
+}
+
+function HabitCardComponent({ habit, onEdit }: HabitCardProps) {
   const { completeHabit, uncompleteHabit, deleteHabit, markHabitMissed, updateMissedReasonValidity, user } = useFirestoreStore()
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showMissedModal, setShowMissedModal] = useState(false)
@@ -22,8 +62,8 @@ export default function HabitCard({ habit, onEdit }: HabitCardProps) {
   const [showXPGain, setShowXPGain] = useState(false)
   const [xpGained, setXpGained] = useState(0)
   const today = format(new Date(), 'yyyy-MM-dd')
-  const targetCount = habit.targetCountPerDay || 1
-  const currentCount = habit.completionsPerDay?.[today] || 0
+  const targetCount = (habit.targetCountPerDay ?? 1) as number
+  const currentCount = (habit.completionsPerDay?.[today] ?? 0) as number
   const isCompleted = habit.completedDates.includes(today)
   const isMissed = habit.missedDates?.some((m) => m.date === today)
   const [prevCompleted, setPrevCompleted] = useState(isCompleted)
@@ -38,22 +78,16 @@ export default function HabitCard({ habit, onEdit }: HabitCardProps) {
         setShowXPGain(false)
       }, 3000)
       setPrevCompleted(true)
-      return () => clearTimeout(timer)
+      return () => {
+        clearTimeout(timer)
+      }
     } else if (!isCompleted) {
       setPrevCompleted(false)
     }
   }, [isCompleted, habit.xpReward, user, prevCompleted])
   
   // Check if habit has started
-  const hasStarted = habit.startDate 
-    ? (() => {
-        const startDate = habit.startDate instanceof Date 
-          ? habit.startDate 
-          : new Date(habit.startDate)
-        const startDateStr = format(startDate, 'yyyy-MM-dd')
-        return today >= startDateStr
-      })()
-    : true // If no startDate, habit has started
+  const hasStarted = checkIfHabitStarted(habit.startDate, today)
 
   const handleToggle = () => {
     const targetCount = habit.targetCountPerDay || 1
@@ -147,9 +181,10 @@ export default function HabitCard({ habit, onEdit }: HabitCardProps) {
 
   const completionRate = habit.completedDates.length / 7 // Last 7 days
   const streak = calculateStreak(habit.completedDates)
+  const showTargetCount = (targetCount ?? 1) > 1
 
   return (
-    <>
+    <div>
       {/* XP Gain Notification */}
       {showXPGain && (
         <div className="fixed top-20 right-6 z-50 animate-bounce">
@@ -364,12 +399,10 @@ export default function HabitCard({ habit, onEdit }: HabitCardProps) {
               )}
             </span>
           </div>
-          {targetCount > 1 && (
+          {showTargetCount && (
             <div className="flex items-center justify-between text-sm">
               <span className="text-gray-600 dark:text-gray-400">Today's Progress</span>
-              <span className="font-semibold text-blue-600 dark:text-blue-400">
-                {currentCount}/{targetCount}
-              </span>
+              <span className="font-semibold text-blue-600 dark:text-blue-400"> {String(currentCount)}/{String(targetCount)}</span>
             </div>
           )}
           <div className="flex items-center justify-between text-sm">
@@ -533,31 +566,18 @@ export default function HabitCard({ habit, onEdit }: HabitCardProps) {
           </div>
         </div>
       )}
-    </>
+    </div>
   )
 }
 
-function calculateStreak(completedDates: string[]): number {
-  if (completedDates.length === 0) return 0
-
-  const sorted = [...completedDates].sort().reverse()
-  let streak = 0
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-
-  for (let i = 0; i < sorted.length; i++) {
-    const date = new Date(sorted[i])
-    date.setHours(0, 0, 0, 0)
-    const expectedDate = new Date(today)
-    expectedDate.setDate(expectedDate.getDate() - i)
-
-    if (format(date, 'yyyy-MM-dd') === format(expectedDate, 'yyyy-MM-dd')) {
-      streak++
-    } else {
-      break
-    }
-  }
-
-  return streak
-}
-
+// Memoize HabitCard to prevent unnecessary re-renders
+export default memo(HabitCardComponent, (prevProps, nextProps) => {
+  // Only re-render if habit data actually changed
+  return (
+    prevProps.habit.id === nextProps.habit.id &&
+    prevProps.habit.completedDates.length === nextProps.habit.completedDates.length &&
+    prevProps.habit.completedDates[prevProps.habit.completedDates.length - 1] === 
+    nextProps.habit.completedDates[nextProps.habit.completedDates.length - 1] &&
+    prevProps.habit.isActive === nextProps.habit.isActive
+  )
+})

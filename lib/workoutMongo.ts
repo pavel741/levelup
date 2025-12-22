@@ -94,25 +94,12 @@ export const saveRoutine = async (routine: Routine): Promise<void> => {
       }
     })
 
-    console.log('💾 Saving routine to MongoDB:', {
-      id: routineData.id,
-      userId: routineData.userId,
-      name: routineData.name,
-      sessionsCount: routineData.sessions?.length || 0,
-    })
-
     // Use upsert to update if exists, insert if not
     const result = await collection.updateOne(
       { id: routine.id, userId: routine.userId },
       { $set: routineData },
       { upsert: true }
     )
-    
-    console.log('✅ Routine saved successfully:', {
-      matched: result.matchedCount,
-      modified: result.modifiedCount,
-      upserted: result.upsertedCount,
-    })
   } catch (error) {
     console.error('❌ Error saving routine to MongoDB:', error)
     throw error

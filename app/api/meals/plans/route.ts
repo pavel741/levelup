@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { saveRoutine, getRoutinesByUserId } from '@/lib/workoutMongo'
-import type { Routine } from '@/types/workout'
+import { getMealPlansByUserId, saveMealPlan } from '@/lib/mealMongo'
+import type { MealPlan } from '@/types/nutrition'
 import { getUserIdFromRequest, validateUserId, successResponse, handleApiError } from '@/lib/utils/api-helpers'
 
 export async function GET(request: NextRequest) {
@@ -9,24 +9,24 @@ export async function GET(request: NextRequest) {
     const validationError = validateUserId(userId)
     if (validationError) return validationError
 
-    const routines = await getRoutinesByUserId(userId!)
-    return successResponse(routines)
+    const mealPlans = await getMealPlansByUserId(userId!)
+    return successResponse(mealPlans)
   } catch (error: any) {
-    return handleApiError(error, 'GET /api/workouts/routines')
+    return handleApiError(error, 'GET /api/meals/plans')
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const routine: Routine = await request.json()
+    const mealPlan: MealPlan = await request.json()
 
-    const validationError = validateUserId(routine.userId)
+    const validationError = validateUserId(mealPlan.userId)
     if (validationError) return validationError
 
-    await saveRoutine(routine)
+    await saveMealPlan(mealPlan)
     return successResponse()
   } catch (error: any) {
-    return handleApiError(error, 'POST /api/workouts/routines')
+    return handleApiError(error, 'POST /api/meals/plans')
   }
 }
 

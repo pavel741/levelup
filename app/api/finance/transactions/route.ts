@@ -5,40 +5,28 @@ import {
   deleteTransaction,
   getAllTransactionsForSummary,
 } from '@/lib/financeMongo'
+import { getUserIdFromRequest, validateUserId, successResponse, errorResponse, handleApiError } from '@/lib/utils/api-helpers'
 
 // GET - Get all transactions
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const userId = searchParams.get('userId')
-    
-    if (!userId) {
-      return NextResponse.json({ error: 'User ID is required' }, { status: 401 })
-    }
+    const userId = getUserIdFromRequest(request)
+    const validationError = validateUserId(userId, 401)
+    if (validationError) return validationError
 
+    const { searchParams } = new URL(request.url)
     const limitParam = searchParams.get('limit')
     const limit = limitParam ? parseInt(limitParam) : 0
-    const forSummary = searchParams.get('forSummary') === 'true'
 
     // Always get all transactions from MongoDB (no quota limits!)
-    const transactions = await getAllTransactionsForSummary(userId)
+    const transactions = await getAllTransactionsForSummary(userId!)
     
     // Only apply limit if explicitly requested and > 0
     const limited = limit > 0 ? transactions.slice(0, limit) : transactions
     
-    return NextResponse.json({ transactions: limited })
+    return successResponse({ transactions: limited })
   } catch (error: any) {
-    console.error('Error in GET /api/finance/transactions:', error)
-    
-    // Provide helpful error messages
-    if (error.message?.includes('timeout') || error.message?.includes('ETIMEDOUT')) {
-      return NextResponse.json({ 
-        error: 'Database connection timeout. Using Firestore fallback.',
-        details: 'If MongoDB is unavailable, the app will use Firestore automatically.'
-      }, { status: 503 })
-    }
-    
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
+    return handleApiError(error, 'GET /api/finance/transactions')
   }
 }
 
@@ -48,16 +36,13 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { userId, ...transaction } = body
     
-    if (!userId) {
-      return NextResponse.json({ error: 'User ID is required' }, { status: 401 })
-    }
+    const validationError = validateUserId(userId, 401)
+    if (validationError) return validationError
 
-    const transactionId = await addTransaction(userId, transaction)
-    
-    return NextResponse.json({ id: transactionId })
+    const transactionId = await addTransaction(userId!, transaction)
+    return successResponse({ id: transactionId })
   } catch (error: any) {
-    console.error('Error in POST /api/finance/transactions:', error)
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
+    return handleApiError(error, 'POST /api/finance/transactions')
   }
 }
 
@@ -66,19 +51,17 @@ export async function PUT(request: NextRequest) {
   try {
     const { userId, id, ...updates } = await request.json()
     
-    if (!userId) {
-      return NextResponse.json({ error: 'User ID is required' }, { status: 401 })
-    }
+    const validationError = validateUserId(userId, 401)
+    if (validationError) return validationError
+    
     if (!id) {
-      return NextResponse.json({ error: 'Transaction ID is required' }, { status: 400 })
+      return errorResponse('Transaction ID is required', 400)
     }
 
-    await updateTransaction(userId, id, updates)
-
-    return NextResponse.json({ success: true })
+    await updateTransaction(userId!, id, updates)
+    return successResponse()
   } catch (error: any) {
-    console.error('Error in PUT /api/finance/transactions:', error)
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
+    return handleApiError(error, 'PUT /api/finance/transactions')
   }
 }
 
@@ -89,19 +72,17 @@ export async function DELETE(request: NextRequest) {
     const id = searchParams.get('id')
     const userId = searchParams.get('userId')
     
-    if (!userId) {
-      return NextResponse.json({ error: 'User ID is required' }, { status: 401 })
-    }
+    const validationError = validateUserId(userId, 401)
+    if (validationError) return validationError
+    
     if (!id) {
-      return NextResponse.json({ error: 'Transaction ID is required' }, { status: 400 })
+      return errorResponse('Transaction ID is required', 400)
     }
 
-    await deleteTransaction(userId, id)
-
-    return NextResponse.json({ success: true })
+    await deleteTransaction(userId!, id)
+    return successResponse()
   } catch (error: any) {
-    console.error('Error in DELETE /api/finance/transactions:', error)
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
+    return handleApiError(error, 'DELETE /api/finance/transactions')
   }
 }
 

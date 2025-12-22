@@ -29,6 +29,7 @@ import type {
   FinanceReconciliationRecord,
 } from '@/types/finance'
 import { Settings, Repeat, History, ArrowLeft, Plus, Trash2, Edit2, X, Save } from 'lucide-react'
+import { formatDateTime } from '@/lib/utils/formatting'
 
 export const dynamic = 'force-dynamic'
 
@@ -77,6 +78,8 @@ export default function FinanceSettingsPage() {
   const [usePaydayPeriod, setUsePaydayPeriod] = useState(false)
   const [periodStartDay, setPeriodStartDay] = useState(1)
   const [periodEndDay, setPeriodEndDay] = useState<number | null>(null)
+  const [paydayCutoffHour, setPaydayCutoffHour] = useState(13) // Default 1pm for end date
+  const [paydayStartCutoffHour, setPaydayStartCutoffHour] = useState(14) // Default 2pm for start date
   const [capDateRangesToData, setCapDateRangesToData] = useState(true)
   const [isSavingPeriod, setIsSavingPeriod] = useState(false)
 
@@ -114,6 +117,8 @@ export default function FinanceSettingsPage() {
           setUsePaydayPeriod(settings.usePaydayPeriod || false)
           setPeriodStartDay(settings.periodStartDay ?? 1)
           setPeriodEndDay(settings.periodEndDay ?? null)
+          setPaydayCutoffHour(settings.paydayCutoffHour ?? 13) // Default 1pm for end date
+          setPaydayStartCutoffHour(settings.paydayStartCutoffHour ?? 14) // Default 2pm for start date
           setCapDateRangesToData(settings.capDateRangesToData !== false) // Default to true
         }
         
@@ -240,6 +245,8 @@ export default function FinanceSettingsPage() {
         usePaydayPeriod,
         periodStartDay,
         periodEndDay,
+        paydayCutoffHour: usePaydayPeriod ? paydayCutoffHour : undefined,
+        paydayStartCutoffHour: usePaydayPeriod ? paydayStartCutoffHour : undefined,
         capDateRangesToData,
       }
       await saveFinanceSettings(user.id, settings)
@@ -317,15 +324,6 @@ export default function FinanceSettingsPage() {
     }
   }
 
-  const formatDateTime = (value: any) => {
-    if (!value) return ''
-    try {
-      const d = (value.toDate ? value.toDate() : value) as Date
-      return d.toLocaleString()
-    } catch {
-      return String(value)
-    }
-  }
 
   const categoryColors = [
     '#6366f1', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899',
@@ -534,9 +532,48 @@ export default function FinanceSettingsPage() {
                       </span>
                     </label>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-6">
-                      Use payday-to-payday periods instead of custom period.
+                      Use payday-to-payday periods instead of custom period. Transactions on the last working day are included only if before the cutoff time.
                     </p>
                   </div>
+                  
+                  {usePaydayPeriod && (
+                    <div className="mb-4 space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Period Start Cutoff Time (hour, 24-hour format)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="23"
+                          value={paydayStartCutoffHour}
+                          onChange={(e) => setPaydayStartCutoffHour(parseInt(e.target.value) || 14)}
+                          className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                          placeholder="14"
+                        />
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          On the last working day of the previous month, transactions at/after {paydayStartCutoffHour}:00 belong to this period.
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Period End Cutoff Time (hour, 24-hour format)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="23"
+                          value={paydayCutoffHour}
+                          onChange={(e) => setPaydayCutoffHour(parseInt(e.target.value) || 13)}
+                          className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                          placeholder="13"
+                        />
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          On the last working day of the current month, transactions before {paydayCutoffHour}:00 belong to this period. Transactions at/after {paydayCutoffHour}:00 belong to the next period.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                   
                   <div className={`space-y-4 mb-4 ${usePaydayPeriod ? 'opacity-50 pointer-events-none' : ''}`}>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

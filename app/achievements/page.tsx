@@ -57,7 +57,7 @@ export default function AchievementsPage() {
 
   const allAchievements = ACHIEVEMENT_DEFINITIONS.map((def) => {
     const userAchievement = achievementMap.get(def.id)
-    const defaultProgress = user ? def.checkProgress(user, habits) : { progress: 0, target: def.checkProgress({ streak: 0, level: 0, xp: 0 } as User, []).target, completed: false }
+    const defaultProgress = user ? def.checkProgress(user, habits, [], []) : { progress: 0, target: def.checkProgress({ streak: 0, level: 0, xp: 0 } as User, [], [], []).target, completed: false }
     return {
       ...def,
       progress: userAchievement?.progress ?? defaultProgress.progress,

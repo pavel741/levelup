@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
 import AuthGuard from '@/components/AuthGuard'
 import Sidebar from '@/components/Sidebar'
@@ -24,6 +24,7 @@ import { getPeriodDates, parseTransactionDate } from '@/lib/financeDateUtils'
 import { CSVImportService } from '@/lib/csvImport'
 import { ESTONIAN_BANK_PROFILES } from '@/lib/bankProfiles'
 import { getSuggestedCategory } from '@/lib/transactionCategorizer'
+import { formatCurrency, formatDate, formatDisplayDate } from '@/lib/utils/formatting'
 
 export const dynamic = 'force-dynamic'
 
@@ -59,6 +60,26 @@ export default function FinancePage() {
   const [currentFilter, setCurrentFilter] = useState<'all' | 'income' | 'expense'>('all')
   const [dateRange, setDateRange] = useState<'month' | 'today' | 'week' | 'year' | 'all' | 'custom'>('month')
   const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('')
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const transactionsPerPage = 50
+  
+  // Debounce search query
+  useEffect(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery)
+    }, 300) // 300ms debounce
+    
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+      }
+    }
+  }, [searchQuery])
   const [customDateFrom, setCustomDateFrom] = useState('')
   const [customDateTo, setCustomDateTo] = useState('')
   const [showCustomDateRange, setShowCustomDateRange] = useState(false)
@@ -310,9 +331,9 @@ export default function FinancePage() {
       })
     }
 
-    // Filter by search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase()
+    // Filter by search query (using debounced value)
+    if (debouncedSearchQuery.trim()) {
+      const query = debouncedSearchQuery.toLowerCase()
       filtered = filtered.filter(
         (tx) =>
           (tx.description || '').toLowerCase().includes(query) ||
@@ -348,7 +369,20 @@ export default function FinancePage() {
     })
 
     return filtered
-  }, [transactions, currentFilter, dateRange, searchQuery, customDateFrom, customDateTo, filterMinAmount, filterMaxAmount, filterCategories])
+  }, [transactions, currentFilter, dateRange, debouncedSearchQuery, customDateFrom, customDateTo, filterMinAmount, filterMaxAmount, filterCategories])
+  
+  // Pagination for filtered transactions
+  const paginatedTransactions = useMemo(() => {
+    const startIndex = (currentPage - 1) * transactionsPerPage
+    return filteredTransactions.slice(startIndex, startIndex + transactionsPerPage)
+  }, [filteredTransactions, currentPage])
+  
+  const totalPages = Math.ceil(filteredTransactions.length / transactionsPerPage)
+  
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [currentFilter, dateRange, debouncedSearchQuery, filterMinAmount, filterMaxAmount, filterCategories])
 
   // Calculate summary for selected month (using all loaded transactions from MongoDB)
   const monthlySummary = useMemo(() => {
@@ -357,11 +391,15 @@ export default function FinancePage() {
     let endDate: Date
     
     if (financeSettings?.usePaydayPeriod || financeSettings?.periodStartDay !== undefined) {
+      const paydayCutoffHour = financeSettings.paydayCutoffHour ?? 13 // Default 1pm for end date
+      const paydayStartCutoffHour = financeSettings.paydayStartCutoffHour ?? 14 // Default 2pm for start date
       const periodDates = getPeriodDates(
         selectedMonth,
         financeSettings.usePaydayPeriod || false,
         financeSettings.periodStartDay ?? 1,
-        financeSettings.periodEndDay ?? null
+        financeSettings.periodEndDay ?? null,
+        paydayCutoffHour,
+        paydayStartCutoffHour
       )
       startDate = periodDates.startDate
       endDate = periodDates.endDate
@@ -377,7 +415,51 @@ export default function FinancePage() {
 
     allTransactionsForSummary.forEach((tx) => {
       const txDate = parseTransactionDate(tx.date)
-      if (txDate >= startDate && txDate <= endDate) {
+      // For payday periods with cutoff times:
+      // - Start: Last working day of previous month at 2pm (14:00) - transactions at/after 2pm belong to this period
+      // - End: Last working day of current month at 1pm (13:00) - transactions before 1pm belong to this period
+      let isInPeriod = false
+      if (financeSettings?.usePaydayPeriod && financeSettings?.paydayCutoffHour !== undefined) {
+        const endCutoffHour = financeSettings.paydayCutoffHour ?? 13 // 1pm for end date
+        const startCutoffHour = financeSettings.paydayStartCutoffHour ?? 14 // 2pm for start date
+        
+        // Check if transaction is within the period boundaries
+        if (txDate > startDate && txDate < endDate) {
+          // Between start and end dates (exclusive boundaries)
+          isInPeriod = true
+        } else {
+          // Check boundary days
+          const startDateOnly = new Date(startDate)
+          startDateOnly.setHours(0, 0, 0, 0)
+          const endDateOnly = new Date(endDate)
+          endDateOnly.setHours(0, 0, 0, 0)
+          const txDateOnly = new Date(txDate)
+          txDateOnly.setHours(0, 0, 0, 0)
+          
+          if (txDateOnly.getTime() === startDateOnly.getTime()) {
+            // Same day as start date - check if at/after start cutoff (2pm)
+            const txHour = txDate.getHours()
+            const txMinutes = txDate.getMinutes()
+            const cutoffMinutes = startCutoffHour * 60
+            const txTotalMinutes = txHour * 60 + txMinutes
+            isInPeriod = txTotalMinutes >= cutoffMinutes
+          } else if (txDateOnly.getTime() === endDateOnly.getTime()) {
+            // Same day as end date - check if before end cutoff (1pm)
+            const txHour = txDate.getHours()
+            const txMinutes = txDate.getMinutes()
+            const cutoffMinutes = endCutoffHour * 60
+            const txTotalMinutes = txHour * 60 + txMinutes
+            isInPeriod = txTotalMinutes < cutoffMinutes
+          } else {
+            isInPeriod = false
+          }
+        }
+      } else {
+        // Standard period check (inclusive boundaries)
+        isInPeriod = txDate >= startDate && txDate <= endDate
+      }
+      
+      if (isInPeriod) {
         const amount = Number(tx.amount) || 0
         const type = (tx.type || '').toLowerCase()
         if (type === 'income') {
@@ -404,47 +486,44 @@ export default function FinancePage() {
   const allTimeSummary = useMemo(() => {
     let income = 0
     let expenses = 0
+    let untypedCount = 0
+    let negativeIncomeCount = 0
+    let positiveExpenseCount = 0
 
     allTransactionsForSummary.forEach((tx) => {
       const amount = Number(tx.amount) || 0
       const type = (tx.type || '').toLowerCase()
+      
       if (type === 'income') {
         income += Math.abs(amount) // Always positive
+        if (amount < 0) negativeIncomeCount++
       } else if (type === 'expense') {
         expenses += Math.abs(amount) // Always positive
+        if (amount > 0) positiveExpenseCount++
       } else {
-        if (amount < 0) expenses += Math.abs(amount)
-        else income += Math.abs(amount)
+        untypedCount++
+        if (amount < 0) {
+          expenses += Math.abs(amount)
+        } else {
+          income += Math.abs(amount)
+        }
       }
     })
+
+    // Debug info (only log if there's a potential issue)
+    if (untypedCount > 0 || negativeIncomeCount > 0 || positiveExpenseCount > 0) {
+      console.log('📊 All-time summary debug:', {
+        totalTransactions: allTransactionsForSummary.length,
+        untypedTransactions: untypedCount,
+        negativeIncomeTransactions: negativeIncomeCount,
+        positiveExpenseTransactions: positiveExpenseCount,
+        calculatedBalance: income - expenses
+      })
+    }
 
     return { income, expenses, balance: income - expenses }
   }, [allTransactionsForSummary])
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('et-EE', {
-      style: 'currency',
-      currency: 'EUR',
-    }).format(amount)
-  }
-
-  const formatDate = (value: any) => {
-    if (!value) return ''
-    if (typeof value === 'string') return value
-    try {
-      const d = (value.toDate ? value.toDate() : value) as Date
-      return d.toISOString().split('T')[0]
-    } catch {
-      return String(value)
-    }
-  }
-
-  const formatDisplayDate = (value: any) => {
-    const dateStr = formatDate(value)
-    if (!dateStr) return ''
-    const d = new Date(dateStr)
-    return d.toLocaleDateString('et-EE', { day: '2-digit', month: '2-digit', year: 'numeric' })
-  }
 
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1260,8 +1339,13 @@ export default function FinancePage() {
                             </span>
                   </div>
                           {summaryView === 'monthly' && monthlySummary.startDate && monthlySummary.endDate && (
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              {monthlySummary.startDate.toLocaleDateString()} - {monthlySummary.endDate.toLocaleDateString()}
+                            <div className="text-xs text-gray-500 dark:text-gray-400 px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">
+                              Period: {formatDisplayDate(monthlySummary.startDate)} - {formatDisplayDate(monthlySummary.endDate)}
+                              {financeSettings?.usePaydayPeriod && (
+                                <span className="ml-2 text-blue-600 dark:text-blue-400" title={`Payday period: starts at ${financeSettings.paydayStartCutoffHour ?? 14}:00 on last working day of previous month, ends at ${financeSettings.paydayCutoffHour ?? 13}:00 on last working day of current month`}>
+                                  📅 Payday ({financeSettings.paydayStartCutoffHour ?? 14}:00 - {financeSettings.paydayCutoffHour ?? 13}:00)
+                                </span>
+                              )}
                             </div>
                           )}
                           <button
@@ -1918,7 +2002,34 @@ export default function FinancePage() {
                             </p>
                           </div>
                         ) : (
-                          filteredTransactions.map((tx) => {
+                          <>
+                            {filteredTransactions.length > transactionsPerPage && (
+                              <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center justify-between">
+                                <span className="text-sm text-blue-800 dark:text-blue-200">
+                                  Showing {((currentPage - 1) * transactionsPerPage) + 1}-{Math.min(currentPage * transactionsPerPage, filteredTransactions.length)} of {filteredTransactions.length} transactions
+                                </span>
+                                <div className="flex gap-2 items-center">
+                                  <button
+                                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                    disabled={currentPage === 1}
+                                    className="px-3 py-1 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700"
+                                  >
+                                    Previous
+                                  </button>
+                                  <span className="text-sm text-gray-700 dark:text-gray-300">
+                                    Page {currentPage} of {totalPages}
+                                  </span>
+                                  <button
+                                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                    disabled={currentPage === totalPages}
+                                    className="px-3 py-1 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700"
+                                  >
+                                    Next
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                            {paginatedTransactions.map((tx) => {
                             const txType = (tx.type || '').toLowerCase()
                             const amount = Number(tx.amount) || 0
                             
@@ -2016,9 +2127,10 @@ export default function FinancePage() {
                                 </div>
                               </div>
                             )
-                          })
-                        )}
-                      </div>
+                            })}
+                            </>
+                          )}
+                        </div>
                     </div>
                   </div>
                 </div>

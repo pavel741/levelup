@@ -54,12 +54,12 @@ export const subscribeToRoutines = (
   // Initial fetch
   fetchRoutines()
 
-  // Poll every 5 seconds
+  // Poll every 30 seconds (reduced frequency to avoid excessive requests)
   const intervalId = setInterval(() => {
     if (isActive) {
       fetchRoutines()
     }
-  }, 5000)
+  }, 30000)
 
   return () => {
     isActive = false
@@ -109,6 +109,25 @@ export const deleteRoutine = async (routineId: string, userId: string): Promise<
 }
 
 // Workout Logs
+export const getWorkoutLogs = async (userId: string): Promise<WorkoutLog[]> => {
+  try {
+    const response = await fetch(`${API_BASE}/logs?userId=${userId}`)
+    if (!response.ok) {
+      throw new Error('Failed to fetch workout logs')
+    }
+    const logs: WorkoutLog[] = await response.json()
+    return logs.map((log) => ({
+      ...log,
+      date: log.date instanceof Date ? log.date : new Date(log.date),
+      startTime: log.startTime instanceof Date ? log.startTime : new Date(log.startTime),
+      endTime: log.endTime instanceof Date ? log.endTime : (log.endTime ? new Date(log.endTime) : undefined),
+    }))
+  } catch (error) {
+    console.error('Error fetching workout logs:', error)
+    return []
+  }
+}
+
 export const subscribeToWorkoutLogs = (
   userId: string,
   callback: (logs: WorkoutLog[]) => void
@@ -156,12 +175,12 @@ export const subscribeToWorkoutLogs = (
   // Initial fetch
   fetchLogs()
 
-  // Poll every 5 seconds
+  // Poll every 30 seconds (reduced frequency to avoid excessive requests)
   const intervalId = setInterval(() => {
     if (isActive) {
       fetchLogs()
     }
-  }, 5000)
+  }, 30000)
 
   return () => {
     isActive = false

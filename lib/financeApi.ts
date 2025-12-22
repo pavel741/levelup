@@ -57,9 +57,9 @@ export const subscribeToTransactions = (
   // Load immediately
   loadTransactions()
 
-  // Poll every 10 seconds for updates (reduced from 2s for better performance)
+  // Poll every 30 seconds for updates (reduced frequency for better performance)
   // Only poll if there's no limit (for real-time updates) or if limitCount > 0
-  const pollInterval = limitCount === 0 ? 30000 : 10000 // 30s for unlimited, 10s for limited
+  const pollInterval = 30000 // 30s for all cases
   const intervalId = setInterval(() => {
     if (isActive) {
       loadTransactions()
@@ -187,11 +187,12 @@ export const subscribeToCategories = (
 
   loadCategories()
 
+  // Poll every 30 seconds for categories (reduced frequency)
   const intervalId = setInterval(() => {
     if (isActive) {
       loadCategories()
     }
-  }, 3000)
+  }, 30000)
 
   return () => {
     isActive = false

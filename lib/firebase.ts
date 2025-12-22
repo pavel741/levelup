@@ -13,18 +13,7 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 }
 
-// Debug: Log what we have (only in development or if explicitly enabled)
-if (typeof window !== 'undefined' && (process.env.NODE_ENV === 'development' || window.location.search.includes('debug=firebase'))) {
-  console.log('🔍 Firebase Config Debug:', {
-    hasApiKey: !!firebaseConfig.apiKey,
-    hasAuthDomain: !!firebaseConfig.authDomain,
-    hasProjectId: !!firebaseConfig.projectId,
-    hasAppId: !!firebaseConfig.appId,
-    apiKeyLength: firebaseConfig.apiKey?.length || 0,
-    authDomain: firebaseConfig.authDomain,
-    projectId: firebaseConfig.projectId,
-  })
-}
+// Debug logging removed - only log errors
 
 // Validate Firebase configuration
 // Check the actual config values, not process.env (since values are baked in at build time)
@@ -95,22 +84,17 @@ The variables must be present BEFORE the build runs.`
         // This ensures users stay logged in after page refresh
         try {
           await setPersistence(auth, browserLocalPersistence)
-          console.log('✅ Auth persistence set to local storage')
         } catch (persistenceError) {
           console.warn('⚠️ Could not set auth persistence (may already be set):', persistenceError)
         }
 
         db = getFirestore(app)
 
-        console.log('✅ Firebase initialized successfully')
-        console.log('Project ID:', firebaseConfig.projectId)
-        console.log('Auth Domain:', firebaseConfig.authDomain)
         
         // Initialize Analytics only in browser and if measurementId is provided
         if (process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID) {
           try {
             analytics = getAnalytics(app)
-            console.log('✅ Firebase Analytics initialized')
           } catch (error) {
             console.warn('⚠️ Firebase Analytics initialization failed:', error)
           }
