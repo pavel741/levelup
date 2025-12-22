@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
 export const dynamic = 'force-dynamic'
 import AuthGuard from '@/components/AuthGuard'
@@ -11,20 +11,19 @@ import { Trophy, Plus, X } from 'lucide-react'
 import { Challenge } from '@/types'
 import { format } from 'date-fns'
 import { useFinanceChallengeUpdater } from '@/hooks/useFinanceChallengeUpdater'
+import { useWorkoutChallengeUpdater } from '@/hooks/useWorkoutChallengeUpdater'
 
 export default function ChallengesPage() {
-  const { challenges, activeChallenges, addChallenge, updateChallenge, user, habits } = useFirestoreStore()
-  
-  // Auto-update finance challenge progress when transactions change
-  useFinanceChallengeUpdater()
+  const { challenges, activeChallenges, addChallenge, updateChallenge, deleteChallenge, user, habits } = useFirestoreStore()
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editingChallenge, setEditingChallenge] = useState<Challenge | null>(null)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [routines, setRoutines] = useState<any[]>([])
   const [newChallenge, setNewChallenge] = useState({
     title: '',
     description: '',
-    type: 'habit' as 'habit' | 'distraction' | 'goal' | 'community' | 'finance',
+    type: 'habit' as 'habit' | 'distraction' | 'goal' | 'community' | 'finance' | 'workout',
     difficulty: 'medium' as 'easy' | 'medium' | 'hard',
     xpReward: 100,
     duration: 7,
@@ -37,7 +36,46 @@ export default function ChallengesPage() {
     financeTarget: undefined as number | undefined,
     financeTargetPercentage: undefined as number | undefined,
     financePeriod: 'challenge_duration' as 'daily' | 'weekly' | 'monthly' | 'challenge_duration',
+    // Workout-specific fields
+    workoutGoalType: undefined as 'workouts_completed' | 'workouts_per_week' | 'routine_completed' | 'total_volume' | 'streak' | undefined,
+    workoutTarget: undefined as number | undefined,
+    workoutTargetPerWeek: undefined as number | undefined,
+    workoutRoutineId: undefined as string | undefined,
   })
+  
+  // Load routines for workout challenge routine selection
+  useEffect(() => {
+    if (!user?.id) return
+    if (newChallenge.type !== 'workout' || newChallenge.workoutGoalType !== 'routine_completed') {
+      setRoutines([])
+      return
+    }
+
+    let unsubscribe: (() => void) | null = null
+    let isMounted = true
+
+    import('@/lib/workoutApi').then(({ subscribeToRoutines }) => {
+      if (!isMounted) return
+      unsubscribe = subscribeToRoutines(user.id, (routines) => {
+        if (isMounted) {
+          setRoutines(routines)
+        }
+      })
+    })
+
+    return () => {
+      isMounted = false
+      if (unsubscribe) {
+        unsubscribe()
+      }
+    }
+  }, [user?.id, newChallenge.type, newChallenge.workoutGoalType])
+  
+  // Auto-update finance challenge progress when transactions change
+  useFinanceChallengeUpdater()
+  // Auto-update workout challenge progress when workout logs change
+  useWorkoutChallengeUpdater()
+  
   const availableChallenges = challenges.filter(
     (c) => !activeChallenges.some((ac) => ac.id === c.id)
   )
@@ -57,6 +95,26 @@ export default function ChallengesPage() {
       }
       if ((newChallenge.financeGoalType === 'spending_limit' || newChallenge.financeGoalType === 'savings_amount' || newChallenge.financeGoalType === 'no_spend_days') && (!newChallenge.financeTarget || newChallenge.financeTarget <= 0)) {
         alert(`Please enter a valid target ${newChallenge.financeGoalType === 'no_spend_days' ? 'number of days' : 'amount'}`)
+        return
+      }
+    }
+
+    // Validate workout challenge fields
+    if (newChallenge.type === 'workout') {
+      if (!newChallenge.workoutGoalType) {
+        alert('Please select a workout goal type')
+        return
+      }
+      if (newChallenge.workoutGoalType === 'routine_completed' && !newChallenge.workoutRoutineId) {
+        alert('Please select a routine to complete')
+        return
+      }
+      if (newChallenge.workoutGoalType === 'workouts_per_week' && (!newChallenge.workoutTargetPerWeek || newChallenge.workoutTargetPerWeek <= 0)) {
+        alert('Please enter a valid target workouts per week')
+        return
+      }
+      if ((newChallenge.workoutGoalType === 'workouts_completed' || newChallenge.workoutGoalType === 'routine_completed' || newChallenge.workoutGoalType === 'total_volume' || newChallenge.workoutGoalType === 'streak') && (!newChallenge.workoutTarget || newChallenge.workoutTarget <= 0)) {
+        alert(`Please enter a valid target ${newChallenge.workoutGoalType === 'streak' ? 'number of days' : newChallenge.workoutGoalType === 'total_volume' ? 'volume in kg' : 'number'}`)
         return
       }
     }
@@ -120,6 +178,10 @@ export default function ChallengesPage() {
       financeTarget: undefined,
       financeTargetPercentage: undefined,
       financePeriod: 'challenge_duration',
+      workoutGoalType: undefined,
+      workoutTarget: undefined,
+      workoutTargetPerWeek: undefined,
+      workoutRoutineId: undefined,
     })
     setShowAddModal(false)
   }
@@ -148,6 +210,10 @@ export default function ChallengesPage() {
       financeTarget: challenge.financeTarget,
       financeTargetPercentage: challenge.financeTargetPercentage,
       financePeriod: challenge.financePeriod || 'challenge_duration',
+      workoutGoalType: challenge.workoutGoalType,
+      workoutTarget: challenge.workoutTarget,
+      workoutTargetPerWeek: challenge.workoutTargetPerWeek,
+      workoutRoutineId: challenge.workoutRoutineId,
     })
     setShowEditModal(true)
   }
@@ -189,6 +255,11 @@ export default function ChallengesPage() {
       financeTarget: newChallenge.financeTarget,
       financeTargetPercentage: newChallenge.financeTargetPercentage,
       financePeriod: newChallenge.financePeriod,
+      // Workout-specific fields
+      workoutGoalType: newChallenge.workoutGoalType,
+      workoutTarget: newChallenge.workoutTarget,
+      workoutTargetPerWeek: newChallenge.workoutTargetPerWeek,
+      workoutRoutineId: newChallenge.workoutRoutineId,
     })
 
     // Reset form
@@ -207,6 +278,10 @@ export default function ChallengesPage() {
       financeTarget: undefined,
       financeTargetPercentage: undefined,
       financePeriod: 'challenge_duration',
+      workoutGoalType: undefined,
+      workoutTarget: undefined,
+      workoutTargetPerWeek: undefined,
+      workoutRoutineId: undefined,
     })
     setShowEditModal(false)
     setEditingChallenge(null)
@@ -228,6 +303,19 @@ export default function ChallengesPage() {
   const removeRequirement = (index: number) => {
     const updated = newChallenge.requirements.filter((_, i) => i !== index)
     setNewChallenge({ ...newChallenge, requirements: updated.length > 0 ? updated : [''] })
+  }
+
+  const handleDeleteChallenge = async (challengeId: string) => {
+    if (!confirm('Are you sure you want to delete this challenge? This action cannot be undone.')) {
+      return
+    }
+    
+    try {
+      await deleteChallenge(challengeId)
+    } catch (error) {
+      console.error('Error deleting challenge:', error)
+      alert('Failed to delete challenge. Please try again.')
+    }
   }
 
   return (
@@ -258,7 +346,7 @@ export default function ChallengesPage() {
                   <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">My Active Challenges</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {activeChallenges.map((challenge) => (
-                      <ChallengeCard key={challenge.id} challenge={challenge} onEdit={handleEditChallenge} />
+                      <ChallengeCard key={challenge.id} challenge={challenge} onEdit={handleEditChallenge} onDelete={handleDeleteChallenge} />
                     ))}
                   </div>
                 </div>
@@ -269,7 +357,7 @@ export default function ChallengesPage() {
                 {availableChallenges.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {availableChallenges.map((challenge) => (
-                      <ChallengeCard key={challenge.id} challenge={challenge} onEdit={handleEditChallenge} />
+                      <ChallengeCard key={challenge.id} challenge={challenge} onEdit={handleEditChallenge} onDelete={handleDeleteChallenge} />
                     ))}
                   </div>
                 ) : (
@@ -334,6 +422,11 @@ export default function ChallengesPage() {
                         financeGoalType: newType === 'finance' ? newChallenge.financeGoalType : undefined,
                         financeTarget: newType === 'finance' ? newChallenge.financeTarget : undefined,
                         financeTargetPercentage: newType === 'finance' ? newChallenge.financeTargetPercentage : undefined,
+                        // Reset workout fields when switching away from workout type
+                        workoutGoalType: newType === 'workout' ? newChallenge.workoutGoalType : undefined,
+                        workoutTarget: newType === 'workout' ? newChallenge.workoutTarget : undefined,
+                        workoutTargetPerWeek: newType === 'workout' ? newChallenge.workoutTargetPerWeek : undefined,
+                        workoutRoutineId: newType === 'workout' ? newChallenge.workoutRoutineId : undefined,
                       })
                     }}
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
@@ -343,6 +436,7 @@ export default function ChallengesPage() {
                     <option value="goal">Goal</option>
                     <option value="community">Community</option>
                     <option value="finance">Finance</option>
+                    <option value="workout">Workout</option>
                   </select>
                 </div>
                 <div>
@@ -483,6 +577,178 @@ export default function ChallengesPage() {
                   )}
                 </div>
               )}
+
+              {/* Workout Challenge Fields - Show immediately after Type selection */}
+              {newChallenge.type === 'workout' && (
+                <div className="space-y-4 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border-2 border-green-300 dark:border-green-700">
+                  <div className="flex items-center gap-2 mb-3">
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">💪 Workout Goal Settings</h3>
+                    <span className="text-xs text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded">Required</span>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Goal Type <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={newChallenge.workoutGoalType || ''}
+                      onChange={(e) => setNewChallenge({ 
+                        ...newChallenge, 
+                        workoutGoalType: e.target.value as any || undefined 
+                      })}
+                      className="w-full px-4 py-2 border-2 border-green-300 dark:border-green-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    >
+                      <option value="">-- Select goal type --</option>
+                      <option value="workouts_completed">🏋️ Workouts Completed - Complete X workouts</option>
+                      <option value="workouts_per_week">📅 Workouts Per Week - Complete X workouts per week</option>
+                      <option value="routine_completed">🎯 Routine Completed - Complete a specific routine X times</option>
+                      <option value="total_volume">⚖️ Total Volume - Lift X total kg</option>
+                      <option value="streak">🔥 Streak - Maintain X day workout streak</option>
+                    </select>
+                    {!newChallenge.workoutGoalType && (
+                      <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+                        Please select a workout goal type to continue
+                      </p>
+                    )}
+                  </div>
+
+                  {newChallenge.workoutGoalType === 'workouts_completed' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Target Workouts
+                      </label>
+                      <input
+                        type="number"
+                        value={newChallenge.workoutTarget || ''}
+                        onChange={(e) => {
+                          const value = e.target.value === '' ? undefined : parseInt(e.target.value)
+                          setNewChallenge({ ...newChallenge, workoutTarget: value })
+                        }}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        placeholder="e.g., 10"
+                        min="1"
+                      />
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        Total number of workouts to complete during the challenge
+                      </p>
+                    </div>
+                  )}
+
+                  {newChallenge.workoutGoalType === 'workouts_per_week' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Target Workouts Per Week
+                      </label>
+                      <input
+                        type="number"
+                        value={newChallenge.workoutTargetPerWeek || ''}
+                        onChange={(e) => {
+                          const value = e.target.value === '' ? undefined : parseInt(e.target.value)
+                          setNewChallenge({ ...newChallenge, workoutTargetPerWeek: value })
+                        }}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        placeholder="e.g., 3"
+                        min="1"
+                        max="7"
+                      />
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        Number of workouts to complete each week
+                      </p>
+                    </div>
+                  )}
+
+                  {newChallenge.workoutGoalType === 'routine_completed' && (
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Select Routine <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          value={newChallenge.workoutRoutineId || ''}
+                          onChange={(e) => setNewChallenge({ ...newChallenge, workoutRoutineId: e.target.value || undefined })}
+                          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        >
+                          <option value="">-- Select routine --</option>
+                          {routines.map((routine) => (
+                            <option key={routine.id} value={routine.id}>
+                              {routine.name}
+                            </option>
+                          ))}
+                        </select>
+                        {routines.length === 0 && (
+                          <p className="mt-1 text-xs text-yellow-600 dark:text-yellow-400">
+                            No routines found. Create a routine first in the Workouts page.
+                          </p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Target Completions
+                        </label>
+                        <input
+                          type="number"
+                          value={newChallenge.workoutTarget || ''}
+                          onChange={(e) => {
+                            const value = e.target.value === '' ? undefined : parseInt(e.target.value)
+                            setNewChallenge({ ...newChallenge, workoutTarget: value })
+                          }}
+                          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          placeholder="e.g., 5"
+                          min="1"
+                        />
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          Number of times to complete this routine
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {newChallenge.workoutGoalType === 'total_volume' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Target Total Volume (kg)
+                      </label>
+                      <input
+                        type="number"
+                        value={newChallenge.workoutTarget || ''}
+                        onChange={(e) => {
+                          const value = e.target.value === '' ? undefined : parseFloat(e.target.value)
+                          setNewChallenge({ ...newChallenge, workoutTarget: value })
+                        }}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        placeholder="e.g., 10000"
+                        min="0"
+                        step="0.1"
+                      />
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        Total weight lifted (sets × reps × weight) across all workouts
+                      </p>
+                    </div>
+                  )}
+
+                  {newChallenge.workoutGoalType === 'streak' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Target Streak (days)
+                      </label>
+                      <input
+                        type="number"
+                        value={newChallenge.workoutTarget || ''}
+                        onChange={(e) => {
+                          const value = e.target.value === '' ? undefined : parseInt(e.target.value)
+                          setNewChallenge({ ...newChallenge, workoutTarget: value })
+                        }}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        placeholder="e.g., 7"
+                        min="1"
+                      />
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        Consecutive days with at least one workout
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -567,17 +833,15 @@ export default function ChallengesPage() {
                     type="date"
                     value={newChallenge.startDate}
                     onChange={(e) => {
-                      setNewChallenge({ ...newChallenge, startDate: e.target.value })
-                      // Auto-update end date if it becomes invalid
-                      if (newChallenge.endDate && e.target.value >= newChallenge.endDate) {
-                        const newEndDate = new Date(e.target.value)
-                        newEndDate.setDate(newEndDate.getDate() + newChallenge.duration)
-                        setNewChallenge({ 
-                          ...newChallenge, 
-                          startDate: e.target.value,
-                          endDate: format(newEndDate, 'yyyy-MM-dd')
-                        })
-                      }
+                      // Always recalculate end date based on duration when start date changes
+                      const newStartDate = e.target.value
+                      const newEndDate = new Date(newStartDate)
+                      newEndDate.setDate(newEndDate.getDate() + newChallenge.duration)
+                      setNewChallenge({ 
+                        ...newChallenge, 
+                        startDate: newStartDate,
+                        endDate: format(newEndDate, 'yyyy-MM-dd')
+                      })
                     }}
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     min={format(new Date(), 'yyyy-MM-dd')}
@@ -722,6 +986,10 @@ export default function ChallengesPage() {
                     financeTarget: undefined,
                     financeTargetPercentage: undefined,
                     financePeriod: 'challenge_duration',
+                    workoutGoalType: undefined,
+                    workoutTarget: undefined,
+                    workoutTargetPerWeek: undefined,
+                    workoutRoutineId: undefined,
                   })
                 }}
                 className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
@@ -764,6 +1032,11 @@ export default function ChallengesPage() {
                         financeGoalType: newType === 'finance' ? newChallenge.financeGoalType : undefined,
                         financeTarget: newType === 'finance' ? newChallenge.financeTarget : undefined,
                         financeTargetPercentage: newType === 'finance' ? newChallenge.financeTargetPercentage : undefined,
+                        // Reset workout fields when switching away from workout type
+                        workoutGoalType: newType === 'workout' ? newChallenge.workoutGoalType : undefined,
+                        workoutTarget: newType === 'workout' ? newChallenge.workoutTarget : undefined,
+                        workoutTargetPerWeek: newType === 'workout' ? newChallenge.workoutTargetPerWeek : undefined,
+                        workoutRoutineId: newType === 'workout' ? newChallenge.workoutRoutineId : undefined,
                       })
                     }}
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
@@ -773,6 +1046,7 @@ export default function ChallengesPage() {
                     <option value="goal">Goal</option>
                     <option value="community">Community</option>
                     <option value="finance">Finance</option>
+                    <option value="workout">Workout</option>
                   </select>
                 </div>
                 <div>
@@ -871,17 +1145,15 @@ export default function ChallengesPage() {
                     type="date"
                     value={newChallenge.startDate}
                     onChange={(e) => {
-                      setNewChallenge({ ...newChallenge, startDate: e.target.value })
-                      // Auto-update end date if it becomes invalid
-                      if (newChallenge.endDate && e.target.value >= newChallenge.endDate) {
-                        const newEndDate = new Date(e.target.value)
-                        newEndDate.setDate(newEndDate.getDate() + newChallenge.duration)
-                        setNewChallenge({ 
-                          ...newChallenge, 
-                          startDate: e.target.value,
-                          endDate: format(newEndDate, 'yyyy-MM-dd')
-                        })
-                      }
+                      // Always recalculate end date based on duration when start date changes
+                      const newStartDate = e.target.value
+                      const newEndDate = new Date(newStartDate)
+                      newEndDate.setDate(newEndDate.getDate() + newChallenge.duration)
+                      setNewChallenge({ 
+                        ...newChallenge, 
+                        startDate: newStartDate,
+                        endDate: format(newEndDate, 'yyyy-MM-dd')
+                      })
                     }}
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   />
@@ -1060,8 +1332,180 @@ export default function ChallengesPage() {
                 </div>
               )}
 
-              {/* Habit Linking - only show for non-finance challenges */}
-              {newChallenge.type !== 'finance' && (
+              {/* Workout Challenge Fields - Edit Modal */}
+              {newChallenge.type === 'workout' && (
+                <div className="space-y-4 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border-2 border-green-300 dark:border-green-700">
+                  <div className="flex items-center gap-2 mb-3">
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">💪 Workout Goal Settings</h3>
+                    <span className="text-xs text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded">Required</span>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Goal Type <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={newChallenge.workoutGoalType || ''}
+                      onChange={(e) => setNewChallenge({ 
+                        ...newChallenge, 
+                        workoutGoalType: e.target.value as any || undefined 
+                      })}
+                      className="w-full px-4 py-2 border-2 border-green-300 dark:border-green-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    >
+                      <option value="">-- Select goal type --</option>
+                      <option value="workouts_completed">🏋️ Workouts Completed - Complete X workouts</option>
+                      <option value="workouts_per_week">📅 Workouts Per Week - Complete X workouts per week</option>
+                      <option value="routine_completed">🎯 Routine Completed - Complete a specific routine X times</option>
+                      <option value="total_volume">⚖️ Total Volume - Lift X total kg</option>
+                      <option value="streak">🔥 Streak - Maintain X day workout streak</option>
+                    </select>
+                    {!newChallenge.workoutGoalType && (
+                      <p className="mt-1 text-xs text-red-500 dark:text-red-400">
+                        Please select a workout goal type to continue
+                      </p>
+                    )}
+                  </div>
+
+                  {newChallenge.workoutGoalType === 'workouts_completed' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Target Workouts
+                      </label>
+                      <input
+                        type="number"
+                        value={newChallenge.workoutTarget || ''}
+                        onChange={(e) => {
+                          const value = e.target.value === '' ? undefined : parseInt(e.target.value)
+                          setNewChallenge({ ...newChallenge, workoutTarget: value })
+                        }}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        placeholder="e.g., 10"
+                        min="1"
+                      />
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        Total number of workouts to complete during the challenge
+                      </p>
+                    </div>
+                  )}
+
+                  {newChallenge.workoutGoalType === 'workouts_per_week' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Target Workouts Per Week
+                      </label>
+                      <input
+                        type="number"
+                        value={newChallenge.workoutTargetPerWeek || ''}
+                        onChange={(e) => {
+                          const value = e.target.value === '' ? undefined : parseInt(e.target.value)
+                          setNewChallenge({ ...newChallenge, workoutTargetPerWeek: value })
+                        }}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        placeholder="e.g., 3"
+                        min="1"
+                        max="7"
+                      />
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        Number of workouts to complete each week
+                      </p>
+                    </div>
+                  )}
+
+                  {newChallenge.workoutGoalType === 'routine_completed' && (
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Select Routine <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                          value={newChallenge.workoutRoutineId || ''}
+                          onChange={(e) => setNewChallenge({ ...newChallenge, workoutRoutineId: e.target.value || undefined })}
+                          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        >
+                          <option value="">-- Select routine --</option>
+                          {routines.map((routine) => (
+                            <option key={routine.id} value={routine.id}>
+                              {routine.name}
+                            </option>
+                          ))}
+                        </select>
+                        {routines.length === 0 && (
+                          <p className="mt-1 text-xs text-yellow-600 dark:text-yellow-400">
+                            No routines found. Create a routine first in the Workouts page.
+                          </p>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                          Target Completions
+                        </label>
+                        <input
+                          type="number"
+                          value={newChallenge.workoutTarget || ''}
+                          onChange={(e) => {
+                            const value = e.target.value === '' ? undefined : parseInt(e.target.value)
+                            setNewChallenge({ ...newChallenge, workoutTarget: value })
+                          }}
+                          className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                          placeholder="e.g., 5"
+                          min="1"
+                        />
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                          Number of times to complete this routine
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {newChallenge.workoutGoalType === 'total_volume' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Target Total Volume (kg)
+                      </label>
+                      <input
+                        type="number"
+                        value={newChallenge.workoutTarget || ''}
+                        onChange={(e) => {
+                          const value = e.target.value === '' ? undefined : parseFloat(e.target.value)
+                          setNewChallenge({ ...newChallenge, workoutTarget: value })
+                        }}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        placeholder="e.g., 10000"
+                        min="0"
+                        step="0.1"
+                      />
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        Total weight lifted (sets × reps × weight) across all workouts
+                      </p>
+                    </div>
+                  )}
+
+                  {newChallenge.workoutGoalType === 'streak' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Target Streak (days)
+                      </label>
+                      <input
+                        type="number"
+                        value={newChallenge.workoutTarget || ''}
+                        onChange={(e) => {
+                          const value = e.target.value === '' ? undefined : parseInt(e.target.value)
+                          setNewChallenge({ ...newChallenge, workoutTarget: value })
+                        }}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        placeholder="e.g., 7"
+                        min="1"
+                      />
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        Consecutive days with at least one workout
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Habit Linking - only show for non-finance and non-workout challenges */}
+              {newChallenge.type !== 'finance' && newChallenge.type !== 'workout' && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Link Habits <span className="text-xs text-gray-500 dark:text-gray-400">(optional)</span>
@@ -1127,6 +1571,10 @@ export default function ChallengesPage() {
                     financeTarget: undefined,
                     financeTargetPercentage: undefined,
                     financePeriod: 'challenge_duration',
+                    workoutGoalType: undefined,
+                    workoutTarget: undefined,
+                    workoutTargetPerWeek: undefined,
+                    workoutRoutineId: undefined,
                   })
                 }}
                 className="flex-1 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium text-sm sm:text-base"

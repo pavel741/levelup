@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, X, GripVertical, Trash2, Save, ArrowUp, ArrowDown } from 'lucide-react'
-import { EXERCISE_DATABASE, getExerciseById } from '@/lib/exerciseDatabase'
+import { Plus, X, GripVertical, Trash2, Save, ArrowUp, ArrowDown, RefreshCw, Info } from 'lucide-react'
+import { EXERCISE_DATABASE, getExerciseById, findSimilarExercises } from '@/lib/exerciseDatabase'
 import ExerciseLibrary from './ExerciseLibrary'
+import ExerciseInstructions from './ExerciseInstructions'
 import type { Routine, RoutineExercise, RoutineSession, SetConfiguration, Exercise } from '@/types/workout'
 
 interface RoutineBuilderProps {
@@ -47,6 +48,8 @@ export default function RoutineBuilder({ onSave, onCancel, initialRoutine }: Rou
   
   const [sessions, setSessions] = useState<RoutineSession[]>(initializeSessions)
   const [editingExerciseIndex, setEditingExerciseIndex] = useState<{ sessionId: string; exerciseIndex: number } | null>(null)
+  const [replacingExercise, setReplacingExercise] = useState<{ sessionId: string; exerciseIndex: number } | null>(null)
+  const [showingInstructions, setShowingInstructions] = useState<{ sessionId: string; exerciseIndex: number } | null>(null)
 
   // Load initial routine data when it changes
   useEffect(() => {
@@ -121,14 +124,38 @@ export default function RoutineBuilder({ onSave, onCancel, initialRoutine }: Rou
   }
 
   const handleRemoveExercise = (sessionId: string, exerciseIndex: number) => {
-    setSessions(sessions.map(s => 
-      s.id === sessionId 
-        ? { 
-            ...s, 
+    setSessions(sessions.map(s =>
+      s.id === sessionId
+        ? {
+            ...s,
             exercises: s.exercises.filter((_, i) => i !== exerciseIndex).map((ex, i) => ({ ...ex, order: i }))
           }
         : s
     ))
+  }
+
+  const handleReplaceExercise = (sessionId: string, exerciseIndex: number, newExerciseId: string) => {
+    const session = sessions.find(s => s.id === sessionId)
+    if (!session) return
+
+    const currentExercise = session.exercises[exerciseIndex]
+    const newExercise = getExerciseById(newExerciseId)
+    if (!newExercise) return
+
+    // Replace the exercise but keep the same sets configuration
+    const updatedExercises = [...session.exercises]
+    updatedExercises[exerciseIndex] = {
+      ...currentExercise,
+      exerciseId: newExerciseId,
+    }
+
+    setSessions(sessions.map(s =>
+      s.id === sessionId
+        ? { ...s, exercises: updatedExercises }
+        : s
+    ))
+
+    setReplacingExercise(null)
   }
 
   const handleMoveExercise = (sessionId: string, exerciseIndex: number, direction: 'up' | 'down') => {
@@ -447,13 +474,94 @@ export default function RoutineBuilder({ onSave, onCancel, initialRoutine }: Rou
                               </p>
                             </div>
                           </div>
-                          <button
-                            onClick={() => handleRemoveExercise(session.id, exerciseIndex)}
-                            className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setShowingInstructions(
+                                showingInstructions?.sessionId === session.id && showingInstructions?.exerciseIndex === exerciseIndex
+                                  ? null
+                                  : { sessionId: session.id, exerciseIndex }
+                              )}
+                              className="p-2 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                              title="Show exercise instructions"
+                            >
+                              <Info className="w-5 h-5" />
+                            </button>
+                            <button
+                              onClick={() => setReplacingExercise({ sessionId: session.id, exerciseIndex })}
+                              className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                              title="Replace with similar exercise"
+                            >
+                              <RefreshCw className="w-5 h-5" />
+                            </button>
+                            <button
+                              onClick={() => handleRemoveExercise(session.id, exerciseIndex)}
+                              className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                              title="Remove exercise"
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </button>
+                          </div>
                         </div>
+
+                        {/* Exercise Instructions */}
+                        {showingInstructions?.sessionId === session.id && showingInstructions?.exerciseIndex === exerciseIndex && (
+                          <div className="mt-3 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                            <ExerciseInstructions exercise={exercise} compact={true} />
+                          </div>
+                        )}
+
+                        {/* Replace Exercise Modal */}
+                        {replacingExercise?.sessionId === session.id && replacingExercise?.exerciseIndex === exerciseIndex && (
+                          <div className="mt-3 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                            <div className="flex items-center justify-between mb-3">
+                              <h4 className="font-semibold text-blue-900 dark:text-blue-100">
+                                Replace with Similar Exercise
+                              </h4>
+                              <button
+                                onClick={() => setReplacingExercise(null)}
+                                className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                            <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
+                              Current: <span className="font-medium">{exercise.name}</span>
+                            </p>
+                            <div className="space-y-2 max-h-60 overflow-y-auto">
+                              {findSimilarExercises(exercise.id, 8).map((similarExercise) => (
+                                <button
+                                  key={similarExercise.id}
+                                  onClick={() => handleReplaceExercise(session.id, exerciseIndex, similarExercise.id)}
+                                  className="w-full text-left p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-500 hover:shadow-md transition-all"
+                                >
+                                  <div className="font-medium text-gray-900 dark:text-white">
+                                    {similarExercise.name}
+                                  </div>
+                                  <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                                    {[...similarExercise.muscleGroups.primary, ...similarExercise.muscleGroups.secondary].join(', ')}
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-2">
+                                    <span className={`px-2 py-0.5 rounded text-xs ${
+                                      similarExercise.difficulty === 'beginner' ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400' :
+                                      similarExercise.difficulty === 'intermediate' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400' :
+                                      'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400'
+                                    }`}>
+                                      {similarExercise.difficulty}
+                                    </span>
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                                      {similarExercise.equipment.join(', ')}
+                                    </span>
+                                  </div>
+                                </button>
+                              ))}
+                              {findSimilarExercises(exercise.id, 8).length === 0 && (
+                                <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-2">
+                                  No similar exercises found
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )}
 
                         {/* Sets Configuration */}
                         <div className="space-y-2">

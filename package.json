@@ -11,7 +11,8 @@
     "lint": "next lint",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "migrate:mongo-to-firestore": "ts-node scripts/migrate-mongo-to-firestore.ts"
   },
   "dependencies": {
     "chart.js": "^4.5.1",

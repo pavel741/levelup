@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Play, Pause, Check, X, Plus, Minus, Clock, RotateCcw, Save } from 'lucide-react'
-import { getExerciseById } from '@/lib/exerciseDatabase'
+import { Play, Pause, Check, X, Plus, Minus, Clock, RotateCcw, Save, RefreshCw, Info } from 'lucide-react'
+import { getExerciseById, findSimilarExercises } from '@/lib/exerciseDatabase'
+import ExerciseInstructions from '@/components/ExerciseInstructions'
 import type { ActiveWorkout, ActiveWorkoutExercise, ActiveWorkoutSet, Routine, WorkoutLog } from '@/types/workout'
 import { saveWorkoutLog } from '@/lib/workoutApi'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
@@ -20,6 +21,8 @@ export default function ActiveWorkoutView({ routine, onComplete, onCancel }: Act
   const [isPaused, setIsPaused] = useState(false)
   const [restTimer, setRestTimer] = useState<number | null>(null)
   const [restTimerActive, setRestTimerActive] = useState(false)
+  const [replacingExercise, setReplacingExercise] = useState<number | null>(null)
+  const [showInstructions, setShowInstructions] = useState(false)
   const restTimerIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const workoutStartTimeRef = useRef<Date>(new Date())
   const pausedTimeRef = useRef<number>(0)
@@ -351,13 +354,109 @@ export default function ActiveWorkoutView({ routine, onComplete, onCancel }: Act
       {/* Current Exercise */}
       <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="mb-4">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-1">
-            {exercise?.name || currentExercise.exerciseName}
-          </h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            {exercise?.muscleGroups.primary.join(', ')}
-          </p>
+          <div className="flex items-start justify-between mb-2">
+            <div className="flex-1">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-1">
+                {exercise?.name || currentExercise.exerciseName}
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {exercise?.muscleGroups.primary.join(', ')}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {exercise && (
+                <>
+                  <button
+                    onClick={() => setShowInstructions(!showInstructions)}
+                    className="p-2 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
+                    title="Show exercise instructions"
+                  >
+                    <Info className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => setReplacingExercise(workout.currentExerciseIndex)}
+                    className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                    title="Replace with similar exercise"
+                  >
+                    <RefreshCw className="w-5 h-5" />
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Replace Exercise Modal */}
+          {replacingExercise === workout.currentExerciseIndex && exercise && (
+            <div className="mt-3 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-semibold text-blue-900 dark:text-blue-100">
+                  Replace with Similar Exercise
+                </h4>
+                <button
+                  onClick={() => setReplacingExercise(null)}
+                  className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
+                Current: <span className="font-medium">{exercise.name}</span>
+              </p>
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {findSimilarExercises(exercise.id, 6).map((similarExercise) => (
+                  <button
+                    key={similarExercise.id}
+                    onClick={() => {
+                      const updatedExercises = [...workout.exercises]
+                      updatedExercises[workout.currentExerciseIndex] = {
+                        ...updatedExercises[workout.currentExerciseIndex],
+                        exerciseId: similarExercise.id,
+                        exerciseName: similarExercise.name,
+                      }
+                      setWorkout({
+                        ...workout,
+                        exercises: updatedExercises,
+                      })
+                      setReplacingExercise(null)
+                    }}
+                    className="w-full text-left p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-500 hover:shadow-md transition-all"
+                  >
+                    <div className="font-medium text-gray-900 dark:text-white">
+                      {similarExercise.name}
+                    </div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                      {[...similarExercise.muscleGroups.primary, ...similarExercise.muscleGroups.secondary].join(', ')}
+                    </div>
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className={`px-2 py-0.5 rounded text-xs ${
+                        similarExercise.difficulty === 'beginner' ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400' :
+                        similarExercise.difficulty === 'intermediate' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400' :
+                        'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400'
+                      }`}>
+                        {similarExercise.difficulty}
+                      </span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        {similarExercise.equipment.join(', ')}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+                {findSimilarExercises(exercise.id, 6).length === 0 && (
+                  <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-2">
+                    No similar exercises found
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
         </div>
+
+        {/* Exercise Instructions */}
+        {exercise && showInstructions && (
+          <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
+            <ExerciseInstructions exercise={exercise} compact={true} />
+          </div>
+        )}
 
         {/* Sets */}
         <div className="space-y-3">
@@ -432,7 +531,8 @@ export default function ActiveWorkoutView({ routine, onComplete, onCancel }: Act
                     </div>
                   )}
 
-                  {set.targetWeight !== undefined && (
+                  {/* Always show weight input for exercises that can use weight */}
+                  {exercise && !exercise.equipment.includes('bodyweight') && exercise.equipment.length > 0 && (
                     <div>
                       <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Weight (kg)
@@ -440,7 +540,7 @@ export default function ActiveWorkoutView({ routine, onComplete, onCancel }: Act
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => handleSetUpdate(workout.currentExerciseIndex, setIndex, {
-                            completedWeight: Math.max(0, (set.completedWeight || set.targetWeight || 0) - 2.5)
+                            completedWeight: Math.max(0, (set.completedWeight ?? set.targetWeight ?? 0) - 2.5)
                           })}
                           className="p-1 bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600"
                         >
@@ -449,6 +549,7 @@ export default function ActiveWorkoutView({ routine, onComplete, onCancel }: Act
                         <input
                           type="number"
                           step="0.5"
+                          placeholder="0"
                           value={set.completedWeight ?? set.targetWeight ?? ''}
                           onChange={(e) => handleSetUpdate(workout.currentExerciseIndex, setIndex, {
                             completedWeight: parseFloat(e.target.value) || 0
@@ -457,7 +558,7 @@ export default function ActiveWorkoutView({ routine, onComplete, onCancel }: Act
                         />
                         <button
                           onClick={() => handleSetUpdate(workout.currentExerciseIndex, setIndex, {
-                            completedWeight: (set.completedWeight || set.targetWeight || 0) + 2.5
+                            completedWeight: (set.completedWeight ?? set.targetWeight ?? 0) + 2.5
                           })}
                           className="p-1 bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600"
                         >
@@ -466,12 +567,30 @@ export default function ActiveWorkoutView({ routine, onComplete, onCancel }: Act
                       </div>
                     </div>
                   )}
+                  
+                  {/* Show bodyweight indicator for bodyweight-only exercises */}
+                  {exercise && exercise.equipment.includes('bodyweight') && exercise.equipment.length === 1 && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Type
+                      </label>
+                      <div className="px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded text-sm text-gray-600 dark:text-gray-400">
+                        Bodyweight
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
               {set.completed && (
                 <div className="text-sm text-gray-600 dark:text-gray-400">
-                  {set.completedReps || set.targetReps} reps × {set.completedWeight || set.targetWeight} kg
+                  {set.completedReps || set.targetReps} reps
+                  {(set.completedWeight ?? set.targetWeight ?? 0) > 0 && (
+                    <span> × {set.completedWeight ?? set.targetWeight} kg</span>
+                  )}
+                  {(set.completedWeight ?? set.targetWeight ?? 0) === 0 && exercise && exercise.equipment.includes('bodyweight') && (
+                    <span> (Bodyweight)</span>
+                  )}
                 </div>
               )}
             </div>

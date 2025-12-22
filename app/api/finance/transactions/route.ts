@@ -33,8 +33,8 @@ export async function GET(request: NextRequest) {
     // Provide helpful error messages
     if (error.message?.includes('timeout') || error.message?.includes('ETIMEDOUT')) {
       return NextResponse.json({ 
-        error: 'MongoDB connection timeout. Please check your IP whitelist in MongoDB Atlas.',
-        details: 'Go to MongoDB Atlas → Network Access → Add your IP address (or 0.0.0.0/0 for development)'
+        error: 'Database connection timeout. Using Firestore fallback.',
+        details: 'If MongoDB is unavailable, the app will use Firestore automatically.'
       }, { status: 503 })
     }
     
@@ -74,6 +74,7 @@ export async function PUT(request: NextRequest) {
     }
 
     await updateTransaction(userId, id, updates)
+
     return NextResponse.json({ success: true })
   } catch (error: any) {
     console.error('Error in PUT /api/finance/transactions:', error)
@@ -96,6 +97,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     await deleteTransaction(userId, id)
+
     return NextResponse.json({ success: true })
   } catch (error: any) {
     console.error('Error in DELETE /api/finance/transactions:', error)

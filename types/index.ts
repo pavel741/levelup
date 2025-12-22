@@ -37,20 +37,22 @@ export interface Habit {
   reminderEnabled?: boolean
   reminderTime?: string // Format: "HH:mm" (e.g., "09:00")
   lastReminderDate?: string // Format: "yyyy-MM-dd"
+  targetCountPerDay?: number // Number of times habit must be completed per day (defaults to 1)
+  completionsPerDay?: { [date: string]: number } // Track how many times completed each day
 }
 
 export interface Challenge {
   id: string
   title: string
   description: string
-  type: 'habit' | 'distraction' | 'goal' | 'community' | 'finance'
+  type: 'habit' | 'distraction' | 'goal' | 'community' | 'finance' | 'workout'
   difficulty: 'easy' | 'medium' | 'hard'
   xpReward: number
   duration: number // days
   requirements: string[]
   participants: string[]
   habitIds?: string[] // Habit IDs linked to this challenge - when these habits are completed, challenge progress updates
-  progress?: { [userId: string]: number } // Track progress per user (days completed or percentage for finance)
+  progress?: { [userId: string]: number } // Track progress per user (days completed or percentage for finance/workout)
   completedDates?: { [userId: string]: string[] } // Track which dates each user completed
   startDate: Date
   endDate: Date
@@ -60,6 +62,11 @@ export interface Challenge {
   financeTarget?: number // Target amount (for savings_amount or spending_limit)
   financeTargetPercentage?: number // Target percentage (for savings_rate, e.g., 15 for 15%)
   financePeriod?: 'daily' | 'weekly' | 'monthly' | 'challenge_duration' // Period for finance tracking
+  // Workout-specific fields
+  workoutGoalType?: 'workouts_completed' | 'workouts_per_week' | 'routine_completed' | 'total_volume' | 'streak' // Type of workout challenge
+  workoutTarget?: number // Target number (for workouts_completed, routine_completed, total_volume in kg)
+  workoutTargetPerWeek?: number // Target workouts per week (for workouts_per_week)
+  workoutRoutineId?: string // Specific routine ID to complete (for routine_completed)
 }
 
 export interface Achievement {

@@ -36,15 +36,79 @@ const SPLIT_TEMPLATES: Record<number, string[]> = {
   6: ['push', 'pull', 'legs', 'push', 'pull', 'legs'],
 }
 
+// Normalize equipment names (handle singular/plural variations)
+function normalizeEquipmentName(eq: string): string {
+  const normalized = eq.toLowerCase().trim()
+  // Handle common pluralizations
+  const pluralMap: Record<string, string> = {
+    'dumbbell': 'dumbbells',
+    'dumbbells': 'dumbbells',
+    'kettlebell': 'kettlebell',
+    'kettlebells': 'kettlebell',
+    'resistance_band': 'resistance_bands',
+    'resistance_bands': 'resistance_bands',
+    'pull-up-bar': 'pull-up-bar',
+    'pull-up-bars': 'pull-up-bar',
+    'jump-rope': 'jump-rope',
+    'jump-ropes': 'jump-rope',
+    'ab-wheel': 'ab-wheel',
+    'ab-wheels': 'ab-wheel',
+    'battle-ropes': 'battle-ropes',
+    'battle-rope': 'battle-ropes',
+  }
+  return pluralMap[normalized] || normalized
+}
+
 // Get exercises filtered by equipment
 function getExercisesByEquipment(equipment: string[]): typeof EXERCISE_DATABASE {
   if (equipment.length === 0) return EXERCISE_DATABASE
   
+  // Normalize user's equipment list
+  const normalizedUserEquipment = equipment.map(normalizeEquipmentName)
+  console.log('🔧 User equipment (normalized):', normalizedUserEquipment)
+  
   return EXERCISE_DATABASE.filter((ex) => {
-    // If exercise has no equipment (bodyweight), include it
-    if (ex.equipment.length === 0) return true
-    // Check if exercise equipment matches any selected equipment
-    return ex.equipment.some((eq) => equipment.includes(eq.toLowerCase()))
+    // Always include bodyweight-only exercises
+    if (ex.equipment.length === 0 || (ex.equipment.length === 1 && ex.equipment[0] === 'bodyweight')) {
+      return true
+    }
+    
+    // Normalize exercise equipment
+    const normalizedExerciseEquipment = ex.equipment.map(normalizeEquipmentName)
+    
+    // Check if user has ALL required equipment for this exercise
+    // OR if the exercise only requires bodyweight (which is always available)
+    const requiresBodyweightOnly = normalizedExerciseEquipment.length === 1 && normalizedExerciseEquipment[0] === 'bodyweight'
+    if (requiresBodyweightOnly) return true
+    
+    // Check if user has matching equipment
+    const hasBodyweight = normalizedUserEquipment.includes('bodyweight')
+    
+    // Handle 'bench' as special case - assume available if user has barbell/dumbbells
+    const exerciseEquipmentWithoutBench = normalizedExerciseEquipment.filter(eq => eq !== 'bench')
+    const needsBench = normalizedExerciseEquipment.includes('bench')
+    const hasBenchOrEquivalent = !needsBench || 
+      normalizedUserEquipment.includes('bench') ||
+      normalizedUserEquipment.includes('barbell') ||
+      normalizedUserEquipment.includes('dumbbells')
+    
+    // Check if user has at least one matching equipment from the exercise's requirements
+    // (exercises with multiple equipment types can usually be done with any of them)
+    const hasMatchingEquipment = exerciseEquipmentWithoutBench.some((eq) => {
+      return normalizedUserEquipment.includes(eq)
+    })
+    
+    // Include if: 
+    // 1. Has matching equipment AND (doesn't need bench OR has bench/equivalent)
+    // 2. OR exercise needs bodyweight and user has bodyweight
+    const shouldInclude = (hasMatchingEquipment && hasBenchOrEquivalent) || 
+      (normalizedExerciseEquipment.includes('bodyweight') && hasBodyweight)
+    
+    if (!shouldInclude) {
+      console.log(`❌ Excluding "${ex.name}" - requires: [${normalizedExerciseEquipment.join(', ')}], user has: [${normalizedUserEquipment.join(', ')}]`)
+    }
+    
+    return shouldInclude
   })
 }
 
@@ -119,9 +183,24 @@ function getSetRepScheme(
 }
 
 // Determine if exercise is compound
+// A compound exercise targets multiple muscle groups (2+ primary groups or 1 primary + multiple secondary)
 function isCompoundExercise(exerciseId: string): boolean {
-  const compoundExercises = ['bench-press', 'deadlift', 'squat', 'overhead-press', 'barbell-row', 'pull-ups']
-  return compoundExercises.includes(exerciseId)
+  const exercise = EXERCISE_DATABASE.find(ex => ex.id === exerciseId)
+  if (!exercise) return false
+  
+  // Consider it compound if:
+  // 1. Has 2+ primary muscle groups, OR
+  // 2. Has 1 primary + 2+ secondary muscle groups, OR
+  // 3. Is a major compound movement (deadlift, squat, bench press, etc.)
+  const primaryCount = exercise.muscleGroups.primary.length
+  const secondaryCount = exercise.muscleGroups.secondary.length
+  
+  // Major compound movements (always compound)
+  const majorCompounds = ['deadlift', 'squat', 'bench-press', 'overhead-press', 'barbell-row', 'pull-ups', 'chin-ups', 'front-squat', 'romanian-deadlift', 'thruster', 'clean-and-press']
+  if (majorCompounds.includes(exerciseId)) return true
+  
+  // Multi-joint movements
+  return primaryCount >= 2 || (primaryCount >= 1 && secondaryCount >= 2)
 }
 
 // Generate exercises for a session type
@@ -171,15 +250,49 @@ function generateSessionExercises(
       idx === self.findIndex((e) => e.id === ex.id)
     )
     
-    // Filter out used exercises and sort
+    // Filter exercises by difficulty based on experience level
+    // Advanced users can do all exercises, intermediate can do intermediate+beginner, beginner can do beginner+some intermediate
+    const difficultyFilter: Record<string, string[]> = {
+      'beginner': ['beginner', 'intermediate'], // Beginners can do beginner and some intermediate exercises for variety
+      'intermediate': ['beginner', 'intermediate'], // Intermediate can do beginner and intermediate
+      'advanced': ['beginner', 'intermediate', 'advanced'], // Advanced can do ALL difficulty levels (prioritizes advanced)
+    }
+    
+    const allowedDifficulties = difficultyFilter[experience] || ['beginner', 'intermediate', 'advanced']
+    
+    // Filter and sort exercises
     muscleGroupExercises = muscleGroupExercises
-      .filter((ex) => !usedExerciseIds.has(ex.id))
+      .filter((ex) => {
+        // Always include if not used
+        if (usedExerciseIds.has(ex.id)) return false
+        // Filter by difficulty - allow exercises at or below user's level
+        return allowedDifficulties.includes(ex.difficulty)
+      })
       .sort((a, b) => {
-        // Prioritize compound movements
+        // First priority: Match user's experience level
+        const aMatchesLevel = a.difficulty === experience
+        const bMatchesLevel = b.difficulty === experience
+        if (aMatchesLevel && !bMatchesLevel) return -1
+        if (!aMatchesLevel && bMatchesLevel) return 1
+        
+        // Second priority: Prefer harder exercises (for advanced/intermediate) or easier (for beginner)
+        const difficultyOrder = { 'beginner': 1, 'intermediate': 2, 'advanced': 3 }
+        if (experience === 'advanced' || experience === 'intermediate') {
+          // Prefer harder exercises
+          if (difficultyOrder[a.difficulty] > difficultyOrder[b.difficulty]) return -1
+          if (difficultyOrder[a.difficulty] < difficultyOrder[b.difficulty]) return 1
+        } else {
+          // Beginner: prefer easier exercises
+          if (difficultyOrder[a.difficulty] < difficultyOrder[b.difficulty]) return -1
+          if (difficultyOrder[a.difficulty] > difficultyOrder[b.difficulty]) return 1
+        }
+        
+        // Third priority: Prioritize compound movements
         const aIsCompound = isCompoundExercise(a.id)
         const bIsCompound = isCompoundExercise(b.id)
         if (aIsCompound && !bIsCompound) return -1
         if (!aIsCompound && bIsCompound) return 1
+        
         return 0
       })
     
@@ -312,8 +425,21 @@ export function generateRoutine(profile: UserProfile): Routine {
   const heightInMeters = height / 100
   const bmi = weight / (heightInMeters * heightInMeters)
   
-  // Get available exercises
-  const availableExercises = getExercisesByEquipment(equipment.length > 0 ? equipment : ['barbell', 'dumbbell', 'machine', 'cable', 'bodyweight'])
+  // Get available exercises - respect user's equipment selection
+  console.log('📋 Generating routine with equipment:', equipment)
+  let availableExercises = getExercisesByEquipment(equipment)
+  console.log(`✅ Filtered to ${availableExercises.length} exercises from ${EXERCISE_DATABASE.length} total`)
+  
+  if (availableExercises.length === 0) {
+    console.warn('⚠️ No exercises available with selected equipment! Including bodyweight exercises as fallback.')
+    // Fallback: at least include bodyweight exercises
+    availableExercises = getExercisesByEquipment(['bodyweight'])
+    if (availableExercises.length === 0) {
+      console.error('❌ Even bodyweight exercises not available! Using all exercises as ultimate fallback.')
+      // Ultimate fallback: return all exercises
+      availableExercises = EXERCISE_DATABASE
+    }
+  }
   
   // Get split template
   const splitTemplate = SPLIT_TEMPLATES[daysPerWeek] || SPLIT_TEMPLATES[3]

@@ -11,8 +11,11 @@ import {
   subscribeToChallenges,
   saveChallenge,
   updateChallenge,
+  deleteChallenge,
+  getChallenges,
   saveDailyStats,
   getUserDailyStats,
+  getAllUserDailyStats,
   getUserData,
   updateUserData,
 } from '@/lib/firestore'
@@ -40,6 +43,7 @@ interface AppState {
   activeChallenges: Challenge[]
   addChallenge: (challenge: Challenge) => Promise<void>
   updateChallenge: (id: string, updates: Partial<Challenge>) => Promise<void>
+  deleteChallenge: (id: string) => Promise<void>
   joinChallenge: (challengeId: string) => Promise<void>
   completeChallenge: (challengeId: string) => Promise<void>
   
@@ -58,6 +62,9 @@ interface AppState {
 
   // User preferences
   updateUserPreference: (key: string, value: any) => Promise<void>
+
+  // Reset progress
+  resetProgress: () => Promise<void>
 
   // Cleanup
   unsubscribe: () => void
@@ -253,15 +260,35 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
       }
     }
 
-    const alreadyCompleted = habit.completedDates.includes(today)
-    if (alreadyCompleted) return
+    const targetCount = habit.targetCountPerDay || 1
+    const currentCount = habit.completionsPerDay?.[today] || 0
+    
+    // Check if already reached target for today
+    if (currentCount >= targetCount) {
+      return
+    }
 
-    const updatedDates = [...habit.completedDates, today]
-    await updateHabitFirestore(id, { completedDates: updatedDates })
+    // Increment completion count for today
+    const newCount = currentCount + 1
+    const updatedCompletionsPerDay = {
+      ...(habit.completionsPerDay || {}),
+      [today]: newCount,
+    }
 
-    // Add XP
+    // If we've reached the target count, mark the date as completed
+    const wasCompleted = habit.completedDates.includes(today)
+    const updatedDates = newCount >= targetCount && !wasCompleted
+      ? [...habit.completedDates, today]
+      : habit.completedDates
+
+    await updateHabitFirestore(id, { 
+      completionsPerDay: updatedCompletionsPerDay,
+      completedDates: updatedDates,
+    })
+
+    // Add XP only when target is reached for the first time today
     const user = get().user
-    if (user) {
+    if (user && newCount >= targetCount && !wasCompleted) {
       await get().addXP(habit.xpReward)
       
       // Update daily stats - track habits completed
@@ -270,12 +297,10 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
       await get().updateDailyStats({
         habitsCompleted: currentHabitsCompleted + 1,
       })
-    }
 
-    // Update streak based on actual consecutive days
-    if (user) {
+      // Update streak based on actual consecutive days
       // Recalculate streak from all habits
-      const allHabits = get().habits
+      const allHabits = get().habits.map(h => h.id === id ? { ...h, completedDates: updatedDates } : h)
       const newStreak = calculateUserStreak(allHabits)
       const currentLongestStreak = user.longestStreak || 0
       
@@ -288,10 +313,8 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
       await get().checkAchievements()
       
       await get().syncUser(user.id)
-    }
 
-    // Update linked challenges
-    if (user) {
+      // Update linked challenges
       const activeChallenges = get().activeChallenges.filter(
         (challenge) => 
           challenge.participants.includes(user.id) && 
@@ -346,16 +369,33 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
     const habit = get().habits.find((h) => h.id === id)
     if (!habit) return
 
-    const isCompleted = habit.completedDates.includes(today)
-    if (!isCompleted) return
+    const targetCount = habit.targetCountPerDay || 1
+    const currentCount = habit.completionsPerDay?.[today] || 0
+    
+    // Can't uncomplete if count is already 0
+    if (currentCount <= 0) return
 
-    // Remove today's date from completedDates
-    const updatedDates = habit.completedDates.filter((date) => date !== today)
-    await updateHabitFirestore(id, { completedDates: updatedDates })
+    // Decrement completion count for today
+    const newCount = currentCount - 1
+    const updatedCompletionsPerDay = {
+      ...(habit.completionsPerDay || {}),
+      [today]: newCount,
+    }
 
-    // Deduct XP and recalculate level
+    // If count drops below target, remove from completedDates
+    const wasCompleted = habit.completedDates.includes(today)
+    const updatedDates = newCount < targetCount && wasCompleted
+      ? habit.completedDates.filter((date) => date !== today)
+      : habit.completedDates
+
+    await updateHabitFirestore(id, { 
+      completionsPerDay: updatedCompletionsPerDay,
+      completedDates: updatedDates,
+    })
+
+    // Deduct XP and recalculate level only if we're removing the completion status
     const user = get().user
-    if (user) {
+    if (user && newCount < targetCount && wasCompleted) {
       const newXP = Math.max(0, user.xp - habit.xpReward)
       const newLevel = Math.floor(newXP / 100) + 1
       const xpToNextLevel = calculateXPForNextLevel(newLevel) - newXP
@@ -468,6 +508,10 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
   },
   updateChallenge: async (id, updates) => {
     await updateChallenge(id, updates)
+    // Firestore subscription will update the state
+  },
+  deleteChallenge: async (id) => {
+    await deleteChallenge(id)
     // Firestore subscription will update the state
   },
   joinChallenge: async (challengeId) => {
@@ -606,6 +650,112 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
     await updateUserData(user.id, { [key]: value })
     // Update local state
     set({ user: { ...user, [key]: value } })
+  },
+
+  resetProgress: async () => {
+    const user = get().user
+    if (!user) return
+
+    // Reset user XP, level, streak, longestStreak
+    await updateUserData(user.id, {
+      xp: 0,
+      level: 1,
+      xpToNextLevel: 100,
+      streak: 0,
+      longestStreak: 0,
+    })
+
+    // Clear all habit completion data
+    const habits = get().habits
+    for (const habit of habits) {
+      await updateHabitFirestore(habit.id, {
+        completedDates: [],
+        completionsPerDay: {},
+        missedDates: [],
+      })
+    }
+
+    // Clear challenge progress for this user
+    // Get all challenges and reset progress for challenges where user is a participant
+    const allChallenges = await getChallenges()
+    const userChallenges = allChallenges.filter(challenge => 
+      challenge.participants.includes(user.id)
+    )
+    
+    for (const challenge of userChallenges) {
+      // Remove user's progress and completedDates
+      const updatedProgress = { ...(challenge.progress || {}) }
+      delete updatedProgress[user.id]
+      
+      const updatedCompletedDates = { ...(challenge.completedDates || {}) }
+      delete updatedCompletedDates[user.id]
+      
+      // Only update if there were changes
+      if (challenge.progress?.[user.id] !== undefined || challenge.completedDates?.[user.id] !== undefined) {
+        const cleanUpdates: any = {}
+        
+        // Only include progress if there are other users with progress, or if we're removing the last one
+        if (Object.keys(updatedProgress).length > 0) {
+          cleanUpdates.progress = updatedProgress
+        } else if (challenge.progress) {
+          // If removing the last user's progress, set to empty object
+          cleanUpdates.progress = {}
+        }
+        
+        // Same for completedDates
+        if (Object.keys(updatedCompletedDates).length > 0) {
+          cleanUpdates.completedDates = updatedCompletedDates
+        } else if (challenge.completedDates) {
+          cleanUpdates.completedDates = {}
+        }
+        
+        // Remove undefined fields
+        Object.keys(cleanUpdates).forEach(key => {
+          if (cleanUpdates[key] === undefined) {
+            delete cleanUpdates[key]
+          }
+        })
+        
+        if (Object.keys(cleanUpdates).length > 0) {
+          await updateChallenge(challenge.id, cleanUpdates)
+        }
+      }
+    }
+
+    // Clear daily stats XP earned (reset all daily stats)
+    // Get all daily stats from Firestore, not just the ones in current state
+    const allDailyStats = await getAllUserDailyStats(user.id)
+    for (const stat of allDailyStats) {
+      await saveDailyStats(user.id, {
+        ...stat,
+        xpEarned: 0,
+        habitsCompleted: 0,
+        challengesCompleted: 0,
+        distractionsBlocked: 0,
+      })
+    }
+
+    // Update local state
+    set({ 
+      user: { 
+        ...user, 
+        xp: 0, 
+        level: 1, 
+        xpToNextLevel: 100, 
+        streak: 0, 
+        longestStreak: 0 
+      },
+      dailyStats: allDailyStats.map(stat => ({
+        ...stat,
+        xpEarned: 0,
+        habitsCompleted: 0,
+        challengesCompleted: 0,
+        distractionsBlocked: 0,
+      }))
+    })
+
+    // Sync user to refresh all data
+    await get().syncUser(user.id)
   },
 
   unsubscribe: () => {

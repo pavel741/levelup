@@ -1,34 +1,37 @@
 'use client'
 
 import { useFirestoreStore } from '@/store/useFirestoreStore'
-import { Trophy, Users, Clock, Edit2, DollarSign, Link2 } from 'lucide-react'
+import { Trophy, Users, Clock, Edit2, DollarSign, Link2, Trash2 } from 'lucide-react'
 import { Challenge } from '@/types'
 import { format, differenceInDays } from 'date-fns'
 import { calculateFinanceChallengeProgress, getFinanceChallengeStatus } from '@/lib/financeChallengeUtils'
+import { calculateWorkoutChallengeProgress, getWorkoutChallengeProgressText } from '@/lib/workoutChallengeUtils'
 import { useEffect, useState } from 'react'
 import { subscribeToTransactions } from '@/lib/financeApi'
+import { subscribeToWorkoutLogs } from '@/lib/workoutApi'
 import type { FinanceTransaction } from '@/types/finance'
+import type { WorkoutLog } from '@/types/workout'
 
 interface ChallengeCardProps {
   challenge: Challenge
   onEdit?: (challenge: Challenge) => void
+  onDelete?: (challengeId: string) => void
 }
 
-export default function ChallengeCard({ challenge, onEdit }: ChallengeCardProps) {
+export default function ChallengeCard({ challenge, onEdit, onDelete }: ChallengeCardProps) {
   const { user, joinChallenge, habits } = useFirestoreStore()
   const [financeTransactions, setFinanceTransactions] = useState<FinanceTransaction[]>([])
+  const [workoutLogs, setWorkoutLogs] = useState<WorkoutLog[]>([])
   const isParticipating = challenge.participants.includes(user?.id || '')
   const daysRemaining = differenceInDays(challenge.endDate, new Date())
   
   // Load finance transactions for finance challenges (only if participating)
-  // Note: This creates a subscription, but it's debounced and optimized in the subscription function
   useEffect(() => {
     if (challenge.type === 'finance' && user?.id && isParticipating) {
       let lastHash = ''
       const unsubscribe = subscribeToTransactions(
         user.id,
         (txs) => {
-          // Only update if data changed (handled by subscription, but double-check)
           const newHash = txs.length > 0 
             ? `${txs.length}-${txs[0]?.id || ''}-${txs[txs.length - 1]?.id || ''}`
             : 'empty'
@@ -37,7 +40,27 @@ export default function ChallengeCard({ challenge, onEdit }: ChallengeCardProps)
             setFinanceTransactions(txs)
           }
         },
-        { limitCount: 0 } // Load all transactions for accurate calculation
+        { limitCount: 0 }
+      )
+      return () => unsubscribe()
+    }
+  }, [challenge.type, user?.id, isParticipating])
+
+  // Load workout logs for workout challenges (only if participating)
+  useEffect(() => {
+    if (challenge.type === 'workout' && user?.id && isParticipating) {
+      let lastHash = ''
+      const unsubscribe = subscribeToWorkoutLogs(
+        user.id,
+        (logs) => {
+          const newHash = logs.length > 0 
+            ? `${logs.length}-${logs[0]?.id || ''}-${logs[logs.length - 1]?.id || ''}`
+            : 'empty'
+          if (newHash !== lastHash) {
+            lastHash = newHash
+            setWorkoutLogs(logs)
+          }
+        }
       )
       return () => unsubscribe()
     }
@@ -55,6 +78,12 @@ export default function ChallengeCard({ challenge, onEdit }: ChallengeCardProps)
     progressPercentage = userProgress
     isCompleted = userProgress >= 100
     progressLabel = getFinanceChallengeStatus(challenge, userProgress)
+  } else if (challenge.type === 'workout' && challenge.workoutGoalType) {
+    // Workout challenge: progress is percentage-based
+    userProgress = user ? calculateWorkoutChallengeProgress(challenge, workoutLogs, user.id) : 0
+    progressPercentage = userProgress
+    isCompleted = userProgress >= 100
+    progressLabel = user ? getWorkoutChallengeProgressText(challenge, workoutLogs, user.id) : '0%'
   } else {
     // Habit challenge: progress is days-based
     progressPercentage = Math.min((userProgress / challenge.duration) * 100, 100)
@@ -78,6 +107,11 @@ export default function ChallengeCard({ challenge, onEdit }: ChallengeCardProps)
                 challenge.difficulty === 'easy' ? 'text-green-600' :
                 challenge.difficulty === 'medium' ? 'text-yellow-600' : 'text-red-600'
               }`} />
+            ) : challenge.type === 'workout' ? (
+              <Trophy className={`w-5 h-5 ${
+                challenge.difficulty === 'easy' ? 'text-green-600' :
+                challenge.difficulty === 'medium' ? 'text-yellow-600' : 'text-red-600'
+              }`} />
             ) : (
               <Trophy className={`w-5 h-5 ${
                 challenge.difficulty === 'easy' ? 'text-green-600' :
@@ -85,15 +119,30 @@ export default function ChallengeCard({ challenge, onEdit }: ChallengeCardProps)
               }`} />
             )}
             <h3 className="font-semibold text-gray-900 dark:text-white">{challenge.title}</h3>
-            {onEdit && (
-              <button
-                onClick={() => onEdit(challenge)}
-                className="ml-auto p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-                title="Edit challenge"
-              >
-                <Edit2 className="w-4 h-4" />
-              </button>
-            )}
+            <div className="flex items-center gap-1">
+              {onEdit && (
+                <button
+                  onClick={() => onEdit(challenge)}
+                  className="p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                  title="Edit challenge"
+                >
+                  <Edit2 className="w-4 h-4" />
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  onClick={() => {
+                    if (confirm(`Are you sure you want to delete "${challenge.title}"? This action cannot be undone.`)) {
+                      onDelete(challenge.id)
+                    }
+                  }}
+                  className="p-1.5 rounded-lg text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                  title="Delete challenge"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+            </div>
           </div>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">{challenge.description}</p>
           <div className="flex items-center gap-2 mb-3">
@@ -135,6 +184,15 @@ export default function ChallengeCard({ challenge, onEdit }: ChallengeCardProps)
                 {challenge.financeGoalType === 'no_spend_days' && `Target: ${challenge.financeTarget} no-spend days`}
               </p>
             )}
+            {challenge.type === 'workout' && challenge.workoutGoalType && (
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {challenge.workoutGoalType === 'workouts_completed' && `Target: ${challenge.workoutTarget} workouts`}
+                {challenge.workoutGoalType === 'workouts_per_week' && `Target: ${challenge.workoutTargetPerWeek} workouts per week`}
+                {challenge.workoutGoalType === 'routine_completed' && `Target: Complete routine ${challenge.workoutTarget} times`}
+                {challenge.workoutGoalType === 'total_volume' && `Target: ${challenge.workoutTarget} kg total volume`}
+                {challenge.workoutGoalType === 'streak' && `Target: ${challenge.workoutTarget} day workout streak`}
+              </p>
+            )}
           </div>
         )}
         <div className="flex items-center justify-between text-sm">
@@ -151,6 +209,13 @@ export default function ChallengeCard({ challenge, onEdit }: ChallengeCardProps)
           <div className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1.5 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded">
             <Link2 className="w-3 h-3" />
             <span className="font-medium">Linked to your finances</span>
+            <span className="text-gray-500 dark:text-gray-400">• Updates automatically</span>
+          </div>
+        )}
+        {challenge.type === 'workout' && (
+          <div className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1.5 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded">
+            <Link2 className="w-3 h-3" />
+            <span className="font-medium">Linked to your workouts</span>
             <span className="text-gray-500 dark:text-gray-400">• Updates automatically</span>
           </div>
         )}

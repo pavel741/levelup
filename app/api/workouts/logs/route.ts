@@ -37,6 +37,7 @@ export async function POST(request: NextRequest) {
     }
 
     await saveWorkoutLog(log)
+
     return NextResponse.json({ success: true })
   } catch (error: any) {
     console.error('Error saving workout log:', error)

@@ -7,12 +7,12 @@ export const dynamic = 'force-dynamic'
 import AuthGuard from '@/components/AuthGuard'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { User, Bell, Shield, Moon, CheckCircle2 } from 'lucide-react'
+import { User, Bell, Shield, Moon, CheckCircle2, RotateCcw, AlertTriangle } from 'lucide-react'
 import { useTheme } from '@/components/ThemeProvider'
 import { requestNotificationPermission } from '@/lib/notifications'
 
 export default function SettingsPage() {
-  const { user, updateUserPreference } = useFirestoreStore()
+  const { user, updateUserPreference, resetProgress } = useFirestoreStore()
   const { theme, toggleTheme } = useTheme()
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default')
   const [emailSummaryEnabled, setEmailSummaryEnabled] = useState(user?.emailSummaryEnabled || false)
@@ -21,6 +21,8 @@ export default function SettingsPage() {
   const [name, setName] = useState(user?.name || '')
   const [avatarUrl, setAvatarUrl] = useState(user?.avatar || '')
   const [isSavingProfile, setIsSavingProfile] = useState(false)
+  const [isResettingProgress, setIsResettingProgress] = useState(false)
+  const [showResetConfirm, setShowResetConfirm] = useState(false)
 
   useEffect(() => {
     if ('Notification' in window) {
@@ -75,6 +77,22 @@ export default function SettingsPage() {
       console.error('Error saving profile:', error)
     } finally {
       setIsSavingProfile(false)
+    }
+  }
+
+  const handleResetProgress = async () => {
+    if (!user) return
+    
+    setIsResettingProgress(true)
+    try {
+      await resetProgress()
+      setShowResetConfirm(false)
+      alert('Progress has been reset successfully!')
+    } catch (error) {
+      console.error('Error resetting progress:', error)
+      alert('Failed to reset progress. Please try again.')
+    } finally {
+      setIsResettingProgress(false)
     }
   }
 
@@ -300,7 +318,7 @@ export default function SettingsPage() {
               </div>
 
               {/* Appearance */}
-              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
                 <div className="p-6 border-b border-gray-200 dark:border-gray-700">
                   <div className="flex items-center gap-3">
                     <Moon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
@@ -326,6 +344,69 @@ export default function SettingsPage() {
                       ></span>
                     </button>
                   </div>
+                </div>
+              </div>
+
+              {/* Reset Progress */}
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-red-200 dark:border-red-900">
+                <div className="p-6 border-b border-red-200 dark:border-red-900">
+                  <div className="flex items-center gap-3">
+                    <RotateCcw className="w-5 h-5 text-red-600 dark:text-red-400" />
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Reset Progress</h2>
+                  </div>
+                </div>
+                <div className="p-6 space-y-4">
+                  <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-red-900 dark:text-red-200 mb-2">Warning: This action cannot be undone</h3>
+                        <p className="text-sm text-red-800 dark:text-red-300 mb-3">
+                          Resetting your progress will permanently delete:
+                        </p>
+                        <ul className="text-sm text-red-800 dark:text-red-300 space-y-1 list-disc list-inside mb-3">
+                          <li>All XP earned (reset to 0)</li>
+                          <li>All streaks (reset to 0)</li>
+                          <li>All completed habit dates</li>
+                          <li>All daily statistics</li>
+                        </ul>
+                        <p className="text-sm text-red-800 dark:text-red-300">
+                          Your habits, challenges, and account settings will remain unchanged.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {!showResetConfirm ? (
+                    <button
+                      onClick={() => setShowResetConfirm(true)}
+                      className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                    >
+                      Reset Progress
+                    </button>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        Are you sure you want to reset all progress? This cannot be undone.
+                      </p>
+                      <div className="flex gap-3">
+                        <button
+                          onClick={handleResetProgress}
+                          disabled={isResettingProgress || !user}
+                          className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          {isResettingProgress ? 'Resetting...' : 'Yes, Reset Everything'}
+                        </button>
+                        <button
+                          onClick={() => setShowResetConfirm(false)}
+                          disabled={isResettingProgress}
+                          className="px-6 py-2 bg-gray-300 dark:bg-gray-600 text-gray-900 dark:text-white rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

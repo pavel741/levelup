@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import { Search, Filter, X, Play, Info } from 'lucide-react'
 import { EXERCISE_DATABASE, searchExercises, getExercisesByCategory, getExercisesByMuscleGroup, getExercisesByEquipment } from '@/lib/exerciseDatabase'
+import ExerciseInstructions from '@/components/ExerciseInstructions'
 import type { Exercise } from '@/types/workout'
 
 interface ExerciseLibraryProps {
@@ -294,111 +295,17 @@ export default function ExerciseLibrary({ onSelectExercise }: ExerciseLibraryPro
         </div>
       )}
 
-      {/* Exercise Detail Modal */}
+      {/* Exercise Detail Modal - Use ExerciseInstructions component */}
       {selectedExercise && (
-        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl max-w-2xl w-full shadow-xl max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{selectedExercise.name}</h2>
-              <button
-                onClick={() => setSelectedExercise(null)}
-                className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <p className="text-gray-600 dark:text-gray-400">{selectedExercise.description}</p>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <span className={`px-3 py-1 rounded text-sm font-medium ${getCategoryColor(selectedExercise.category)}`}>
-                  {selectedExercise.category}
-                </span>
-                <span className={`px-3 py-1 rounded text-sm font-medium ${getDifficultyColor(selectedExercise.difficulty)}`}>
-                  {selectedExercise.difficulty}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Primary Muscles</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {selectedExercise.muscleGroups.primary.join(', ')}
-                  </p>
-                </div>
-                {selectedExercise.muscleGroups.secondary.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Secondary Muscles</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {selectedExercise.muscleGroups.secondary.join(', ')}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Equipment</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  {selectedExercise.equipment.join(', ') || 'None required'}
-                </p>
-              </div>
-
-              <div>
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Instructions</h3>
-                <ol className="list-decimal list-inside space-y-1 text-sm text-gray-600 dark:text-gray-400">
-                  {selectedExercise.instructions.map((instruction, index) => (
-                    <li key={index}>{instruction}</li>
-                  ))}
-                </ol>
-              </div>
-
-              {selectedExercise.tips && selectedExercise.tips.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
-                    <Info className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                    Tips
-                  </h3>
-                  <ul className="list-disc list-inside space-y-1 text-sm text-gray-600 dark:text-gray-400">
-                    {selectedExercise.tips.map((tip, index) => (
-                      <li key={index}>{tip}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {selectedExercise.commonMistakes && selectedExercise.commonMistakes.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Common Mistakes</h3>
-                  <ul className="list-disc list-inside space-y-1 text-sm text-red-600 dark:text-red-400">
-                    {selectedExercise.commonMistakes.map((mistake, index) => (
-                      <li key={index}>{mistake}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {onSelectExercise && (
-                <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-                  <button
-                    onClick={() => {
-                      onSelectExercise(selectedExercise)
-                      setSelectedExercise(null)
-                    }}
-                    className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center gap-2"
-                  >
-                    <Play className="w-5 h-5" />
-                    Add to Routine
-                  </button>
-                </div>
-              )}
-            </div>
-            </div>
-          </div>
-        </div>
+        <ExerciseInstructions 
+          exercise={selectedExercise} 
+          onClose={() => setSelectedExercise(null)}
+          showAddButton={!!onSelectExercise}
+          onAddToRoutine={onSelectExercise ? () => {
+            onSelectExercise(selectedExercise)
+            setSelectedExercise(null)
+          } : undefined}
+        />
       )}
     </div>
   )

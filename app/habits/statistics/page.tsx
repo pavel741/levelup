@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
 export const dynamic = 'force-dynamic'
 import AuthGuard from '@/components/AuthGuard'
@@ -8,12 +9,13 @@ import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts'
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO } from 'date-fns'
-import { TrendingUp, Calendar, Award, Target, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { TrendingUp, Calendar, Award, Target, ArrowUpDown, ArrowUp, ArrowDown, ArrowLeft, BarChart3 } from 'lucide-react'
 import { useTheme } from '@/components/ThemeProvider'
 
-export default function StatisticsPage() {
+export default function HabitsStatisticsPage() {
   const { habits, user, dailyStats } = useFirestoreStore()
   const { theme } = useTheme()
+  const router = useRouter()
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'all'>('month')
   const [sortBy, setSortBy] = useState<'completionRate' | 'totalCompletions' | 'name'>('completionRate')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
@@ -238,9 +240,21 @@ export default function StatisticsPage() {
             <main className="flex-1 overflow-y-auto p-4 sm:p-6">
               <div className="max-w-7xl mx-auto">
                 <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                  <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">Statistics & Analytics</h1>
-                    <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">Track your progress and see your growth</p>
+                  <div className="flex items-center gap-4">
+                    <button
+                      onClick={() => router.push('/habits')}
+                      className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                      title="Back to Habits"
+                    >
+                      <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                    </button>
+                    <div>
+                      <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+                        <BarChart3 className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600 dark:text-blue-400" />
+                        Statistics & Analytics
+                      </h1>
+                      <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">Track your progress and see your growth</p>
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     <button
@@ -706,5 +720,4 @@ export default function StatisticsPage() {
     </AuthGuard>
   )
 }
-
 

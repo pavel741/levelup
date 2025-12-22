@@ -35,9 +35,9 @@ if (process.env.NODE_ENV === 'development') {
 
 // MongoDB connection options with better timeout and retry settings
 const options = {
-  serverSelectionTimeoutMS: 10000, // 10 seconds timeout
+  serverSelectionTimeoutMS: 15000, // 15 seconds timeout (increased from 10)
   socketTimeoutMS: 45000, // 45 seconds socket timeout
-  connectTimeoutMS: 10000, // 10 seconds connection timeout
+  connectTimeoutMS: 15000, // 15 seconds connection timeout (increased from 10)
   maxPoolSize: 10, // Maximum number of connections
   retryWrites: true,
   retryReads: true,
@@ -113,8 +113,32 @@ export async function getDatabase(): Promise<Db> {
       throw new Error('MongoDB DNS resolution failed. Please check your connection string format.')
     }
     
-    if (error.message?.includes('ETIMEDOUT') || error.message?.includes('timeout')) {
-      throw new Error('MongoDB connection timeout. Please check your network connection and IP whitelist settings in MongoDB Atlas.')
+    if (error.message?.includes('ETIMEDOUT') || error.message?.includes('timeout') || error.message?.includes('Server selection timed out')) {
+      console.error('💡 MongoDB connection timeout detected.')
+      console.error('💡 Common causes:')
+      console.error('   1. Your IP address is not whitelisted in MongoDB Atlas')
+      console.error('   2. MongoDB Atlas cluster is paused (free tier)')
+      console.error('   3. Network connectivity issues')
+      console.error('   4. VPN or firewall blocking the connection')
+      console.error('💡 Solutions:')
+      console.error('   - Go to MongoDB Atlas → Network Access → Add IP Address (or use 0.0.0.0/0 for testing)')
+      console.error('   - Check if your cluster is running (MongoDB Atlas → Clusters)')
+      console.error('   - Try disconnecting VPN if you\'re using one')
+      console.error('   - Check your internet connection')
+      throw new Error('MongoDB connection timeout. Please check your network connection, IP whitelist settings, and ensure your MongoDB Atlas cluster is running.')
+    }
+    
+    if (error.message?.includes('ReplicaSetNoPrimary') || error.message?.includes('no primary')) {
+      console.error('💡 MongoDB replica set has no primary server.')
+      console.error('💡 This usually means:')
+      console.error('   1. MongoDB Atlas cluster is paused or unavailable')
+      console.error('   2. Network connectivity issues preventing connection to primary')
+      console.error('   3. Cluster is in the process of failing over')
+      console.error('💡 Solutions:')
+      console.error('   - Check MongoDB Atlas dashboard to ensure cluster is running')
+      console.error('   - Wait a few minutes and try again')
+      console.error('   - Check your network connection')
+      throw new Error('MongoDB cluster unavailable. Please check MongoDB Atlas to ensure your cluster is running.')
     }
     
     throw error

@@ -37,6 +37,7 @@ export async function POST(request: NextRequest) {
     }
 
     await saveRoutine(routine)
+
     return NextResponse.json({ success: true })
   } catch (error: any) {
     console.error('Error saving routine:', error)

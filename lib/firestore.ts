@@ -329,6 +329,20 @@ export const updateChallenge = async (challengeId: string, updates: Partial<Chal
   }
 }
 
+export const deleteChallenge = async (challengeId: string): Promise<void> => {
+  if (!db) {
+    throw new Error('Firestore is not initialized')
+  }
+  
+  try {
+    const challengeRef = doc(db, 'challenges', challengeId)
+    await deleteDoc(challengeRef)
+  } catch (error) {
+    console.error('Error deleting challenge:', error)
+    throw error
+  }
+}
+
 // Daily stats
 export const getUserDailyStats = async (userId: string, date: string): Promise<DailyStats | null> => {
   if (!db) {
@@ -369,7 +383,49 @@ export const saveDailyStats = async (userId: string, stats: DailyStats): Promise
   }
 }
 
+export const getAllUserDailyStats = async (userId: string): Promise<DailyStats[]> => {
+  if (!db) {
+    throw new Error('Firestore is not initialized')
+  }
+  
+  try {
+    const statsRef = collection(db, 'dailyStats')
+    const q = query(statsRef, where('userId', '==', userId))
+    const querySnapshot = await getDocs(q)
+    
+    return querySnapshot.docs.map((doc) => doc.data() as DailyStats)
+  } catch (error) {
+    console.error('Error getting all daily stats:', error)
+    return []
+  }
+}
+
 // Workout operations
+export const getRoutinesByUserId = async (userId: string): Promise<Routine[]> => {
+  if (!db) {
+    throw new Error('Firestore is not initialized')
+  }
+  
+  try {
+    const routinesRef = collection(db, 'routines')
+    const q = query(routinesRef, where('userId', '==', userId))
+    const querySnapshot = await getDocs(q)
+    
+    return querySnapshot.docs.map((doc) => {
+      const data = doc.data()
+      return {
+        id: doc.id,
+        ...data,
+        createdAt: data.createdAt?.toDate() || new Date(),
+        updatedAt: data.updatedAt?.toDate() || new Date(),
+      }
+    }) as Routine[]
+  } catch (error) {
+    console.error('Error getting routines from Firestore:', error)
+    return []
+  }
+}
+
 export const subscribeToRoutines = (
   userId: string,
   callback: (routines: Routine[]) => void
@@ -467,6 +523,36 @@ export const deleteRoutine = async (routineId: string): Promise<void> => {
   } catch (error) {
     console.error('Error deleting routine:', error)
     throw error
+  }
+}
+
+export const getWorkoutLogsByUserId = async (userId: string): Promise<WorkoutLog[]> => {
+  if (!db) {
+    throw new Error('Firestore is not initialized')
+  }
+  
+  try {
+    const logsRef = collection(db, 'workoutLogs')
+    const q = query(logsRef, where('userId', '==', userId))
+    const querySnapshot = await getDocs(q)
+    
+    const logs = querySnapshot.docs.map((doc) => {
+      const data = doc.data()
+      return {
+        id: doc.id,
+        ...data,
+        date: data.date?.toDate() || new Date(),
+        startTime: data.startTime?.toDate() || new Date(),
+        endTime: data.endTime?.toDate() || undefined,
+      }
+    }) as WorkoutLog[]
+    
+    // Sort by date descending (most recent first)
+    logs.sort((a, b) => b.date.getTime() - a.date.getTime())
+    return logs
+  } catch (error) {
+    console.error('Error getting workout logs from Firestore:', error)
+    return []
   }
 }
 

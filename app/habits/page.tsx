@@ -7,7 +7,7 @@ import AuthGuard from '@/components/AuthGuard'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import HabitCard from '@/components/HabitCard'
-import { Plus, Target, CheckCircle2 } from 'lucide-react'
+import { Plus, Target, CheckCircle2, BarChart3 } from 'lucide-react'
 import { Habit } from '@/types'
 import { format } from 'date-fns'
 
@@ -41,6 +41,7 @@ export default function HabitsPage() {
     reminderEnabled: false,
     reminderTime: '09:00',
     startDate: '', // Format: "yyyy-MM-dd"
+    targetCountPerDay: 1,
   })
 
   const handleAddHabit = () => {
@@ -71,6 +72,8 @@ export default function HabitsPage() {
       isActive: true,
       reminderEnabled: newHabit.reminderEnabled,
       reminderTime: newHabit.reminderEnabled ? newHabit.reminderTime : undefined,
+      targetCountPerDay: newHabit.targetCountPerDay || 1,
+      completionsPerDay: {},
     })
 
     setNewHabit({
@@ -84,6 +87,7 @@ export default function HabitsPage() {
       reminderEnabled: false,
       reminderTime: '09:00',
       startDate: '',
+      targetCountPerDay: 1,
     })
     setShowAddModal(false)
   }
@@ -106,6 +110,7 @@ export default function HabitsPage() {
       reminderEnabled: habit.reminderEnabled || false,
       reminderTime: habit.reminderTime || '09:00',
       startDate: startDate,
+      targetCountPerDay: habit.targetCountPerDay || 1,
     })
     setShowEditModal(true)
   }
@@ -133,6 +138,7 @@ export default function HabitsPage() {
       startDate: newHabit.startDate ? new Date(newHabit.startDate) : undefined,
       reminderEnabled: newHabit.reminderEnabled,
       reminderTime: newHabit.reminderEnabled ? newHabit.reminderTime : undefined,
+      targetCountPerDay: newHabit.targetCountPerDay || 1,
     })
 
     setNewHabit({
@@ -146,6 +152,7 @@ export default function HabitsPage() {
       reminderEnabled: false,
       reminderTime: '09:00',
       startDate: '',
+      targetCountPerDay: 1,
     })
     setShowEditModal(false)
     setEditingHabit(null)
@@ -153,8 +160,16 @@ export default function HabitsPage() {
 
   const today = format(new Date(), 'yyyy-MM-dd')
   const activeHabits = habits.filter((h) => h.isActive)
-  const completedToday = activeHabits.filter((h) => h.completedDates.includes(today))
-  const incompleteToday = activeHabits.filter((h) => !h.completedDates.includes(today))
+  const completedToday = activeHabits.filter((h) => {
+    const targetCount = h.targetCountPerDay || 1
+    const currentCount = h.completionsPerDay?.[today] || 0
+    return h.completedDates.includes(today) && currentCount >= targetCount
+  })
+  const incompleteToday = activeHabits.filter((h) => {
+    const targetCount = h.targetCountPerDay || 1
+    const currentCount = h.completionsPerDay?.[today] || 0
+    return !h.completedDates.includes(today) || currentCount < targetCount
+  })
   const archivedHabits = habits.filter((h) => !h.isActive)
 
   return (
@@ -167,18 +182,27 @@ export default function HabitsPage() {
           <main className="flex-1 overflow-y-auto p-4 sm:p-6">
             <div className="max-w-7xl mx-auto">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-                <div>
+                <div className="flex-1">
                   <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">My Habits</h1>
                   <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">Track your daily habits and build consistency</p>
                 </div>
-                <button
-                  onClick={() => setShowAddModal(true)}
-                  className="flex items-center justify-center gap-2 px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all font-medium shadow-lg text-sm sm:text-base"
-                >
-                  <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
-                  <span className="hidden sm:inline">Add Habit</span>
-                  <span className="sm:hidden">Add</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <a
+                    href="/habits/statistics"
+                    className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-2"
+                  >
+                    <BarChart3 className="w-4 h-4" />
+                    Statistics
+                  </a>
+                  <button
+                    onClick={() => setShowAddModal(true)}
+                    className="flex items-center justify-center gap-2 px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all font-medium shadow-lg text-sm sm:text-base"
+                  >
+                    <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <span className="hidden sm:inline">Add Habit</span>
+                    <span className="sm:hidden">Add</span>
+                  </button>
+                </div>
               </div>
 
               {incompleteToday.length > 0 && (
@@ -417,6 +441,39 @@ export default function HabitsPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Target Count Per Day <span className="text-xs text-gray-500 dark:text-gray-400">(optional)</span>
+                </label>
+                <input
+                  type="number"
+                  value={newHabit.targetCountPerDay === 1 ? '' : newHabit.targetCountPerDay}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    if (value === '') {
+                      setNewHabit({ ...newHabit, targetCountPerDay: 1 })
+                    } else {
+                      const numValue = parseInt(value)
+                      if (!isNaN(numValue) && numValue >= 1) {
+                        setNewHabit({ ...newHabit, targetCountPerDay: numValue })
+                      }
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const value = parseInt(e.target.value)
+                    if (!value || value < 1) {
+                      setNewHabit({ ...newHabit, targetCountPerDay: 1 })
+                    }
+                  }}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  min="1"
+                  max="20"
+                  placeholder="1 (default)"
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  How many times should this habit be completed per day? (e.g., 3 meals, 2 dog walks). Leave empty or set to 1 for single completion.
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Start Date <span className="text-xs text-gray-500 dark:text-gray-400">(optional)</span>
                 </label>
                 <input
@@ -646,6 +703,39 @@ export default function HabitsPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Target Count Per Day <span className="text-xs text-gray-500 dark:text-gray-400">(optional)</span>
+                </label>
+                <input
+                  type="number"
+                  value={newHabit.targetCountPerDay === 1 ? '' : newHabit.targetCountPerDay}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    if (value === '') {
+                      setNewHabit({ ...newHabit, targetCountPerDay: 1 })
+                    } else {
+                      const numValue = parseInt(value)
+                      if (!isNaN(numValue) && numValue >= 1) {
+                        setNewHabit({ ...newHabit, targetCountPerDay: numValue })
+                      }
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const value = parseInt(e.target.value)
+                    if (!value || value < 1) {
+                      setNewHabit({ ...newHabit, targetCountPerDay: 1 })
+                    }
+                  }}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  min="1"
+                  max="20"
+                  placeholder="1 (default)"
+                />
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  How many times should this habit be completed per day? (e.g., 3 meals, 2 dog walks). Leave empty or set to 1 for single completion.
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Start Date <span className="text-xs text-gray-500 dark:text-gray-400">(optional)</span>
                 </label>
                 <input
@@ -694,6 +784,7 @@ export default function HabitsPage() {
                     reminderEnabled: false,
                     reminderTime: '09:00',
                     startDate: '',
+                    targetCountPerDay: 1,
                   })
                 }}
                 className="flex-1 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium text-sm sm:text-base"

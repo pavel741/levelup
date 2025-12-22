@@ -23,6 +23,7 @@ export default function AIRoutineGenerator({ onRoutineGenerated, onClose }: AIRo
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedRoutine, setGeneratedRoutine] = useState<Routine | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [isAlreadySaved, setIsAlreadySaved] = useState(false)
 
   const availableEquipment = ['barbell', 'dumbbell', 'machine', 'cable', 'bodyweight', 'kettlebell', 'resistance_bands']
 
@@ -47,20 +48,27 @@ export default function AIRoutineGenerator({ onRoutineGenerated, onClose }: AIRo
       return
     }
 
-    console.log('Starting generation...')
-    setIsGenerating(true)
-    setError(null)
-    setGeneratedRoutine(null)
+      console.log('Starting generation...')
+      setIsGenerating(true)
+      setError(null)
+      setGeneratedRoutine(null)
+      setIsAlreadySaved(false) // Reset saved state when generating new routine
 
     try {
+      // Use selected equipment, or empty array to get all exercises
+      // Empty array will be handled by the generator to include all exercises
+      const selectedEquipment = equipment.length > 0 ? equipment : []
+      
       const requestBody = {
         weight: parseFloat(weight),
         height: parseFloat(height),
         goal,
         experience,
         daysPerWeek: parseInt(daysPerWeek),
-        equipment: equipment.length > 0 ? equipment : availableEquipment,
+        equipment: selectedEquipment,
       }
+      
+      console.log('📤 Sending equipment selection:', selectedEquipment.length > 0 ? selectedEquipment : 'ALL (none selected)')
       
       console.log('Sending request:', requestBody)
       
@@ -118,6 +126,7 @@ export default function AIRoutineGenerator({ onRoutineGenerated, onClose }: AIRo
           
           // Update the generated routine with the saved version (with userId)
           setGeneratedRoutine(routineToSave)
+          setIsAlreadySaved(true) // Mark as already saved to prevent duplicate saves
           return // Don't set the original routine without userId
         } catch (saveError) {
           console.error('❌ Error auto-saving routine:', saveError)
@@ -304,8 +313,13 @@ export default function AIRoutineGenerator({ onRoutineGenerated, onClose }: AIRo
               ))}
             </div>
             {equipment.length === 0 && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                No equipment selected - will assume all equipment available
+              <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
+                ⚠️ No equipment selected - generator will use ALL available exercises (including gym equipment)
+              </p>
+            )}
+            {equipment.length > 0 && (
+              <p className="text-xs text-green-600 dark:text-green-400 mt-2">
+                ✓ Filtering exercises to match your equipment: {equipment.join(', ')}
               </p>
             )}
           </div>
@@ -342,12 +356,26 @@ export default function AIRoutineGenerator({ onRoutineGenerated, onClose }: AIRo
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-            <h3 className="font-semibold text-green-900 dark:text-green-100 mb-2">
-              ✓ Routine Generated Successfully!
+          <div className={`p-4 border rounded-lg ${
+            isAlreadySaved 
+              ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' 
+              : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+          }`}>
+            <h3 className={`font-semibold mb-2 ${
+              isAlreadySaved 
+                ? 'text-green-900 dark:text-green-100' 
+                : 'text-blue-900 dark:text-blue-100'
+            }`}>
+              {isAlreadySaved ? '✓ Routine Saved Successfully!' : '✓ Routine Generated Successfully!'}
             </h3>
-            <p className="text-sm text-green-700 dark:text-green-300">
-              Review the routine below and save it to your routines.
+            <p className={`text-sm ${
+              isAlreadySaved 
+                ? 'text-green-700 dark:text-green-300' 
+                : 'text-blue-700 dark:text-blue-300'
+            }`}>
+              {isAlreadySaved 
+                ? 'This routine has been automatically saved to your routines list.' 
+                : 'Review the routine below and save it to your routines.'}
             </p>
           </div>
 
@@ -407,18 +435,29 @@ export default function AIRoutineGenerator({ onRoutineGenerated, onClose }: AIRo
               onClick={() => {
                 setGeneratedRoutine(null)
                 setError(null)
+                setIsAlreadySaved(false)
               }}
               className="flex-1 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors font-medium"
             >
               Generate Another
             </button>
-            <button
-              onClick={handleSaveRoutine}
-              className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center justify-center gap-2"
-            >
-              <Save className="w-4 h-4" />
-              Save Routine
-            </button>
+            {isAlreadySaved ? (
+              <button
+                disabled
+                className="flex-1 px-4 py-2 bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-lg font-medium flex items-center justify-center gap-2 cursor-not-allowed"
+              >
+                <Save className="w-4 h-4" />
+                Already Saved
+              </button>
+            ) : (
+              <button
+                onClick={handleSaveRoutine}
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center justify-center gap-2"
+              >
+                <Save className="w-4 h-4" />
+                Save Routine
+              </button>
+            )}
           </div>
         </div>
       )}

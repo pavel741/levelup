@@ -19,7 +19,6 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
     { icon: Target, label: 'Habits', href: '/habits' },
     { icon: Trophy, label: 'Challenges', href: '/challenges' },
     { icon: Dumbbell, label: 'Workouts', href: '/workouts' },
-    { icon: BarChart3, label: 'Statistics', href: '/statistics' },
     { icon: Wallet, label: 'Finance', href: '/finance' },
     { icon: Award, label: 'Achievements', href: '/achievements' },
     { icon: MessageCircle, label: 'Feedback', href: '/feedback' },

@@ -11,7 +11,7 @@ import AchievementCelebration from '@/components/AchievementCelebration'
 import { Achievement } from '@/types'
 
 export default function Home() {
-  const { user, habits, challenges, addHabit, newAchievements, showAchievementCelebration } = useFirestoreStore()
+  const { user, newAchievements, showAchievementCelebration } = useFirestoreStore()
   const initialized = useRef(false)
   const [showCelebration, setShowCelebration] = useState(false)
   const [celebratingAchievement, setCelebratingAchievement] = useState<Achievement | null>(null)
@@ -36,8 +36,6 @@ export default function Home() {
     if (!initialized.current && user) {
       initialized.current = true
     }
-
-    // Challenges are loaded from Firestore automatically
   }, [user])
 
   return (

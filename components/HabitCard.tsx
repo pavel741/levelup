@@ -21,10 +21,12 @@ export default function HabitCard({ habit, onEdit }: HabitCardProps) {
   const [validationResult, setValidationResult] = useState<{ valid: boolean; message?: string } | null>(null)
   const [showXPGain, setShowXPGain] = useState(false)
   const [xpGained, setXpGained] = useState(0)
-  const [prevCompleted, setPrevCompleted] = useState(habit.completedDates.includes(format(new Date(), 'yyyy-MM-dd')))
   const today = format(new Date(), 'yyyy-MM-dd')
+  const targetCount = habit.targetCountPerDay || 1
+  const currentCount = habit.completionsPerDay?.[today] || 0
   const isCompleted = habit.completedDates.includes(today)
   const isMissed = habit.missedDates?.some((m) => m.date === today)
+  const [prevCompleted, setPrevCompleted] = useState(isCompleted)
   
   // Track XP changes to show notification when habit becomes completed
   useEffect(() => {
@@ -54,9 +56,14 @@ export default function HabitCard({ habit, onEdit }: HabitCardProps) {
     : true // If no startDate, habit has started
 
   const handleToggle = () => {
-    if (isCompleted) {
+    const targetCount = habit.targetCountPerDay || 1
+    const currentCount = habit.completionsPerDay?.[today] || 0
+    
+    // If already reached target, uncomplete (decrement)
+    if (isCompleted && currentCount >= targetCount) {
       uncompleteHabit(habit.id)
     } else {
+      // Otherwise, complete (increment)
       completeHabit(habit.id)
     }
   }
@@ -178,36 +185,47 @@ export default function HabitCard({ habit, onEdit }: HabitCardProps) {
                 <span>Missed</span>
               </button>
             )}
-            <button
-              onClick={handleToggle}
-              disabled={!hasStarted}
-              className={`p-2 rounded-lg transition-colors ${
-                !hasStarted
-                  ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed opacity-50'
-                  : isCompleted
-                  ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20'
-                  : isMissed
-                  ? 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20'
-                  : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-              }`}
-              title={
-                !hasStarted && habit.startDate
-                  ? `Habit starts on ${habit.startDate instanceof Date ? format(habit.startDate, 'MMM d, yyyy') : format(new Date(habit.startDate), 'MMM d, yyyy')}`
-                  : isCompleted 
-                  ? 'Completed' 
-                  : isMissed 
-                  ? 'Missed' 
-                  : 'Mark as complete'
-              }
-            >
-              {isCompleted ? (
-                <CheckCircle2 className="w-6 h-6" />
-              ) : isMissed ? (
-                <AlertCircle className="w-6 h-6" />
-              ) : (
-                <Circle className="w-6 h-6" />
+            <div className="flex items-center gap-2">
+              {targetCount > 1 && (
+                <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                  {currentCount}/{targetCount}
+                </span>
               )}
-            </button>
+              <button
+                onClick={handleToggle}
+                disabled={!hasStarted || (isCompleted && currentCount >= targetCount)}
+                className={`p-2 rounded-lg transition-colors ${
+                  !hasStarted
+                    ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed opacity-50'
+                    : isCompleted && currentCount >= targetCount
+                    ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 cursor-default'
+                    : isMissed
+                    ? 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20'
+                    : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                }`}
+                title={
+                  !hasStarted && habit.startDate
+                    ? `Habit starts on ${habit.startDate instanceof Date ? format(habit.startDate, 'MMM d, yyyy') : format(new Date(habit.startDate), 'MMM d, yyyy')}`
+                    : isCompleted && currentCount >= targetCount
+                    ? `Completed (${currentCount}/${targetCount})`
+                    : targetCount > 1
+                    ? `${currentCount}/${targetCount} - Click to add one more`
+                    : isCompleted 
+                    ? 'Completed' 
+                    : isMissed 
+                    ? 'Missed' 
+                    : 'Mark as complete'
+                }
+              >
+                {isCompleted && currentCount >= targetCount ? (
+                  <CheckCircle2 className="w-6 h-6" />
+                ) : isMissed ? (
+                  <AlertCircle className="w-6 h-6" />
+                ) : (
+                  <Circle className="w-6 h-6" />
+                )}
+              </button>
+            </div>
             {onEdit && (
               <button
                 onClick={() => onEdit(habit)}
@@ -346,6 +364,14 @@ export default function HabitCard({ habit, onEdit }: HabitCardProps) {
               )}
             </span>
           </div>
+          {targetCount > 1 && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-600 dark:text-gray-400">Today's Progress</span>
+              <span className="font-semibold text-blue-600 dark:text-blue-400">
+                {currentCount}/{targetCount}
+              </span>
+            </div>
+          )}
           <div className="flex items-center justify-between text-sm">
             <span className="text-gray-600 dark:text-gray-400">Streak</span>
             <span className="font-semibold text-orange-600 dark:text-orange-400">🔥 {streak} days</span>
