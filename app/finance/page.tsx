@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
-import AuthGuard from '@/components/AuthGuard'
-import Sidebar from '@/components/Sidebar'
-import Header from '@/components/Header'
+import AuthGuard from '@/components/common/AuthGuard'
+import Sidebar from '@/components/layout/Sidebar'
+import Header from '@/components/layout/Header'
 import { Wallet, TrendingUp, TrendingDown, DollarSign } from 'lucide-react'
 // Using MongoDB for finance data (no quota limits!)
 // Client-side API wrapper (calls server-side MongoDB via API routes)
@@ -18,13 +18,16 @@ import {
   batchAddTransactions,
   batchDeleteTransactions,
   getFinanceSettings,
+  getTransactions,
 } from '@/lib/financeApi'
 import type { FinanceTransaction, FinanceCategories, FinanceSettings } from '@/types/finance'
 import { getPeriodDates, parseTransactionDate } from '@/lib/financeDateUtils'
 import { CSVImportService } from '@/lib/csvImport'
 import { ESTONIAN_BANK_PROFILES } from '@/lib/bankProfiles'
 import { getSuggestedCategory } from '@/lib/transactionCategorizer'
-import { formatCurrency, formatDate, formatDisplayDate } from '@/lib/utils/formatting'
+import { formatCurrency, formatDate, formatDisplayDate, normalizeDate, showError, showSuccess } from '@/lib/utils'
+import { CardSkeleton, TransactionListSkeleton } from '@/components/ui/Skeleton'
+import { VirtualList } from '@/components/ui/VirtualList'
 
 export const dynamic = 'force-dynamic'
 
@@ -104,7 +107,7 @@ export default function FinancePage() {
   const [csvDetectedBank, setCsvDetectedBank] = useState<string | null>(null)
   const [csvSelectedBank, setCsvSelectedBank] = useState<string | null>(null)
   
-  // Load transactions with optimized polling
+  // Load transactions with optimized initial load (limit to 100 for fast initial render)
   useEffect(() => {
     if (!user?.id) return
 
@@ -113,18 +116,24 @@ export default function FinancePage() {
     const loadTransactions = async () => {
       try {
         setIsLoading(true)
+        // Fast initial load with limit for immediate UI feedback
+        getTransactions(user.id, { limitCount: 100 }).then(txs => {
+          setTransactions(txs)
+          setIsLoading(false)
+        }).catch(error => {
+          console.error('Error fetching transactions on mount:', error)
+          setIsLoading(false)
+        })
+        
+        // Then set up subscription for ongoing updates (load all in background)
         unsubscribe = subscribeToTransactions(
           user.id,
           (txs) => {
             // Only update state if transactions actually changed (handled by subscription)
             setTransactions(txs)
             setIsLoading(false)
-            // Reduced logging for performance
-            if (txs.length > 0 && txs.length % 1000 === 0) {
-              console.log(`📊 Loaded ${txs.length} transactions from MongoDB`)
-            }
           },
-          { limitCount: 0 } // 0 = no limit, load all transactions (MongoDB can handle it!)
+          { limitCount: 0 } // Load all in background for complete data
         )
       } catch (error) {
         console.error('Failed to load transactions from MongoDB:', error)
@@ -308,10 +317,13 @@ export default function FinancePage() {
       startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
       endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
     } else if (dateRange === 'week') {
-      const dayOfWeek = now.getDay()
-      const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1)
-      startDate = new Date(now.getFullYear(), now.getMonth(), diff)
-      endDate = new Date(now.getFullYear(), now.getMonth(), diff + 6, 23, 59, 59)
+      // Calculate start of week (Monday) - more robust approach
+      const dayOfWeek = now.getDay() // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1 // Days to subtract to get to Monday
+      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysToMonday)
+      startDate.setHours(0, 0, 0, 0)
+      // End date is today at end of day
+      endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
     } else if (dateRange === 'month') {
       startDate = new Date(now.getFullYear(), now.getMonth(), 1)
       endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
@@ -327,7 +339,11 @@ export default function FinancePage() {
     if (startDate && endDate) {
       filtered = filtered.filter((tx) => {
         const txDate = parseTransactionDate(tx.date)
-        return txDate >= startDate! && txDate <= endDate!
+        // Normalize dates to midnight for accurate comparison
+        const txDateOnly = new Date(txDate.getFullYear(), txDate.getMonth(), txDate.getDate())
+        const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate())
+        const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate())
+        return txDateOnly >= startDateOnly && txDateOnly <= endDateOnly
       })
     }
 
@@ -558,7 +574,7 @@ export default function FinancePage() {
       setFormDate(new Date().toISOString().split('T')[0])
     } catch (error) {
       console.error('Error saving transaction:', error)
-      alert('Error saving transaction. Please try again.')
+      showError(error, { component: 'FinancePage', action: 'saveTransaction' })
     } finally {
       setIsSubmitting(false)
     }
@@ -587,7 +603,7 @@ export default function FinancePage() {
       await deleteTransaction(user.id, id)
     } catch (error) {
       console.error('Error deleting transaction:', error)
-      alert('Error deleting transaction. Please try again.')
+      showError(error, { component: 'FinancePage', action: 'deleteTransaction' })
     }
   }
 
@@ -606,11 +622,11 @@ export default function FinancePage() {
       const transactionIds = transactions.map((tx) => tx.id!).filter((id) => id)
       if (transactionIds.length > 0) {
         await batchDeleteTransactions(user.id, transactionIds)
-        alert(`Successfully deleted ${transactionIds.length} transactions`)
+        showSuccess(`Successfully deleted ${transactionIds.length} transactions`)
       }
     } catch (error) {
       console.error('Error deleting all transactions:', error)
-      alert('Error deleting transactions. Please try again.')
+      showError(error, { component: 'FinancePage', action: 'batchDeleteTransactions' })
     } finally {
       setIsSubmitting(false)
     }
@@ -836,10 +852,10 @@ export default function FinancePage() {
         }
       }
       
-      alert(`Successfully recategorized ${updatedCount} of ${transactionsSnapshot.length} transactions`)
+      showSuccess(`Successfully recategorized ${updatedCount} of ${transactionsSnapshot.length} transactions`)
     } catch (error) {
       console.error('Error recategorizing transactions:', error)
-      alert('Error recategorizing transactions. Please try again.')
+      showError(error, { component: 'FinancePage', action: 'recategorizeTransactions' })
     } finally {
       setIsSubmitting(false)
     }
@@ -907,7 +923,7 @@ export default function FinancePage() {
   // Verify imported dates
   const handleVerifyDates = () => {
     if (transactions.length === 0) {
-      alert('No transactions to verify')
+      showError('No transactions to verify', { component: 'FinancePage', action: 'verifyDates' })
       return
     }
 
@@ -922,20 +938,35 @@ export default function FinancePage() {
       futureCount: 0,
       veryOldCount: 0,
       invalidCount: 0,
-      suspiciousDates: [] as Array<{ description: string; date: any; issue: string }>,
+      suspiciousDates: [] as Array<{ description: string; date: string | Date; issue: string }>,
+    }
+
+    // Helper to normalize date to string or Date for display
+    const normalizeDateForDisplay = (date: string | Date | { toDate?: () => Date }): string | Date => {
+      const normalized = normalizeDate(date)
+      if (normalized) {
+        return normalized
+      }
+      // Fallback: return as string if normalization fails
+      if (typeof date === 'string') {
+        return date
+      }
+      return String(date)
     }
 
     transactions.forEach((tx) => {
-      let txDate: Date
+      let txDate: Date | null = null
       try {
-        if (typeof tx.date === 'string') {
-          txDate = new Date(tx.date + 'T00:00:00')
-        } else if (tx.date && typeof tx.date === 'object' && 'toDate' in tx.date && typeof (tx.date as any).toDate === 'function') {
-          txDate = (tx.date as any).toDate()
-        } else if (tx.date instanceof Date) {
-          txDate = tx.date
-        } else {
-          txDate = new Date(tx.date as any)
+        // Use unified date normalization
+        txDate = normalizeDate(tx.date)
+        if (!txDate) {
+          stats.invalidCount++
+          stats.suspiciousDates.push({
+            description: tx.description || 'Unknown',
+            date: normalizeDateForDisplay(tx.date),
+            issue: 'Invalid date format',
+          })
+          return
         }
         txDate.setHours(0, 0, 0, 0)
 
@@ -943,7 +974,7 @@ export default function FinancePage() {
           stats.invalidCount++
           stats.suspiciousDates.push({
             description: tx.description || 'Unknown',
-            date: tx.date,
+            date: normalizeDateForDisplay(tx.date),
             issue: 'Invalid date format',
           })
           return
@@ -954,7 +985,7 @@ export default function FinancePage() {
           if (stats.todayCount <= 5) {
             stats.suspiciousDates.push({
               description: tx.description || 'Unknown',
-              date: tx.date,
+              date: normalizeDateForDisplay(tx.date),
               issue: 'Date is today (might indicate parsing failure)',
             })
           }
@@ -963,7 +994,7 @@ export default function FinancePage() {
           if (stats.futureCount <= 5) {
             stats.suspiciousDates.push({
               description: tx.description || 'Unknown',
-              date: tx.date,
+              date: normalizeDateForDisplay(tx.date),
               issue: 'Future date',
             })
           }
@@ -972,7 +1003,7 @@ export default function FinancePage() {
           if (stats.veryOldCount <= 5) {
             stats.suspiciousDates.push({
               description: tx.description || 'Unknown',
-              date: tx.date,
+              date: normalizeDateForDisplay(tx.date),
               issue: 'Very old date (more than 1 year ago)',
             })
           }
@@ -981,7 +1012,7 @@ export default function FinancePage() {
         stats.invalidCount++
         stats.suspiciousDates.push({
           description: tx.description || 'Unknown',
-          date: tx.date,
+          date: normalizeDateForDisplay(tx.date),
           issue: 'Error parsing date',
         })
       }
@@ -1003,7 +1034,8 @@ export default function FinancePage() {
       message += `All dates appear to be valid!`
     }
 
-    alert(message)
+    // Show verification results as info message (longer duration for reading)
+    showSuccess(message, 10000)
   }
 
   // CSV Import handlers
@@ -1033,8 +1065,8 @@ export default function FinancePage() {
       setShowCsvMapping(true)
       const bankInfo = result.detectedBank ? ` (${result.detectedBank.displayName})` : ''
       setCsvImportStatus(`Found ${result.transactions.length} transactions${bankInfo}`)
-    } catch (error: any) {
-      const errorMessage = error?.message || 'Unknown error'
+    } catch (error: unknown) {
+      const errorMessage = error && typeof error === 'object' && 'message' in error && typeof error.message === 'string' ? error.message : 'Unknown error'
       if (errorMessage.includes('parsing')) {
         setCsvImportStatus(`Error parsing CSV: ${errorMessage}`)
       } else {
@@ -1059,8 +1091,9 @@ export default function FinancePage() {
         setCsvHeaders(result.columnMapping._allHeaders || [])
         setCsvDetectedBank(result.detectedBank?.id || null)
         setCsvImportStatus(`Re-parsed ${result.transactions.length} transactions using ${ESTONIAN_BANK_PROFILES.find(b => b.id === bankId)?.displayName || 'selected bank'} profile`)
-      } catch (error: any) {
-        setCsvImportStatus(`Error re-parsing CSV: ${error?.message || 'Unknown error'}`)
+      } catch (error: unknown) {
+        const errorMessage = error && typeof error === 'object' && 'message' in error && typeof error.message === 'string' ? error.message : 'Unknown error'
+        setCsvImportStatus(`Error re-parsing CSV: ${errorMessage}`)
       }
     }
   }
@@ -1225,16 +1258,17 @@ export default function FinancePage() {
         setCsvImportStatus('')
         setCsvImportProgress(0)
       }, 3000)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ CSV Import Error:', error)
-      let errorMessage = error.message || 'Unknown error'
+      let errorMessage = error && typeof error === 'object' && 'message' in error && typeof error.message === 'string' ? error.message : 'Unknown error'
       
       setCsvImportProgress(0)
       // Provide user-friendly message for quota errors
       if (errorMessage.includes('quota') || errorMessage.includes('resource-exhausted')) {
-        errorMessage = `Firestore quota exceeded. ${errorMessage.includes('after') ? errorMessage : 
-          'Firestore free tier has daily write limits (~20k writes/day). ' +
-          'Please wait a few minutes and try importing the remaining transactions, or upgrade to a paid plan for higher limits.'}`
+        const quotaMessage = errorMessage.includes('after') 
+          ? errorMessage 
+          : 'Firestore free tier has daily write limits (~20k writes/day). Please wait a few minutes and try importing the remaining transactions, or upgrade to a paid plan for higher limits.'
+        errorMessage = `Firestore quota exceeded. ${quotaMessage}`
       }
       
       setCsvImportStatus(`Error importing: ${errorMessage}`)
@@ -1284,7 +1318,19 @@ export default function FinancePage() {
                   </div>
                 </div>
 
-                {/* Dashboard */}
+                {/* Dashboard - Show immediately with skeleton if loading */}
+                {isLoading && transactions.length === 0 ? (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <CardSkeleton />
+                      <CardSkeleton />
+                      <CardSkeleton />
+                    </div>
+                    <CardSkeleton />
+                    <TransactionListSkeleton count={10} />
+                  </div>
+                ) : (
+                <>
                 <div className="mb-6">
                   <div className="flex justify-between items-center mb-4 flex-wrap gap-4">
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Summary</h2>
@@ -2003,7 +2049,8 @@ export default function FinancePage() {
                           </div>
                         ) : (
                           <>
-                            {filteredTransactions.length > transactionsPerPage && (
+                            {/* Pagination only for small lists (<=50 items) */}
+                            {filteredTransactions.length <= 50 && filteredTransactions.length > transactionsPerPage && (
                               <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center justify-between">
                                 <span className="text-sm text-blue-800 dark:text-blue-200">
                                   Showing {((currentPage - 1) * transactionsPerPage) + 1}-{Math.min(currentPage * transactionsPerPage, filteredTransactions.length)} of {filteredTransactions.length} transactions
@@ -2029,111 +2076,229 @@ export default function FinancePage() {
                                 </div>
                               </div>
                             )}
-                            {paginatedTransactions.map((tx) => {
-                            const txType = (tx.type || '').toLowerCase()
-                            const amount = Number(tx.amount) || 0
-                            
-                            // Determine if income or expense: prioritize type field, then check amount sign
-                            let isIncome: boolean
-                            if (txType === 'income') {
-                              isIncome = true
-                            } else if (txType === 'expense') {
-                              isIncome = false
-                            } else {
-                              // If type not set, use amount sign: positive = income, negative = expense
-                              isIncome = amount >= 0
-                            }
-                            
-                            // Display amount: if expense with positive amount, show as negative
-                            const displayAmount = !isIncome && amount > 0 ? -amount : amount
-                            
-                            // Clean description - remove card/account info if it's in the description
-                            let cleanDescription = tx.description || '—'
-                            if (cleanDescription.includes('POS:') || cleanDescription.match(/\d{4}\s+\d{2}\*\*/)) {
-                              // Extract merchant name if it exists after card info
-                              const parts = cleanDescription.split(',').map(p => p.trim())
-                              const merchantPart = parts.find(p => !p.includes('POS:') && !p.match(/\d{4}\s+\d{2}\*\*/))
-                              if (merchantPart) {
-                                cleanDescription = merchantPart
-                              } else {
-                                // Just use the first part that's not card info
-                                cleanDescription = parts.find(p => !p.includes('POS:') && !p.match(/\d{4}\s+\d{2}\*\*/)) || cleanDescription
-                              }
-                            }
-                            
-                            return (
-                              <div
-                                key={tx.id}
-                                className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-all"
-                              >
-                                <div className="flex items-start justify-between gap-4">
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-start gap-3 mb-2">
-                                      <div className="flex-1 min-w-0">
-                                        <h3 className="font-semibold text-gray-900 dark:text-white text-base mb-1 truncate">
-                                          {cleanDescription}
-                                        </h3>
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                          <span className="text-xs text-gray-500 dark:text-gray-400">
-                                            {formatDisplayDate(tx.date)}
+                            {/* Show virtual scrolling indicator for large lists */}
+                            {filteredTransactions.length > 50 && (
+                              <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                                <span className="text-sm text-green-800 dark:text-green-200">
+                                  📊 Virtual scrolling enabled: Showing {filteredTransactions.length} transactions (only visible items rendered)
+                                </span>
+                              </div>
+                            )}
+                            {filteredTransactions.length > 50 ? (
+                              // Use virtual scrolling for large lists
+                              <VirtualList
+                                items={filteredTransactions}
+                                itemHeight={120} // Approximate height of each transaction card
+                                containerHeight={600} // Fixed container height
+                                overscan={5} // Render 5 extra items above/below for smooth scrolling
+                                className="space-y-4"
+                                renderItem={(tx) => {
+                                  const txType = (tx.type || '').toLowerCase()
+                                  const amount = Number(tx.amount) || 0
+                                  
+                                  // Determine if income or expense: prioritize type field, then check amount sign
+                                  let isIncome: boolean
+                                  if (txType === 'income') {
+                                    isIncome = true
+                                  } else if (txType === 'expense') {
+                                    isIncome = false
+                                  } else {
+                                    // If type not set, use amount sign: positive = income, negative = expense
+                                    isIncome = amount >= 0
+                                  }
+                                  
+                                  // Display amount: if expense with positive amount, show as negative
+                                  const displayAmount = !isIncome && amount > 0 ? -amount : amount
+                                  
+                                  // Clean description - remove card/account info if it's in the description
+                                  let cleanDescription = tx.description || '—'
+                                  if (cleanDescription.includes('POS:') || cleanDescription.match(/\d{4}\s+\d{2}\*\*/)) {
+                                    // Extract merchant name if it exists after card info
+                                    const parts = cleanDescription.split(',').map(p => p.trim())
+                                    const merchantPart = parts.find(p => !p.includes('POS:') && !p.match(/\d{4}\s+\d{2}\*\*/))
+                                    if (merchantPart) {
+                                      cleanDescription = merchantPart
+                                    } else {
+                                      // Just use the first part that's not card info
+                                      cleanDescription = parts.find(p => !p.includes('POS:') && !p.match(/\d{4}\s+\d{2}\*\*/)) || cleanDescription
+                                    }
+                                  }
+                                  
+                                  return (
+                                    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-all">
+                                      <div className="flex items-start justify-between gap-4">
+                                        <div className="flex-1 min-w-0">
+                                          <div className="flex items-start gap-3 mb-2">
+                                            <div className="flex-1 min-w-0">
+                                              <h3 className="font-semibold text-gray-900 dark:text-white text-base mb-1 truncate">
+                                                {cleanDescription}
+                                              </h3>
+                                              <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                  {formatDisplayDate(tx.date)}
+                                                </span>
+                                                {tx.category && (
+                                                  <>
+                                                    <span className="text-gray-400 dark:text-gray-500">•</span>
+                                                    <span className="text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-md">
+                                                      {tx.category}
+                                                    </span>
+                                                  </>
+                                                )}
+                                                {(tx as any).sourceBank && (
+                                                  <>
+                                                    <span className="text-gray-400 dark:text-gray-500">•</span>
+                                                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                      {(tx as any).sourceBank}
+                                                    </span>
+                                                  </>
+                                                )}
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center gap-3 flex-shrink-0">
+                                          <span
+                                            className={`text-xl font-bold font-mono tabular-nums ${
+                                              isIncome
+                                                ? 'text-green-600 dark:text-green-400'
+                                                : 'text-red-600 dark:text-red-400'
+                                            }`}
+                                          >
+                                            {formatCurrency(displayAmount)}
                                           </span>
-                                          {tx.category && (
-                                            <>
-                                              <span className="text-gray-400 dark:text-gray-500">•</span>
-                                              <span className="text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-md">
-                                                {tx.category}
-                                              </span>
-                                            </>
-                                          )}
-                                          {(tx as any).sourceBank && (
-                                            <>
-                                              <span className="text-gray-400 dark:text-gray-500">•</span>
+                                          <div className="flex gap-2">
+                                            <button
+                                              type="button"
+                                              onClick={() => handleEdit(tx as FinanceTransaction & { id: string })}
+                                              className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                            >
+                                              Edit
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => handleDelete(tx.id!)}
+                                              className="px-3 py-1.5 text-xs font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                                            >
+                                              Delete
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )
+                                }}
+                              />
+                            ) : (
+                              // Use regular rendering for small lists
+                              paginatedTransactions.map((tx) => {
+                                const txType = (tx.type || '').toLowerCase()
+                                const amount = Number(tx.amount) || 0
+                                
+                                // Determine if income or expense: prioritize type field, then check amount sign
+                                let isIncome: boolean
+                                if (txType === 'income') {
+                                  isIncome = true
+                                } else if (txType === 'expense') {
+                                  isIncome = false
+                                } else {
+                                  // If type not set, use amount sign: positive = income, negative = expense
+                                  isIncome = amount >= 0
+                                }
+                                
+                                // Display amount: if expense with positive amount, show as negative
+                                const displayAmount = !isIncome && amount > 0 ? -amount : amount
+                                
+                                // Clean description - remove card/account info if it's in the description
+                                let cleanDescription = tx.description || '—'
+                                if (cleanDescription.includes('POS:') || cleanDescription.match(/\d{4}\s+\d{2}\*\*/)) {
+                                  // Extract merchant name if it exists after card info
+                                  const parts = cleanDescription.split(',').map(p => p.trim())
+                                  const merchantPart = parts.find(p => !p.includes('POS:') && !p.match(/\d{4}\s+\d{2}\*\*/))
+                                  if (merchantPart) {
+                                    cleanDescription = merchantPart
+                                  } else {
+                                    // Just use the first part that's not card info
+                                    cleanDescription = parts.find(p => !p.includes('POS:') && !p.match(/\d{4}\s+\d{2}\*\*/)) || cleanDescription
+                                  }
+                                }
+                                
+                                return (
+                                  <div
+                                    key={tx.id}
+                                    className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-all"
+                                  >
+                                    <div className="flex items-start justify-between gap-4">
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-start gap-3 mb-2">
+                                          <div className="flex-1 min-w-0">
+                                            <h3 className="font-semibold text-gray-900 dark:text-white text-base mb-1 truncate">
+                                              {cleanDescription}
+                                            </h3>
+                                            <div className="flex items-center gap-2 flex-wrap">
                                               <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                {(tx as any).sourceBank}
+                                                {formatDisplayDate(tx.date)}
                                               </span>
-                                            </>
-                                          )}
+                                              {tx.category && (
+                                                <>
+                                                  <span className="text-gray-400 dark:text-gray-500">•</span>
+                                                  <span className="text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-md">
+                                                    {tx.category}
+                                                  </span>
+                                                </>
+                                              )}
+                                              {(tx as any).sourceBank && (
+                                                <>
+                                                  <span className="text-gray-400 dark:text-gray-500">•</span>
+                                                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                    {(tx as any).sourceBank}
+                                                  </span>
+                                                </>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-3 flex-shrink-0">
+                                        <span
+                                          className={`text-xl font-bold font-mono tabular-nums ${
+                                            isIncome
+                                              ? 'text-green-600 dark:text-green-400'
+                                              : 'text-red-600 dark:text-red-400'
+                                          }`}
+                                        >
+                                          {formatCurrency(displayAmount)}
+                                        </span>
+                                        <div className="flex gap-2">
+                                          <button
+                                            type="button"
+                                            onClick={() => handleEdit(tx as FinanceTransaction & { id: string })}
+                                            className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                          >
+                                            Edit
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleDelete(tx.id!)}
+                                            className="px-3 py-1.5 text-xs font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                                          >
+                                            Delete
+                                          </button>
                                         </div>
                                       </div>
                                     </div>
                                   </div>
-                                  <div className="flex items-center gap-3 flex-shrink-0">
-                                    <span
-                                      className={`text-xl font-bold font-mono tabular-nums ${
-                                        isIncome
-                                          ? 'text-green-600 dark:text-green-400'
-                                          : 'text-red-600 dark:text-red-400'
-                                      }`}
-                                    >
-                                      {formatCurrency(displayAmount)}
-                                    </span>
-                                    <div className="flex gap-2">
-                                      <button
-                                        type="button"
-                                        onClick={() => handleEdit(tx as FinanceTransaction & { id: string })}
-                                        className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                                      >
-                                        Edit
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleDelete(tx.id!)}
-                                        className="px-3 py-1.5 text-xs font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                                      >
-                                        Delete
-                                      </button>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            )
-                            })}
-                            </>
-                          )}
-                        </div>
+                                )
+                              })
+                            )}
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
+                </>
+                )}
               </div>
             </main>
           </div>

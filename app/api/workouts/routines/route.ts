@@ -1,32 +1,81 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { saveRoutine, getRoutinesByUserId } from '@/lib/workoutMongo'
+import { getRoutinesByUserId as getRoutinesByUserIdFirestore } from '@/lib/firestore'
 import type { Routine } from '@/types/workout'
-import { getUserIdFromRequest, validateUserId, successResponse, handleApiError } from '@/lib/utils/api-helpers'
+import { getSecureUserIdFromRequest, successResponse, handleApiError, validateUserId, errorResponse } from '@/lib/utils'
+import { withRateLimit } from '@/lib/utils'
 
-export async function GET(request: NextRequest) {
+// Rate limit: 100 requests per 15 minutes per IP
+const rateLimitOptions = {
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  maxRequests: 100,
+}
+
+async function getRoutinesHandler(request: NextRequest) {
   try {
-    const userId = getUserIdFromRequest(request)
-    const validationError = validateUserId(userId)
-    if (validationError) return validationError
+    // Use secure authentication with backward compatibility
+    const userIdResult = await getSecureUserIdFromRequest(request, {
+      allowQueryParam: true, // Allow query param during migration
+      validateOwnership: true, // Ensure user can only access their own data
+    })
 
-    const routines = await getRoutinesByUserId(userId!)
+    if ('error' in userIdResult) {
+      return userIdResult.error
+    }
+
+    const { userId } = userIdResult
+
+    // Try Firestore first (faster, no network dependency)
+    const firestoreRoutines = await getRoutinesByUserIdFirestore(userId)
+    if (firestoreRoutines.length > 0) {
+      return successResponse(firestoreRoutines)
+    }
+
+    // Fallback to MongoDB if Firestore is empty
+    const routines = await getRoutinesByUserId(userId)
     return successResponse(routines)
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleApiError(error, 'GET /api/workouts/routines')
   }
 }
 
-export async function POST(request: NextRequest) {
+async function postRoutineHandler(request: NextRequest) {
   try {
+    // Use secure authentication
+    const userIdResult = await getSecureUserIdFromRequest(request, {
+      allowQueryParam: true, // Allow query param during migration
+      validateOwnership: true,
+    })
+
+    if ('error' in userIdResult) {
+      return userIdResult.error
+    }
+
+    const { userId: authenticatedUserId } = userIdResult
+
     const routine: Routine = await request.json()
+
+    // Validate routine userId matches authenticated user
+    if (!routine.userId || routine.userId !== authenticatedUserId) {
+      return errorResponse(
+        'Forbidden',
+        403,
+        'You can only create routines for yourself',
+        'FORBIDDEN'
+      )
+    }
 
     const validationError = validateUserId(routine.userId)
     if (validationError) return validationError
 
     await saveRoutine(routine)
     return successResponse()
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleApiError(error, 'POST /api/workouts/routines')
   }
 }
+
+// Apply rate limiting to handlers
+export const GET = withRateLimit(getRoutinesHandler, rateLimitOptions)
+export const POST = withRateLimit(postRoutineHandler, rateLimitOptions)
 

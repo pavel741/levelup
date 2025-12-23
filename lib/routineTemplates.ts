@@ -3,7 +3,7 @@
  * Popular workout splits for 3-4 times per week
  */
 
-import type { Routine, RoutineSession } from '@/types/workout'
+import type { Routine } from '@/types/workout'
 
 export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'createdBy' | 'isTemplate' | 'isPublic' | 'rating' | 'timesUsed'>[] = [
   // Push/Pull/Legs (3 days per week)

@@ -3,13 +3,14 @@
 import { useState, useEffect } from 'react'
 export const dynamic = 'force-dynamic'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
-import AuthGuard from '@/components/AuthGuard'
-import Sidebar from '@/components/Sidebar'
-import Header from '@/components/Header'
+import AuthGuard from '@/components/common/AuthGuard'
+import Sidebar from '@/components/layout/Sidebar'
+import Header from '@/components/layout/Header'
 import HabitCard from '@/components/HabitCard'
 import { Plus, Target, CheckCircle2, BarChart3 } from 'lucide-react'
 import { Habit } from '@/types'
 import { format } from 'date-fns'
+import { showWarning } from '@/lib/utils'
 
 export default function HabitsPage() {
   const { habits, addHabit, updateHabit, user } = useFirestoreStore()
@@ -49,7 +50,7 @@ export default function HabitsPage() {
     
     // Validate that weekly/custom habits have at least one day selected
     if ((newHabit.frequency === 'weekly' || newHabit.frequency === 'custom') && (!newHabit.targetDays || newHabit.targetDays.length === 0)) {
-      alert('Please select at least one day for weekly or custom habits')
+      showWarning('Please select at least one day for weekly or custom habits')
       return
     }
 
@@ -120,7 +121,7 @@ export default function HabitsPage() {
     
     // Validate that weekly/custom habits have at least one day selected
     if ((newHabit.frequency === 'weekly' || newHabit.frequency === 'custom') && (!newHabit.targetDays || newHabit.targetDays.length === 0)) {
-      alert('Please select at least one day for weekly or custom habits')
+      showWarning('Please select at least one day for weekly or custom habits')
       return
     }
 
@@ -333,7 +334,6 @@ export default function HabitsPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      const targetDays = newHabit.frequency === 'daily' ? [1, 2, 3, 4, 5, 6, 7] : newHabit.targetDays
                       setNewHabit({ ...newHabit, frequency: 'daily', targetDays: [1, 2, 3, 4, 5, 6, 7] })
                     }}
                     className={`px-4 py-2 rounded-lg border transition-colors ${
@@ -595,7 +595,6 @@ export default function HabitsPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      const targetDays = newHabit.frequency === 'daily' ? [1, 2, 3, 4, 5, 6, 7] : newHabit.targetDays
                       setNewHabit({ ...newHabit, frequency: 'daily', targetDays: [1, 2, 3, 4, 5, 6, 7] })
                     }}
                     className={`px-4 py-2 rounded-lg border transition-colors ${

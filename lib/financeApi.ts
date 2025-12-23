@@ -2,74 +2,116 @@
 // This replaces direct MongoDB imports in client components
 
 import type { FinanceTransaction, FinanceCategories, FinanceSettings } from '@/types/finance'
+import { createSmartPoll } from '@/lib/utils/smart-polling'
+import { cache, createCacheKey } from '@/lib/utils/cache'
+import { createFinanceSSE, SSEClient } from '@/lib/utils/sseClient'
 
 // Transactions
 export const subscribeToTransactions = (
   userId: string,
   callback: (transactions: FinanceTransaction[], meta: { hasMore: boolean; lastDoc: any }) => void,
-  options: { limitCount?: number } = {}
+  options: { limitCount?: number; useSSE?: boolean } = {}
 ): (() => void) => {
   const limitCount = options.limitCount !== undefined && options.limitCount !== null ? options.limitCount : 0
-  let isActive = true
-  let lastDataHash: string | null = null // Track data hash to avoid unnecessary callbacks
+  const useSSE = options.useSSE !== false // Default to true, can be disabled
 
-  // Simple hash function to detect data changes
+  // Try SSE first if supported, fallback to polling
+  if (useSSE && typeof EventSource !== 'undefined') {
+    try {
+      let sseClient: SSEClient | null = null
+      let lastDataHash: string | null = null
+      let isFirstMessage = true
+
+      const hashData = (transactions: FinanceTransaction[]): string => {
+        if (transactions.length === 0) return 'empty'
+        return `${transactions.length}-${transactions[0]?.id || ''}-${transactions[transactions.length - 1]?.id || ''}`
+      }
+
+      sseClient = createFinanceSSE(
+        userId,
+        'transactions',
+        (data) => {
+          if (data.type === 'update' && data.data) {
+            let transactions = Array.isArray(data.data) ? data.data : []
+            
+            // Apply limit if specified
+            if (limitCount > 0) {
+              transactions = transactions.slice(0, limitCount)
+            }
+
+            // Only call callback if data changed
+            const newHash = hashData(transactions)
+            if (isFirstMessage || newHash !== lastDataHash) {
+              isFirstMessage = false
+              lastDataHash = newHash
+              callback(transactions, {
+                hasMore: false,
+                lastDoc: null,
+              })
+            }
+          }
+        },
+        {
+          onError: (error) => {
+            console.warn('SSE connection failed, falling back to polling:', error)
+            // Fallback to polling on error
+            sseClient?.disconnect()
+            sseClient = null
+            // Restart with polling
+            const pollingUnsubscribe = subscribeToTransactions(userId, callback, { ...options, useSSE: false })
+            return pollingUnsubscribe
+          },
+        }
+      )
+
+      sseClient.connect()
+
+      return () => {
+        sseClient?.disconnect()
+      }
+    } catch (error) {
+      console.warn('SSE initialization failed, falling back to polling:', error)
+      // Fall through to polling
+    }
+  }
+
+  // Fallback to smart polling
   const hashData = (transactions: FinanceTransaction[]): string => {
     if (transactions.length === 0) return 'empty'
-    // Use first and last transaction IDs + count as hash (fast comparison)
     return `${transactions.length}-${transactions[0]?.id || ''}-${transactions[transactions.length - 1]?.id || ''}`
   }
 
-  const loadTransactions = async () => {
-    if (!isActive) return
+  const fetchTransactions = async (): Promise<FinanceTransaction[]> => {
+    const params = new URLSearchParams({ userId })
+    
+    if (limitCount > 0) {
+      params.append('limit', limitCount.toString())
+    }
+    
+    const response = await fetch(`/api/finance/transactions?${params}`)
+    if (!response.ok) throw new Error('Failed to fetch transactions')
+    
+    const responseData = await response.json()
+    return responseData.data?.transactions || responseData.transactions || []
+  }
 
-    try {
-      const params = new URLSearchParams({
-        userId,
+  return createSmartPoll(
+    fetchTransactions,
+    (transactions) => {
+      callback(transactions, {
+        hasMore: false,
+        lastDoc: null,
       })
-      
-      // Only add limit if it's greater than 0
-      if (limitCount > 0) {
-        params.append('limit', limitCount.toString())
-      }
-      
-      const response = await fetch(`/api/finance/transactions?${params}`)
-      if (!response.ok) throw new Error('Failed to fetch transactions')
-      
-      const data = await response.json()
-      const transactions = data.transactions || []
-      
-      // Only call callback if data actually changed
-      const newHash = hashData(transactions)
-      if (newHash !== lastDataHash) {
-        lastDataHash = newHash
-        callback(transactions, {
-          hasMore: false,
-          lastDoc: null,
-        })
-      }
-    } catch (error) {
-      console.error('Error loading transactions:', error)
-      callback([], { hasMore: false, lastDoc: null })
+    },
+    {
+      activeInterval: limitCount === 0 ? 30000 : 10000,
+      idleInterval: 120000,
+      hiddenInterval: 300000,
+      idleThreshold: 60000,
+      hashFn: hashData,
+      initialData: [],
     }
-  }
-
-  // Load immediately
-  loadTransactions()
-
-  // Poll every 30 seconds for updates (reduced frequency for better performance)
-  // Only poll if there's no limit (for real-time updates) or if limitCount > 0
-  const pollInterval = 30000 // 30s for all cases
-  const intervalId = setInterval(() => {
-    if (isActive) {
-      loadTransactions()
-    }
-  }, pollInterval)
-
-  return () => {
-    isActive = false
-    clearInterval(intervalId)
-  }
+  )
 }
 
 export const addTransaction = async (
@@ -88,6 +130,10 @@ export const addTransaction = async (
   }
   
   const data = await response.json()
+  
+  // Invalidate transaction cache
+  cache.invalidatePattern(new RegExp(`^transactions:${userId}`))
+  
   return data.id
 }
 
@@ -106,6 +152,9 @@ export const updateTransaction = async (
     const error = await response.json()
     throw new Error(error.error || 'Failed to update transaction')
   }
+  
+  // Invalidate transaction cache
+  cache.invalidatePattern(new RegExp(`^transactions:${userId}`))
 }
 
 export const deleteTransaction = async (
@@ -121,6 +170,9 @@ export const deleteTransaction = async (
     const error = await response.json()
     throw new Error(error.error || 'Failed to delete transaction')
   }
+  
+  // Invalidate transaction cache
+  cache.invalidatePattern(new RegExp(`^transactions:${userId}`))
 }
 
 export const batchAddTransactions = async (
@@ -142,6 +194,10 @@ export const batchAddTransactions = async (
   
   const result = await response.json()
   progressCallback?.(result.success, transactions.length)
+  
+  // Invalidate transaction cache
+  cache.invalidatePattern(new RegExp(`^transactions:${userId}`))
+  
   return result
 }
 
@@ -159,48 +215,100 @@ export const batchDeleteTransactions = async (
     const error = await response.json()
     throw new Error(error.error || 'Failed to batch delete transactions')
   }
+  
+  // Invalidate transaction cache
+  cache.invalidatePattern(new RegExp(`^transactions:${userId}`))
 }
 
 // Categories
 export const subscribeToCategories = (
   userId: string,
-  callback: (categories: FinanceCategories) => void
+  callback: (categories: FinanceCategories) => void,
+  options: { useSSE?: boolean } = {}
 ): (() => void) => {
-  let isActive = true
+  const useSSE = options.useSSE !== false // Default to true
 
-  const loadCategories = async () => {
-    if (!isActive) return
-
+  // Try SSE first if supported
+  if (useSSE && typeof EventSource !== 'undefined') {
     try {
-      const params = new URLSearchParams({ userId })
-      const response = await fetch(`/api/finance/categories?${params}`)
-      
-      if (!response.ok) throw new Error('Failed to fetch categories')
-      
-      const data = await response.json()
-      callback(data.categories || {})
+      let sseClient: SSEClient | null = null
+      let lastDataHash: string | null = null
+      let isFirstMessage = true
+
+      const hashCategories = (categories: FinanceCategories): string => {
+        const income = JSON.stringify(categories.income || [])
+        const expense = JSON.stringify(categories.expense || [])
+        return `${income}-${expense}`
+      }
+
+      sseClient = createFinanceSSE(
+        userId,
+        'categories',
+        (data) => {
+          if (data.type === 'update' && data.data) {
+            const categories = data.data as FinanceCategories
+            const newHash = hashCategories(categories)
+            
+            if (isFirstMessage || newHash !== lastDataHash) {
+              isFirstMessage = false
+              lastDataHash = newHash
+              callback(categories)
+            }
+          }
+        },
+        {
+          onError: (error) => {
+            console.warn('SSE connection failed, falling back to polling:', error)
+            sseClient?.disconnect()
+            sseClient = null
+            const pollingUnsubscribe = subscribeToCategories(userId, callback, { useSSE: false })
+            return pollingUnsubscribe
+          },
+        }
+      )
+
+      sseClient.connect()
+      return () => {
+        sseClient?.disconnect()
+      }
     } catch (error) {
-      console.error('Error loading categories:', error)
-      callback({})
+      console.warn('SSE initialization failed, falling back to polling:', error)
     }
   }
 
-  loadCategories()
-
-  // Poll every 30 seconds for categories (reduced frequency)
-  const intervalId = setInterval(() => {
-    if (isActive) {
-      loadCategories()
-    }
-  }, 30000)
-
-  return () => {
-    isActive = false
-    clearInterval(intervalId)
+  // Fallback to smart polling
+  const fetchCategories = async (): Promise<FinanceCategories> => {
+    const params = new URLSearchParams({ userId })
+    const response = await fetch(`/api/finance/categories?${params}`)
+    
+    if (!response.ok) throw new Error('Failed to fetch categories')
+    
+    const data = await response.json()
+    return data.categories || {}
   }
+
+  const hashCategories = (categories: FinanceCategories): string => {
+    const income = JSON.stringify(categories.income || [])
+    const expense = JSON.stringify(categories.expense || [])
+    return `${income}-${expense}`
+  }
+
+  return createSmartPoll(
+    fetchCategories,
+    callback,
+    {
+      activeInterval: 60000,
+      idleInterval: 300000,
+      hiddenInterval: 600000,
+      idleThreshold: 60000,
+      hashFn: hashCategories,
+      initialData: {},
+    }
+  )
 }
 
-export const getCategories = async (userId: string): Promise<FinanceCategories> => {
+// Internal fetch function (without cache)
+const _getCategories = async (userId: string): Promise<FinanceCategories> => {
   const params = new URLSearchParams({ userId })
   const response = await fetch(`/api/finance/categories?${params}`)
   
@@ -211,6 +319,15 @@ export const getCategories = async (userId: string): Promise<FinanceCategories> 
   
   const data = await response.json()
   return data.categories || {}
+}
+
+// Cached version with stale-while-revalidate
+export const getCategories = async (userId: string): Promise<FinanceCategories> => {
+  const key = createCacheKey('categories', userId)
+  return cache.get(key, () => _getCategories(userId), {
+    staleTime: 10 * 60 * 1000, // 10 minutes (categories change rarely)
+    cacheTime: 60 * 60 * 1000, // 1 hour
+  })
 }
 
 export const saveCategories = async (
@@ -227,10 +344,15 @@ export const saveCategories = async (
     const error = await response.json()
     throw new Error(error.error || 'Failed to save categories')
   }
+  
+  // Invalidate cache after save
+  const key = createCacheKey('categories', userId)
+  cache.invalidate(key)
 }
 
 // Settings
-export const getFinanceSettings = async (userId: string): Promise<FinanceSettings | null> => {
+// Internal fetch function (without cache)
+const _getFinanceSettings = async (userId: string): Promise<FinanceSettings | null> => {
   const params = new URLSearchParams({ userId })
   const response = await fetch(`/api/finance/settings?${params}`)
   
@@ -241,6 +363,15 @@ export const getFinanceSettings = async (userId: string): Promise<FinanceSetting
   
   const data = await response.json()
   return data.settings || null
+}
+
+// Cached version with stale-while-revalidate
+export const getFinanceSettings = async (userId: string): Promise<FinanceSettings | null> => {
+  const key = createCacheKey('financeSettings', userId)
+  return cache.get(key, () => _getFinanceSettings(userId), {
+    staleTime: 10 * 60 * 1000, // 10 minutes (settings change rarely)
+    cacheTime: 60 * 60 * 1000, // 1 hour
+  })
 }
 
 export const saveFinanceSettings = async (
@@ -257,6 +388,47 @@ export const saveFinanceSettings = async (
     const error = await response.json()
     throw new Error(error.error || 'Failed to save settings')
   }
+  
+  // Invalidate cache after save
+  const key = createCacheKey('financeSettings', userId)
+  cache.invalidate(key)
+}
+
+// Internal fetch function (without cache)
+const _getTransactions = async (
+  userId: string,
+  options: { limitCount?: number } = {}
+): Promise<FinanceTransaction[]> => {
+  const limitCount = options.limitCount !== undefined && options.limitCount !== null ? options.limitCount : 0
+  const params = new URLSearchParams({ userId })
+  
+  if (limitCount > 0) {
+    params.append('limit', limitCount.toString())
+  }
+  
+  const response = await fetch(`/api/finance/transactions?${params}`)
+  
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to get transactions')
+  }
+  
+  const responseData = await response.json()
+  // Handle both wrapped (data.data.transactions) and unwrapped (data.transactions) formats
+  return responseData.data?.transactions || responseData.transactions || []
+}
+
+// Cached version with stale-while-revalidate
+export const getTransactions = async (
+  userId: string,
+  options: { limitCount?: number } = {}
+): Promise<FinanceTransaction[]> => {
+  const limitCount = options.limitCount !== undefined && options.limitCount !== null ? options.limitCount : 0
+  const key = createCacheKey('transactions', userId, limitCount)
+  return cache.get(key, () => _getTransactions(userId, options), {
+    staleTime: 30 * 1000, // 30 seconds (transactions change frequently)
+    cacheTime: 5 * 60 * 1000, // 5 minutes
+  })
 }
 
 // Helper for getting all transactions for summary
@@ -271,8 +443,9 @@ export const getAllTransactionsForSummary = async (
     throw new Error(error.error || 'Failed to get transactions')
   }
   
-  const data = await response.json()
-  return data.transactions || []
+  const responseData = await response.json()
+  // Handle both wrapped (data.data.transactions) and unwrapped (data.transactions) formats
+  return responseData.data?.transactions || responseData.transactions || []
 }
 
 // Budget Goals
@@ -310,38 +483,35 @@ export const subscribeToRecurringTransactions = (
   userId: string,
   callback: (transactions: any[]) => void
 ): (() => void) => {
-  let isActive = true
-
-  const loadTransactions = async () => {
-    if (!isActive) return
-
-    try {
-      const params = new URLSearchParams({ userId })
-      const response = await fetch(`/api/finance/recurring?${params}`)
-      
-      if (!response.ok) throw new Error('Failed to fetch recurring transactions')
-      
-      const data = await response.json()
-      callback(data.transactions || [])
-    } catch (error) {
-      console.error('Error loading recurring transactions:', error)
-      callback([])
-    }
+  const fetchRecurringTransactions = async (): Promise<any[]> => {
+    const params = new URLSearchParams({ userId })
+    const response = await fetch(`/api/finance/recurring?${params}`)
+    
+    if (!response.ok) throw new Error('Failed to fetch recurring transactions')
+    
+    const data = await response.json()
+    return data.transactions || []
   }
 
-  loadTransactions()
-
-  // Poll every 30 seconds for recurring transactions (less frequent updates needed)
-  const intervalId = setInterval(() => {
-    if (isActive) {
-      loadTransactions()
-    }
-  }, 30000)
-
-  return () => {
-    isActive = false
-    clearInterval(intervalId)
+  // Hash function for recurring transactions
+  const hashRecurring = (transactions: any[]): string => {
+    if (transactions.length === 0) return 'empty'
+    return `${transactions.length}-${transactions.map(t => t.id).join(',')}`
   }
+
+  // Use smart polling - recurring transactions change infrequently
+  return createSmartPoll(
+    fetchRecurringTransactions,
+    callback,
+    {
+      activeInterval: 60000, // 1 minute when active (recurring transactions rarely change)
+      idleInterval: 300000, // 5 minutes when idle
+      hiddenInterval: 600000, // 10 minutes when tab hidden
+      idleThreshold: 60000, // 1 minute before considered idle
+      hashFn: hashRecurring,
+      initialData: [],
+    }
+  )
 }
 
 export const addRecurringTransaction = async (
@@ -397,7 +567,7 @@ export const deleteRecurringTransaction = async (
 
 // Reconciliation
 export const subscribeToReconciliationHistory = (
-  userId: string,
+  _userId: string,
   callback: (records: any[]) => void
 ): (() => void) => {
   // TODO: Implement API route for reconciliation
@@ -406,14 +576,14 @@ export const subscribeToReconciliationHistory = (
   return () => {}
 }
 
-export const getLastReconciliation = async (userId: string): Promise<any> => {
+export const getLastReconciliation = async (_userId: string): Promise<any> => {
   // TODO: Implement API route
   return null
 }
 
 export const saveLastReconciliation = async (
-  userId: string,
-  record: any
+  _userId: string,
+  _record: any
 ): Promise<void> => {
   // TODO: Implement API route
 }

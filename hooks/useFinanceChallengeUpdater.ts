@@ -4,7 +4,6 @@ import { subscribeToTransactions } from '@/lib/financeApi'
 import { calculateFinanceChallengeProgress } from '@/lib/financeChallengeUtils'
 import { updateChallenge } from '@/lib/firestore'
 import type { FinanceTransaction } from '@/types/finance'
-import type { Challenge } from '@/types'
 
 /**
  * Hook to automatically update finance challenge progress when transactions change
@@ -28,7 +27,6 @@ export function useFinanceChallengeUpdater() {
 
     // Debounce updates to avoid too frequent calculations
     let updateTimeout: NodeJS.Timeout | null = null
-    let lastTransactions: FinanceTransaction[] = []
     let lastTransactionsHash = ''
 
     // Subscribe to transactions with debouncing
@@ -43,7 +41,6 @@ export function useFinanceChallengeUpdater() {
         // Skip if data hasn't changed
         if (newHash === lastTransactionsHash) return
         
-        lastTransactions = transactions
         lastTransactionsHash = newHash
 
         // Debounce updates (wait 2 seconds after last transaction update)

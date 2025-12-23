@@ -7,9 +7,7 @@
 
 import { getDatabase } from '../lib/mongodb'
 import { db } from '../lib/firebase'
-import { collection, doc, setDoc, Timestamp } from 'firebase/firestore'
-import type { Routine, WorkoutLog } from '../types/workout'
-import type { FinanceTransaction } from '../types/finance'
+import { doc, setDoc, Timestamp } from 'firebase/firestore'
 
 async function migrateRoutines(userId: string) {
   console.log(`📦 Migrating routines for user ${userId}...`)

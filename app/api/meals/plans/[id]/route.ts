@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { getMealPlanById, updateMealPlan, deleteMealPlan } from '@/lib/mealMongo'
-import { getUserIdFromRequest, validateUserId, successResponse, errorResponse, handleApiError } from '@/lib/utils/api-helpers'
+import { getUserIdFromRequest, validateUserId, successResponse, errorResponse, handleApiError } from '@/lib/utils'
 
 export async function GET(
   request: NextRequest,
@@ -16,7 +16,7 @@ export async function GET(
       return errorResponse('Meal plan not found', 404)
     }
     return successResponse(mealPlan)
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleApiError(error, 'GET /api/meals/plans/[id]')
   }
 }
@@ -33,7 +33,7 @@ export async function PATCH(
 
     await updateMealPlan(params.id, userId!, updates)
     return successResponse()
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleApiError(error, 'PATCH /api/meals/plans/[id]')
   }
 }
@@ -49,7 +49,7 @@ export async function DELETE(
 
     await deleteMealPlan(params.id, userId!)
     return successResponse()
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleApiError(error, 'DELETE /api/meals/plans/[id]')
   }
 }

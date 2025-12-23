@@ -6,6 +6,7 @@ import { format } from 'date-fns'
 import { CheckCircle2, Circle, Trash2, X, Edit2, AlertCircle, TrendingUp } from 'lucide-react'
 import { Habit } from '@/types'
 import { validateMissedReason } from '@/lib/missedHabitValidation'
+import { showWarning } from '@/lib/utils'
 
 interface HabitCardProps {
   habit: Habit
@@ -84,6 +85,7 @@ function HabitCardComponent({ habit, onEdit }: HabitCardProps) {
     } else if (!isCompleted) {
       setPrevCompleted(false)
     }
+    return undefined
   }, [isCompleted, habit.xpReward, user, prevCompleted])
   
   // Check if habit has started
@@ -93,8 +95,8 @@ function HabitCardComponent({ habit, onEdit }: HabitCardProps) {
     const targetCount = habit.targetCountPerDay || 1
     const currentCount = habit.completionsPerDay?.[today] || 0
     
-    // If already reached target, uncomplete (decrement)
-    if (isCompleted && currentCount >= targetCount) {
+    // If current count exceeds target, or if at/above target and completed, uncomplete (decrement)
+    if (currentCount > targetCount || (isCompleted && currentCount >= targetCount)) {
       uncompleteHabit(habit.id)
     } else {
       // Otherwise, complete (increment)
@@ -104,7 +106,7 @@ function HabitCardComponent({ habit, onEdit }: HabitCardProps) {
 
   const handleMarkMissed = async () => {
     if (!missedReason.trim()) {
-      alert('Please provide a reason for missing this habit')
+      showWarning('Please provide a reason for missing this habit')
       return
     }
 
@@ -114,19 +116,19 @@ function HabitCardComponent({ habit, onEdit }: HabitCardProps) {
     
     // Can't mark future dates as missed
     if (selectedDate > todayDate) {
-      alert('Cannot mark future dates as missed')
+      showWarning('Cannot mark future dates as missed')
       return
     }
 
     // Check if date is already completed
     if (habit.completedDates.includes(missedDate)) {
-      alert('This date is already marked as completed. Uncomplete it first if you want to mark it as missed.')
+      showWarning('This date is already marked as completed. Uncomplete it first if you want to mark it as missed.')
       return
     }
 
     // Check if date is already marked as missed
     if (habit.missedDates?.some((m) => m.date === missedDate)) {
-      alert('This date is already marked as missed')
+      showWarning('This date is already marked as missed')
       return
     }
 
@@ -137,7 +139,7 @@ function HabitCardComponent({ habit, onEdit }: HabitCardProps) {
         : new Date(habit.startDate)
       const startDateStr = format(startDate, 'yyyy-MM-dd')
       if (missedDate < startDateStr) {
-        alert(`Cannot mark dates before the habit start date (${format(startDate, 'MMM d, yyyy')})`)
+        showWarning(`Cannot mark dates before the habit start date (${format(startDate, 'MMM d, yyyy')})`)
         return
       }
     }
@@ -228,12 +230,14 @@ function HabitCardComponent({ habit, onEdit }: HabitCardProps) {
               )}
               <button
                 onClick={handleToggle}
-                disabled={!hasStarted || (isCompleted && currentCount >= targetCount)}
+                disabled={!hasStarted || (currentCount === 0 && !isCompleted)}
                 className={`p-2 rounded-lg transition-colors ${
                   !hasStarted
                     ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed opacity-50'
+                    : currentCount > targetCount
+                    ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30'
                     : isCompleted && currentCount >= targetCount
-                    ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 cursor-default'
+                    ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30'
                     : isMissed
                     ? 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20'
                     : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
@@ -241,12 +245,14 @@ function HabitCardComponent({ habit, onEdit }: HabitCardProps) {
                 title={
                   !hasStarted && habit.startDate
                     ? `Habit starts on ${habit.startDate instanceof Date ? format(habit.startDate, 'MMM d, yyyy') : format(new Date(habit.startDate), 'MMM d, yyyy')}`
+                    : currentCount > targetCount
+                    ? `Completed ${currentCount} times (target: ${targetCount}) - Click to undo one`
                     : isCompleted && currentCount >= targetCount
-                    ? `Completed (${currentCount}/${targetCount})`
+                    ? `Completed (${currentCount}/${targetCount}) - Click to undo`
                     : targetCount > 1
                     ? `${currentCount}/${targetCount} - Click to add one more`
                     : isCompleted 
-                    ? 'Completed' 
+                    ? 'Completed - Click to undo' 
                     : isMissed 
                     ? 'Missed' 
                     : 'Mark as complete'

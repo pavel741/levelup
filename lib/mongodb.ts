@@ -27,7 +27,7 @@ if (!cleanUri.includes('mongodb.net')) {
 
 // Debug: Log the URI being used (hide credentials)
 if (process.env.NODE_ENV === 'development') {
-  const maskedUri = cleanUri.replace(/\/\/[^:]+:[^@]+@/, '//***:***@')
+  // URI logging removed to avoid unused variable
 }
 
 // MongoDB connection options with better timeout and retry settings
@@ -62,10 +62,25 @@ if (process.env.NODE_ENV === 'development') {
     globalWithMongo._mongoClientPromise = client.connect().catch((error) => {
       console.error('❌ MongoDB connection failed:', error.message)
       console.error('💡 URI being used:', cleanUri.replace(/\/\/[^:]+:[^@]+@/, '//***:***@'))
-      console.error('💡 Make sure your IP is whitelisted in MongoDB Atlas')
-      console.error('💡 If you\'re using a VPN, add your VPN IP to the whitelist')
-      console.error('💡 Go to: MongoDB Atlas → Network Access → Add IP Address')
-      console.error('💡 Or disconnect VPN and use your real IP')
+      
+      // Check for DNS resolution errors
+      if (error.message?.includes('ENOTFOUND') || error.message?.includes('querySrv') || error.message?.includes('getaddrinfo')) {
+        console.error('💡 DNS resolution failed. Possible causes:')
+        console.error('   1. MongoDB Atlas cluster is PAUSED (free tier auto-pauses after inactivity)')
+        console.error('   2. Network/DNS connectivity issues')
+        console.error('   3. Incorrect hostname in connection string')
+        console.error('💡 Solutions:')
+        console.error('   - Go to MongoDB Atlas → Clusters → Click "Resume" if cluster is paused')
+        console.error('   - Check your internet connection')
+        console.error('   - Verify the connection string hostname is correct')
+        console.error('   - Try: https://cloud.mongodb.com/ → Clusters → Resume Cluster')
+      } else {
+        console.error('💡 Make sure your IP is whitelisted in MongoDB Atlas')
+        console.error('💡 If you\'re using a VPN, add your VPN IP to the whitelist')
+        console.error('💡 Go to: MongoDB Atlas → Network Access → Add IP Address')
+        console.error('💡 Or disconnect VPN and use your real IP')
+      }
+      
       // Clear the promise so it can be retried
       delete globalWithMongo._mongoClientPromise
       throw error
@@ -102,11 +117,18 @@ export async function getDatabase(): Promise<Db> {
   } catch (error: any) {
     console.error('❌ Error getting MongoDB database:', error.message)
     
-    if (error.message?.includes('ENOTFOUND') || error.message?.includes('querySrv')) {
-      console.error('💡 DNS resolution failed. Check your connection string:')
-      console.error('💡 Make sure it ends with .mongodb.net (not .mongo)')
+    if (error.message?.includes('ENOTFOUND') || error.message?.includes('querySrv') || error.message?.includes('getaddrinfo')) {
+      console.error('💡 DNS resolution failed. Possible causes:')
+      console.error('   1. MongoDB Atlas cluster is PAUSED (free tier auto-pauses after inactivity)')
+      console.error('   2. Network/DNS connectivity issues')
+      console.error('   3. Incorrect hostname in connection string')
       console.error('💡 Current URI:', cleanUri.replace(/\/\/[^:]+:[^@]+@/, '//***:***@'))
-      throw new Error('MongoDB DNS resolution failed. Please check your connection string format.')
+      console.error('💡 Solutions:')
+      console.error('   - Go to MongoDB Atlas → Clusters → Click "Resume" if cluster is paused')
+      console.error('   - Check your internet connection')
+      console.error('   - Verify the connection string hostname is correct')
+      console.error('   - Try: https://cloud.mongodb.com/ → Clusters → Resume Cluster')
+      throw new Error('MongoDB DNS resolution failed. Your MongoDB Atlas cluster may be paused. Please check MongoDB Atlas dashboard and resume the cluster if needed.')
     }
     
     if (error.message?.includes('ETIMEDOUT') || error.message?.includes('timeout') || error.message?.includes('Server selection timed out')) {

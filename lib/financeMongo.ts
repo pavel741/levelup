@@ -1,4 +1,4 @@
-import { ObjectId, MongoClient } from 'mongodb'
+import { ObjectId } from 'mongodb'
 import { getDatabase } from './mongodb'
 import {
   FinanceTransaction,
@@ -8,6 +8,7 @@ import {
   FinanceReconciliationRecord,
   FinanceRecurringTransaction,
 } from '@/types/finance'
+import { queryCache, createQueryCacheKey } from './utils/queryCache'
 
 // ---------- Helpers ----------
 
@@ -16,12 +17,12 @@ type WithId<T> = T & { id: string }
 interface TransactionPage {
   transactions: WithId<FinanceTransaction>[]
   hasMore: boolean
-  lastDoc: any | null
+  lastDoc: ObjectId | string | null
 }
 
 interface TransactionSubscribeMeta {
   hasMore: boolean
-  lastDoc: any | null
+  lastDoc: ObjectId | string | null
 }
 
 type TransactionSubscribeCallback = (
@@ -30,25 +31,25 @@ type TransactionSubscribeCallback = (
 ) => void
 
 // Convert MongoDB ObjectId to string and handle dates
-const convertMongoData = (data: any): any => {
-  if (data === null || data === undefined) return data
+const convertMongoData = <T = unknown>(data: unknown): T | null | undefined => {
+  if (data === null || data === undefined) return data as T | null | undefined
 
   // Handle ObjectId
   if (data instanceof ObjectId) {
-    return data.toString()
+    return data.toString() as T
   }
 
   // Handle Date
   if (data instanceof Date) {
-    return data.toISOString().split('T')[0]
+    return data.toISOString().split('T')[0] as T
   }
 
   if (Array.isArray(data)) {
-    return data.map((item) => convertMongoData(item))
+    return data.map((item) => convertMongoData(item)) as T
   }
 
   if (typeof data === 'object' && data.constructor === Object) {
-    const converted: Record<string, any> = {}
+    const converted: Record<string, unknown> = {}
     for (const [key, value] of Object.entries(data)) {
       if (key === '_id' && value instanceof ObjectId) {
         converted.id = value.toString()
@@ -56,27 +57,27 @@ const convertMongoData = (data: any): any => {
         converted[key] = convertMongoData(value)
       }
     }
-    return converted
+    return converted as T
   }
 
-  return data
+  return data as T
 }
 
 // ---------- Collection helpers ----------
 
-const getTransactionsCollection = async (userId: string) => {
+const getTransactionsCollection = async (_userId: string) => {
   const db = await getDatabase()
   // Use nested collection: finance_transactions collection with userId as part of document
   // This allows better querying and indexing
   return db.collection('finance_transactions')
 }
 
-const getCategoriesCollection = async (userId: string) => {
+const getCategoriesCollection = async (_userId: string) => {
   const db = await getDatabase()
   return db.collection('finance_categories')
 }
 
-const getSettingsCollection = async (userId: string) => {
+const getSettingsCollection = async (_userId: string) => {
   const db = await getDatabase()
   return db.collection('finance_settings')
 }
@@ -158,28 +159,46 @@ export const subscribeToTransactions = (
 }
 
 export const getAllTransactionsForSummary = async (
-  userId: string
+  userId: string,
+  limit?: number
 ): Promise<WithId<FinanceTransaction>[]> => {
-  try {
-    const collection = await getTransactionsCollection(userId)
-    const docs = await collection.find({ userId }).sort({ date: -1 }).toArray()
-    
-    return docs.map((doc) => {
-      const converted = convertMongoData(doc) as FinanceTransaction
-      return {
-        ...converted,
-        id: converted.id || doc._id.toString(),
-      } as WithId<FinanceTransaction>
-    })
-  } catch (error) {
-    console.error('Error loading all transactions from MongoDB:', error)
-    return []
-  }
+  const cacheKey = createQueryCacheKey('transactions', 'summary', userId, limit || 'all')
+  
+  return queryCache.get(
+    cacheKey,
+    async () => {
+      try {
+        const collection = await getTransactionsCollection(userId)
+        let query = collection.find({ userId }).sort({ date: -1 })
+        
+        // Apply limit if provided for better performance
+        if (limit && limit > 0) {
+          query = query.limit(limit)
+        }
+        
+        const docs = await query.toArray()
+        
+        return docs.map((doc) => {
+          const converted = convertMongoData(doc) as FinanceTransaction
+          return {
+            ...converted,
+            id: converted.id || doc._id.toString(),
+          } as WithId<FinanceTransaction>
+        })
+      } catch (error) {
+        console.error('Error loading all transactions from MongoDB:', error)
+        return []
+      }
+    },
+    {
+      ttl: 30 * 1000, // 30 seconds cache (transactions change frequently)
+    }
+  )
 }
 
 export const loadMoreTransactions = async (
   userId: string,
-  lastDoc: any,
+  lastDoc: ObjectId | string | null,
   limitCount = 200
 ): Promise<TransactionPage> => {
   try {
@@ -228,6 +247,10 @@ export const addTransaction = async (
     // Debug logging removed
 
     const result = await collection.insertOne(txData)
+    
+    // Invalidate transaction cache
+    queryCache.invalidatePattern(new RegExp(`^transactions:.*:${userId}`))
+    
     return result.insertedId.toString()
   } catch (error) {
     console.error('Error adding transaction to MongoDB:', error)
@@ -243,19 +266,20 @@ export const updateTransaction = async (
   try {
     const collection = await getTransactionsCollection(userId)
     
-    // Convert date if present
-    const updateData: any = { ...updates }
-    if (updates.date) {
+    // Convert date if present and create updateData without date first
+    const { date, ...updatesWithoutDate } = updates
+    const updateData: Partial<FinanceTransaction> & { date?: Date } = { ...updatesWithoutDate }
+    if (date) {
       // Handle different date types: string, Date, or Timestamp
-      if (updates.date instanceof Date) {
-        updateData.date = updates.date
-      } else if (typeof updates.date === 'string') {
-        updateData.date = new Date(updates.date)
-      } else if ((updates.date as any)?.toDate) {
+      if (date instanceof Date) {
+        updateData.date = date
+      } else if (typeof date === 'string') {
+        updateData.date = new Date(date)
+      } else if (typeof date === 'object' && date !== null && 'toDate' in date && typeof (date as { toDate: () => Date }).toDate === 'function') {
         // Firestore Timestamp
-        updateData.date = (updates.date as any).toDate()
+        updateData.date = (date as { toDate: () => Date }).toDate()
       } else {
-        updateData.date = new Date(updates.date as any)
+        updateData.date = new Date(String(date))
       }
     }
     updateData.updatedAt = new Date()
@@ -265,6 +289,9 @@ export const updateTransaction = async (
       { _id: new ObjectId(transactionId), userId },
       { $set: updateData }
     )
+    
+    // Invalidate transaction cache
+    queryCache.invalidatePattern(new RegExp(`^transactions:.*:${userId}`))
   } catch (error) {
     console.error('Error updating transaction in MongoDB:', error)
     throw error
@@ -279,6 +306,9 @@ export const deleteTransaction = async (
     const collection = await getTransactionsCollection(userId)
     // Ensure userId matches (security check)
     await collection.deleteOne({ _id: new ObjectId(transactionId), userId })
+    
+    // Invalidate transaction cache
+    queryCache.invalidatePattern(new RegExp(`^transactions:.*:${userId}`))
   } catch (error) {
     console.error('Error deleting transaction from MongoDB:', error)
     throw error
@@ -419,12 +449,12 @@ export const batchAddTransactions = async (
         if (i + batchSize < transactions.length) {
           await new Promise(resolve => setTimeout(resolve, 100)) // 100ms delay
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Error in MongoDB batch insert:', error)
         
         // MongoDB insertMany with ordered: false continues on errors
         // Count successful inserts
-        if (error.writeErrors) {
+        if (error && typeof error === 'object' && 'writeErrors' in error && Array.isArray(error.writeErrors)) {
           errorCount += error.writeErrors.length
           successCount += chunk.length - error.writeErrors.length
         } else {
@@ -502,22 +532,32 @@ export const subscribeToCategories = (
 }
 
 export const getCategories = async (userId: string): Promise<FinanceCategories> => {
-  try {
-    const collection = await getCategoriesCollection(userId)
-    // MongoDB allows custom _id values, but TypeScript types are strict - use type assertion
-    const doc = await collection.findOne({ userId, _id: 'categories' as any })
-    
-    if (doc) {
-      const categories = convertMongoData(doc) as any
-      delete categories.id
-      delete categories.userId
-      return categories || {}
+  const cacheKey = createQueryCacheKey('categories', userId)
+  
+  return queryCache.get(
+    cacheKey,
+    async () => {
+      try {
+        const collection = await getCategoriesCollection(userId)
+        // MongoDB allows custom _id values, but TypeScript types are strict - use type assertion
+        const doc = await collection.findOne({ userId, _id: 'categories' as any })
+        
+        if (doc) {
+          const categories = convertMongoData(doc) as any
+          delete categories.id
+          delete categories.userId
+          return categories || {}
+        }
+        return {}
+      } catch (error) {
+        console.error('Error getting categories from MongoDB:', error)
+        return {}
+      }
+    },
+    {
+      ttl: 10 * 60 * 1000, // 10 minutes cache (categories change rarely)
     }
-    return {}
-  } catch (error) {
-    console.error('Error getting categories from MongoDB:', error)
-    return {}
-  }
+  )
 }
 
 export const saveCategories = async (
@@ -532,6 +572,10 @@ export const saveCategories = async (
       { $set: { userId, ...categories, updatedAt: new Date() } },
       { upsert: true }
     )
+    
+    // Invalidate categories cache
+    const cacheKey = createQueryCacheKey('categories', userId)
+    queryCache.invalidate(cacheKey)
   } catch (error) {
     console.error('Error saving categories to MongoDB:', error)
     throw error
@@ -541,22 +585,32 @@ export const saveCategories = async (
 // ---------- Settings ----------
 
 export const getFinanceSettings = async (userId: string): Promise<FinanceSettings | null> => {
-  try {
-    const collection = await getSettingsCollection(userId)
-    // MongoDB allows custom _id values, but TypeScript types are strict - use type assertion
-    const doc = await collection.findOne({ userId, _id: 'settings' as any })
-    
-    if (doc) {
-      const settings = convertMongoData(doc) as any
-      delete settings.id
-      delete settings.userId
-      return settings || null
+  const cacheKey = createQueryCacheKey('financeSettings', userId)
+  
+  return queryCache.get(
+    cacheKey,
+    async () => {
+      try {
+        const collection = await getSettingsCollection(userId)
+        // MongoDB allows custom _id values, but TypeScript types are strict - use type assertion
+        const doc = await collection.findOne({ userId, _id: 'settings' as any })
+        
+        if (doc) {
+          const settings = convertMongoData(doc) as any
+          delete settings.id
+          delete settings.userId
+          return settings || null
+        }
+        return null
+      } catch (error) {
+        console.error('Error getting finance settings from MongoDB:', error)
+        return null
+      }
+    },
+    {
+      ttl: 10 * 60 * 1000, // 10 minutes cache (settings change rarely)
     }
-    return null
-  } catch (error) {
-    console.error('Error getting finance settings from MongoDB:', error)
-    return null
-  }
+  )
 }
 
 export const saveFinanceSettings = async (
@@ -570,6 +624,10 @@ export const saveFinanceSettings = async (
       { $set: { userId, ...settings, updatedAt: new Date() } },
       { upsert: true }
     )
+    
+    // Invalidate settings cache
+    const cacheKey = createQueryCacheKey('financeSettings', userId)
+    queryCache.invalidate(cacheKey)
   } catch (error) {
     console.error('Error saving finance settings to MongoDB:', error)
     throw error
@@ -616,7 +674,7 @@ export const saveBudgetGoals = async (
 
 // ---------- Reconciliation ----------
 
-const getReconciliationCollection = async (userId: string) => {
+const getReconciliationCollection = async (_userId: string) => {
   const db = await getDatabase()
   return db.collection('finance_reconciliation')
 }
@@ -741,7 +799,7 @@ export const saveLastReconciliation = async (
 
 // ---------- Recurring Transactions ----------
 
-const getRecurringTransactionsCollection = async (userId: string) => {
+const getRecurringTransactionsCollection = async (_userId: string) => {
   const db = await getDatabase()
   return db.collection('finance_recurring')
 }
@@ -836,18 +894,20 @@ export const updateRecurringTransaction = async (
 ): Promise<void> => {
   try {
     const collection = await getRecurringTransactionsCollection(userId)
-    const updateData: any = { ...updates }
-    if (updates.nextDate) {
+    // Convert nextDate if present and create updateData without nextDate first
+    const { nextDate, ...updatesWithoutNextDate } = updates
+    const updateData: Partial<FinanceRecurringTransaction> & { nextDate?: Date } = { ...updatesWithoutNextDate }
+    if (nextDate) {
       // Handle different date types: string, Date, or Timestamp
-      if (updates.nextDate instanceof Date) {
-        updateData.nextDate = updates.nextDate
-      } else if (typeof updates.nextDate === 'string') {
-        updateData.nextDate = new Date(updates.nextDate)
-      } else if ((updates.nextDate as any)?.toDate) {
+      if (nextDate instanceof Date) {
+        updateData.nextDate = nextDate
+      } else if (typeof nextDate === 'string') {
+        updateData.nextDate = new Date(nextDate)
+      } else if (typeof nextDate === 'object' && nextDate !== null && 'toDate' in nextDate && typeof (nextDate as { toDate: () => Date }).toDate === 'function') {
         // Firestore Timestamp
-        updateData.nextDate = (updates.nextDate as any).toDate()
+        updateData.nextDate = (nextDate as { toDate: () => Date }).toDate()
       } else {
-        updateData.nextDate = new Date(updates.nextDate as any)
+        updateData.nextDate = new Date(String(nextDate))
       }
     }
     updateData.updatedAt = new Date()

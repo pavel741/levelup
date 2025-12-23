@@ -3,15 +3,16 @@
 import { useState, useEffect } from 'react'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
 export const dynamic = 'force-dynamic'
-import AuthGuard from '@/components/AuthGuard'
-import Sidebar from '@/components/Sidebar'
-import Header from '@/components/Header'
-import ChallengeCard from '@/components/ChallengeCard'
+import AuthGuard from '@/components/common/AuthGuard'
+import Sidebar from '@/components/layout/Sidebar'
+import Header from '@/components/layout/Header'
+import ChallengeCard from '@/components/common/ChallengeCard'
 import { Trophy, Plus, X } from 'lucide-react'
 import { Challenge } from '@/types'
 import { format } from 'date-fns'
 import { useFinanceChallengeUpdater } from '@/hooks/useFinanceChallengeUpdater'
 import { useWorkoutChallengeUpdater } from '@/hooks/useWorkoutChallengeUpdater'
+import { showError, showWarning } from '@/lib/utils'
 
 export default function ChallengesPage() {
   const { challenges, activeChallenges, addChallenge, updateChallenge, deleteChallenge, user, habits } = useFirestoreStore()
@@ -86,15 +87,15 @@ export default function ChallengesPage() {
     // Validate finance challenge fields
     if (newChallenge.type === 'finance') {
       if (!newChallenge.financeGoalType) {
-        alert('Please select a finance goal type')
+        showWarning('Please select a finance goal type')
         return
       }
       if (newChallenge.financeGoalType === 'savings_rate' && (!newChallenge.financeTargetPercentage || newChallenge.financeTargetPercentage <= 0)) {
-        alert('Please enter a valid savings rate percentage (e.g., 15 for 15%)')
+        showWarning('Please enter a valid savings rate percentage (e.g., 15 for 15%)')
         return
       }
       if ((newChallenge.financeGoalType === 'spending_limit' || newChallenge.financeGoalType === 'savings_amount' || newChallenge.financeGoalType === 'no_spend_days') && (!newChallenge.financeTarget || newChallenge.financeTarget <= 0)) {
-        alert(`Please enter a valid target ${newChallenge.financeGoalType === 'no_spend_days' ? 'number of days' : 'amount'}`)
+        showWarning(`Please enter a valid target ${newChallenge.financeGoalType === 'no_spend_days' ? 'number of days' : 'amount'}`)
         return
       }
     }
@@ -102,19 +103,19 @@ export default function ChallengesPage() {
     // Validate workout challenge fields
     if (newChallenge.type === 'workout') {
       if (!newChallenge.workoutGoalType) {
-        alert('Please select a workout goal type')
+        showWarning('Please select a workout goal type')
         return
       }
       if (newChallenge.workoutGoalType === 'routine_completed' && !newChallenge.workoutRoutineId) {
-        alert('Please select a routine to complete')
+        showWarning('Please select a routine to complete')
         return
       }
       if (newChallenge.workoutGoalType === 'workouts_per_week' && (!newChallenge.workoutTargetPerWeek || newChallenge.workoutTargetPerWeek <= 0)) {
-        alert('Please enter a valid target workouts per week')
+        showWarning('Please enter a valid target workouts per week')
         return
       }
       if ((newChallenge.workoutGoalType === 'workouts_completed' || newChallenge.workoutGoalType === 'routine_completed' || newChallenge.workoutGoalType === 'total_volume' || newChallenge.workoutGoalType === 'streak') && (!newChallenge.workoutTarget || newChallenge.workoutTarget <= 0)) {
-        alert(`Please enter a valid target ${newChallenge.workoutGoalType === 'streak' ? 'number of days' : newChallenge.workoutGoalType === 'total_volume' ? 'volume in kg' : 'number'}`)
+        showWarning(`Please enter a valid target ${newChallenge.workoutGoalType === 'streak' ? 'number of days' : newChallenge.workoutGoalType === 'total_volume' ? 'volume in kg' : 'number'}`)
         return
       }
     }
@@ -133,7 +134,7 @@ export default function ChallengesPage() {
     
     // Validate that end date is after start date
     if (endDate <= startDate) {
-      alert('End date must be after start date')
+      showWarning('End date must be after start date')
       return
     }
 
@@ -235,7 +236,7 @@ export default function ChallengesPage() {
     
     // Validate that end date is after start date
     if (endDate <= startDate) {
-      alert('End date must be after start date')
+      showWarning('End date must be after start date')
       return
     }
 
@@ -314,7 +315,7 @@ export default function ChallengesPage() {
       await deleteChallenge(challengeId)
     } catch (error) {
       console.error('Error deleting challenge:', error)
-      alert('Failed to delete challenge. Please try again.')
+      showError(error, { component: 'ChallengesPage', action: 'deleteChallenge' })
     }
   }
 

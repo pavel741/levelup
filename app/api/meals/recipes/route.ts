@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { getRecipesByUserId, saveRecipe } from '@/lib/mealMongo'
 import type { Recipe } from '@/types/nutrition'
-import { getUserIdFromRequest, successResponse, handleApiError } from '@/lib/utils/api-helpers'
+import { getUserIdFromRequest, successResponse, handleApiError } from '@/lib/utils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
 
     const recipes = await getRecipesByUserId(userId || undefined)
     return successResponse(recipes)
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleApiError(error, 'GET /api/meals/recipes')
   }
 }
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
 
     await saveRecipe(recipe)
     return successResponse()
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleApiError(error, 'POST /api/meals/recipes')
   }
 }

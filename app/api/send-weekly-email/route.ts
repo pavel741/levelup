@@ -271,7 +271,7 @@ export async function POST(request: NextRequest) {
           continue
         }
 
-        const { data, error } = await resend.emails.send({
+        const { error } = await resend.emails.send({
           from: process.env.RESEND_FROM_EMAIL || 'LevelUp <noreply@levelup.app>',
           to: user.email,
           subject: `🎯 Your Weekly Progress Summary - ${stats.totalHabitsCompleted} Habits Completed!`,
@@ -284,9 +284,10 @@ export async function POST(request: NextRequest) {
         } else {
           results.push({ userId: user.id, success: true })
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error(`Error processing user ${user.id}:`, error)
-        results.push({ userId: user.id, success: false, error: error.message })
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        results.push({ userId: user.id, success: false, error: errorMessage })
       }
     }
 

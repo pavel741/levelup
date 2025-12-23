@@ -4,12 +4,13 @@ import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
 export const dynamic = 'force-dynamic'
-import AuthGuard from '@/components/AuthGuard'
-import Sidebar from '@/components/Sidebar'
-import Header from '@/components/Header'
+import AuthGuard from '@/components/common/AuthGuard'
+import Sidebar from '@/components/layout/Sidebar'
+import Header from '@/components/layout/Header'
 import { User, Bell, Shield, Moon, CheckCircle2, RotateCcw, AlertTriangle } from 'lucide-react'
-import { useTheme } from '@/components/ThemeProvider'
+import { useTheme } from '@/components/common/ThemeProvider'
 import { requestNotificationPermission } from '@/lib/notifications'
+import { showError, showSuccess } from '@/lib/utils'
 
 export default function SettingsPage() {
   const { user, updateUserPreference, resetProgress } = useFirestoreStore()
@@ -87,10 +88,10 @@ export default function SettingsPage() {
     try {
       await resetProgress()
       setShowResetConfirm(false)
-      alert('Progress has been reset successfully!')
+      showSuccess('Progress has been reset successfully!')
     } catch (error) {
       console.error('Error resetting progress:', error)
-      alert('Failed to reset progress. Please try again.')
+      showError(error, { component: 'SettingsPage', action: 'resetProgress' })
     } finally {
       setIsResettingProgress(false)
     }

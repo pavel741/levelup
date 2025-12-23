@@ -177,7 +177,7 @@ export function detectBankProfile(headers: string[]): BankProfile | null {
     let score = 0
     
     // Check each column type
-    Object.entries(profile.columnMapping).forEach(([columnType, possibleNames]) => {
+    Object.entries(profile.columnMapping).forEach(([_columnType, possibleNames]) => {
       for (const header of normalizedHeaders) {
         for (const possibleName of possibleNames) {
           if (header === possibleName || header.includes(possibleName) || possibleName.includes(header)) {

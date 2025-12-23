@@ -15,7 +15,7 @@ export function categorizeTransaction(
   description: string = '',
   referenceNumber?: string,
   recipientName?: string,
-  amount?: number
+  _amount?: number
 ): CategorizationResult {
   const desc = (description || '').trim()
   const refNum = (referenceNumber || '').trim()

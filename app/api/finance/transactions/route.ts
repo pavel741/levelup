@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import {
   addTransaction,
   updateTransaction,
   deleteTransaction,
   getAllTransactionsForSummary,
 } from '@/lib/financeMongo'
-import { getUserIdFromRequest, validateUserId, successResponse, errorResponse, handleApiError } from '@/lib/utils/api-helpers'
+import { getUserIdFromRequest, validateUserId, successResponse, errorResponse, handleApiError } from '@/lib/utils'
 
 // GET - Get all transactions
 export async function GET(request: NextRequest) {
@@ -16,16 +16,15 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const limitParam = searchParams.get('limit')
-    const limit = limitParam ? parseInt(limitParam) : 0
+    const limit = limitParam ? parseInt(limitParam) : 100 // Default to 100 for faster initial load
 
-    // Always get all transactions from MongoDB (no quota limits!)
-    const transactions = await getAllTransactionsForSummary(userId!)
+    // Use limit in query for better performance (avoids loading all data)
+    const transactions = limit > 0 
+      ? await getAllTransactionsForSummary(userId!, limit)
+      : await getAllTransactionsForSummary(userId!)
     
-    // Only apply limit if explicitly requested and > 0
-    const limited = limit > 0 ? transactions.slice(0, limit) : transactions
-    
-    return successResponse({ transactions: limited })
-  } catch (error: any) {
+    return successResponse({ transactions })
+  } catch (error: unknown) {
     return handleApiError(error, 'GET /api/finance/transactions')
   }
 }
@@ -41,7 +40,7 @@ export async function POST(request: NextRequest) {
 
     const transactionId = await addTransaction(userId!, transaction)
     return successResponse({ id: transactionId })
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleApiError(error, 'POST /api/finance/transactions')
   }
 }
@@ -60,7 +59,7 @@ export async function PUT(request: NextRequest) {
 
     await updateTransaction(userId!, id, updates)
     return successResponse()
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleApiError(error, 'PUT /api/finance/transactions')
   }
 }
@@ -81,7 +80,7 @@ export async function DELETE(request: NextRequest) {
 
     await deleteTransaction(userId!, id)
     return successResponse()
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleApiError(error, 'DELETE /api/finance/transactions')
   }
 }

@@ -8,7 +8,7 @@ import { parseTransactionDate } from './financeDateUtils'
 export function calculateFinanceChallengeProgress(
   challenge: Challenge,
   transactions: FinanceTransaction[],
-  userId: string
+  _userId: string
 ): number {
   if (!challenge.financeGoalType || challenge.type !== 'finance') {
     return 0

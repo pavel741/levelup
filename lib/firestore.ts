@@ -14,7 +14,6 @@ import {
 import { db } from './firebase'
 import { User, Habit, Challenge, DailyStats } from '@/types'
 import { Routine, WorkoutLog } from '@/types/workout'
-import { format } from 'date-fns'
 
 // User operations
 export const getUserData = async (userId: string): Promise<User | null> => {
@@ -398,7 +397,7 @@ export const getAllUserDailyStats = async (userId: string): Promise<DailyStats[]
 // Workout operations
 export const getRoutinesByUserId = async (userId: string): Promise<Routine[]> => {
   if (!db) {
-    throw new Error('Firestore is not initialized')
+    return [] // Return empty array instead of throwing for faster fallback
   }
   
   try {
@@ -523,7 +522,7 @@ export const deleteRoutine = async (routineId: string): Promise<void> => {
 
 export const getWorkoutLogsByUserId = async (userId: string): Promise<WorkoutLog[]> => {
   if (!db) {
-    throw new Error('Firestore is not initialized')
+    return [] // Return empty array instead of throwing for faster fallback
   }
   
   try {

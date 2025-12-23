@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { Calendar, UtensilsCrossed, Plus, Trash2, Edit2, ShoppingCart, ChefHat, Target, Sparkles, X } from 'lucide-react'
+import { Calendar, UtensilsCrossed, Plus, Trash2, ChefHat, Sparkles, X } from 'lucide-react'
 import { subscribeToMealPlans, getMealPlans, saveMealPlan, deleteMealPlan, updateMealPlan } from '@/lib/mealApi'
 import type { MealPlan, MealPlanDay, PlannedMeal, NutritionInfo } from '@/types/nutrition'
-import { formatDate, formatDisplayDate } from '@/lib/utils/formatting'
+import { formatDisplayDate } from '@/lib/utils'
 import { addDays, eachDayOfInterval, startOfWeek, endOfWeek, format, isSameDay } from 'date-fns'
+import { showError } from '@/lib/utils'
 import { getAllMealPlanTemplates, generateMealPlanFromTemplate } from '@/lib/mealPlanTemplates'
 import MealEditor from './MealEditor'
 
@@ -82,9 +83,13 @@ export default function MealPlanner({ userId }: MealPlannerProps) {
       setNewPlanDuration(7)
       setSelectedTemplate(null)
       setSelectedPlan(mealPlan)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving meal plan:', error)
-      alert(`Failed to save meal plan: ${error.message || 'Unknown error'}\n\nIf MongoDB is blocked, meal plans won't be available until you're on a network that allows MongoDB access.`)
+      showError(error, { 
+        component: 'MealPlanner', 
+        action: 'saveMealPlan',
+        metadata: { note: 'If MongoDB is blocked, meal plans won\'t be available until you\'re on a network that allows MongoDB access.' }
+      })
     }
   }
 
@@ -108,10 +113,10 @@ export default function MealPlanner({ userId }: MealPlannerProps) {
       
       // Then delete from database
       await deleteMealPlan(planId, userId)
-    } catch (error: any) {
+    } catch (error: unknown) {
       // If deletion fails, reload plans from server
       console.error('Error deleting meal plan:', error)
-      alert(`Failed to delete meal plan: ${error.message || 'Unknown error'}`)
+      showError(error, { component: 'MealPlanner', action: 'deleteMealPlan' })
       // Reload plans to restore state
       const plans = await getMealPlans(userId)
       setMealPlans(plans)
@@ -123,12 +128,6 @@ export default function MealPlanner({ userId }: MealPlannerProps) {
     return eachDayOfInterval({ start: currentWeekStart, end: weekEnd })
   }, [currentWeekStart])
 
-  const selectedPlanDays = useMemo(() => {
-    if (!selectedPlan) return []
-    return selectedPlan.days.filter(day => 
-      currentWeekDays.some(weekDay => isSameDay(weekDay, day.date))
-    )
-  }, [selectedPlan, currentWeekDays])
 
   const calculateDayNutrition = (meals: PlannedMeal[]): NutritionInfo => {
     return meals.reduce((total, meal) => ({
@@ -164,9 +163,9 @@ export default function MealPlanner({ userId }: MealPlannerProps) {
       await updateMealPlan(selectedPlan.id, userId, updatedPlan)
       setSelectedPlan(updatedPlan)
       setEditingDay(null)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error updating meal plan:', error)
-      alert(`Failed to update meals: ${error.message || 'Unknown error'}`)
+      showError(error, { component: 'MealPlanner', action: 'updateMealPlan' })
     }
   }
 

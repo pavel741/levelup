@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { updateWorkoutLog, deleteWorkoutLog } from '@/lib/workoutMongo'
-import { validateUserId, successResponse, handleApiError } from '@/lib/utils/api-helpers'
+import { validateUserId, successResponse, handleApiError } from '@/lib/utils'
 
 export async function PATCH(
   request: NextRequest,
@@ -14,7 +14,7 @@ export async function PATCH(
 
     await updateWorkoutLog(params.id, userId!, updates)
     return successResponse()
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleApiError(error, 'PATCH /api/workouts/logs/[id]')
   }
 }
@@ -32,7 +32,7 @@ export async function DELETE(
 
     await deleteWorkoutLog(params.id, userId!)
     return successResponse()
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleApiError(error, 'DELETE /api/workouts/logs/[id]')
   }
 }

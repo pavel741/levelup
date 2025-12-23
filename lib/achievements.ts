@@ -32,7 +32,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     description: 'Complete your first habit',
     icon: '🎯',
     rarity: 'common',
-    checkProgress: (user, habits) => {
+    checkProgress: (_user, habits) => {
       const totalCompletions = habits.reduce((sum, h) => sum + h.completedDates.length, 0)
       return { progress: Math.min(totalCompletions, 1), target: 1, completed: totalCompletions >= 1 }
     },
@@ -73,7 +73,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     description: 'Complete 10 habits',
     icon: '📚',
     rarity: 'common',
-    checkProgress: (user, habits) => {
+    checkProgress: (_user, habits) => {
       const totalCompletions = habits.reduce((sum, h) => sum + h.completedDates.length, 0)
       return { progress: Math.min(totalCompletions, 10), target: 10, completed: totalCompletions >= 10 }
     },
@@ -84,7 +84,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     description: 'Complete 100 habits',
     icon: '🏆',
     rarity: 'rare',
-    checkProgress: (user, habits) => {
+    checkProgress: (_user, habits) => {
       const totalCompletions = habits.reduce((sum, h) => sum + h.completedDates.length, 0)
       return { progress: Math.min(totalCompletions, 100), target: 100, completed: totalCompletions >= 100 }
     },
@@ -95,7 +95,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     description: 'Complete 1000 habits',
     icon: '🌟',
     rarity: 'epic',
-    checkProgress: (user, habits) => {
+    checkProgress: (_user, habits) => {
       const totalCompletions = habits.reduce((sum, h) => sum + h.completedDates.length, 0)
       return { progress: Math.min(totalCompletions, 1000), target: 1000, completed: totalCompletions >= 1000 }
     },
@@ -156,7 +156,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     description: 'Have 5 active habits',
     icon: '🎪',
     rarity: 'common',
-    checkProgress: (user, habits) => {
+    checkProgress: (_user, habits) => {
       const activeHabits = habits.filter((h) => h.isActive).length
       return { progress: Math.min(activeHabits, 5), target: 5, completed: activeHabits >= 5 }
     },
@@ -167,7 +167,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     description: 'Complete all habits every day for a week',
     icon: '✨',
     rarity: 'rare',
-    checkProgress: (user, habits) => {
+    checkProgress: (_user, habits) => {
       const activeHabits = habits.filter((h) => h.isActive)
       if (activeHabits.length === 0) return { progress: 0, target: 7, completed: false }
       
@@ -191,7 +191,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     description: 'Record your first transaction',
     icon: '💰',
     rarity: 'common',
-    checkProgress: (user, habits, transactions) => {
+    checkProgress: (_user, _habits, transactions) => {
       const count = transactions?.length || 0
       return { progress: Math.min(count, 1), target: 1, completed: count >= 1 }
     },
@@ -202,7 +202,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     description: 'Record 10 transactions',
     icon: '📊',
     rarity: 'common',
-    checkProgress: (user, habits, transactions) => {
+    checkProgress: (_user, _habits, transactions) => {
       const count = transactions?.length || 0
       return { progress: Math.min(count, 10), target: 10, completed: count >= 10 }
     },
@@ -213,7 +213,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     description: 'Record 100 transactions',
     icon: '💳',
     rarity: 'rare',
-    checkProgress: (user, habits, transactions) => {
+    checkProgress: (_user, _habits, transactions) => {
       const count = transactions?.length || 0
       return { progress: Math.min(count, 100), target: 100, completed: count >= 100 }
     },
@@ -224,7 +224,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     description: 'Save €1,000',
     icon: '💵',
     rarity: 'rare',
-    checkProgress: (user, habits, transactions) => {
+    checkProgress: (_user, _habits, transactions) => {
       if (!transactions || transactions.length === 0) return { progress: 0, target: 1000, completed: false }
       
       let income = 0
@@ -249,7 +249,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     description: 'Save €5,000',
     icon: '💸',
     rarity: 'epic',
-    checkProgress: (user, habits, transactions) => {
+    checkProgress: (_user, _habits, transactions) => {
       if (!transactions || transactions.length === 0) return { progress: 0, target: 5000, completed: false }
       
       let income = 0
@@ -274,7 +274,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     description: 'Save €10,000',
     icon: '🏦',
     rarity: 'legendary',
-    checkProgress: (user, habits, transactions) => {
+    checkProgress: (_user, _habits, transactions) => {
       if (!transactions || transactions.length === 0) return { progress: 0, target: 10000, completed: false }
       
       let income = 0
@@ -299,7 +299,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     description: 'Go 7 days without any expenses',
     icon: '🚫',
     rarity: 'rare',
-    checkProgress: (user, habits, transactions) => {
+    checkProgress: (_user, _habits, transactions) => {
       if (!transactions || transactions.length === 0) return { progress: 0, target: 7, completed: false }
       
       const today = new Date()
@@ -325,7 +325,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     description: 'Track expenses for a full month',
     icon: '📈',
     rarity: 'common',
-    checkProgress: (user, habits, transactions) => {
+    checkProgress: (_user, _habits, transactions) => {
       if (!transactions || transactions.length === 0) return { progress: 0, target: 30, completed: false }
       
       const today = new Date()
@@ -349,7 +349,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     description: 'Complete your first workout',
     icon: '💪',
     rarity: 'common',
-    checkProgress: (user, habits, transactions, workoutLogs) => {
+    checkProgress: (_user, _habits, _transactions, workoutLogs) => {
       const completedWorkouts = workoutLogs?.filter((log) => log.completed) || []
       const count = completedWorkouts.length
       return { progress: Math.min(count, 1), target: 1, completed: count >= 1 }
@@ -361,7 +361,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     description: 'Complete 10 workouts',
     icon: '🏋️',
     rarity: 'common',
-    checkProgress: (user, habits, transactions, workoutLogs) => {
+    checkProgress: (_user, _habits, _transactions, workoutLogs) => {
       const completedWorkouts = workoutLogs?.filter((log) => log.completed) || []
       const count = completedWorkouts.length
       return { progress: Math.min(count, 10), target: 10, completed: count >= 10 }
@@ -373,7 +373,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     description: 'Complete 50 workouts',
     icon: '🔥',
     rarity: 'rare',
-    checkProgress: (user, habits, transactions, workoutLogs) => {
+    checkProgress: (_user, _habits, _transactions, workoutLogs) => {
       const completedWorkouts = workoutLogs?.filter((log) => log.completed) || []
       const count = completedWorkouts.length
       return { progress: Math.min(count, 50), target: 50, completed: count >= 50 }
@@ -385,7 +385,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     description: 'Complete 100 workouts',
     icon: '👑',
     rarity: 'epic',
-    checkProgress: (user, habits, transactions, workoutLogs) => {
+    checkProgress: (_user, _habits, _transactions, workoutLogs) => {
       const completedWorkouts = workoutLogs?.filter((log) => log.completed) || []
       const count = completedWorkouts.length
       return { progress: Math.min(count, 100), target: 100, completed: count >= 100 }
@@ -397,7 +397,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     description: 'Workout 7 days in a row',
     icon: '⚡',
     rarity: 'rare',
-    checkProgress: (user, habits, transactions, workoutLogs) => {
+    checkProgress: (_user, _habits, _transactions, workoutLogs) => {
       const completedWorkouts = workoutLogs?.filter((log) => log.completed) || []
       if (completedWorkouts.length === 0) return { progress: 0, target: 7, completed: false }
       
@@ -430,7 +430,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     description: 'Workout 30 days in a row',
     icon: '💎',
     rarity: 'epic',
-    checkProgress: (user, habits, transactions, workoutLogs) => {
+    checkProgress: (_user, _habits, _transactions, workoutLogs) => {
       const completedWorkouts = workoutLogs?.filter((log) => log.completed) || []
       if (completedWorkouts.length === 0) return { progress: 0, target: 30, completed: false }
       
@@ -463,7 +463,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     description: 'Lift 1,000 kg total volume',
     icon: '🏋️‍♂️',
     rarity: 'rare',
-    checkProgress: (user, habits, transactions, workoutLogs) => {
+    checkProgress: (_user, _habits, _transactions, workoutLogs) => {
       const completedWorkouts = workoutLogs?.filter((log) => log.completed) || []
       const totalVolume = completedWorkouts.reduce((sum, log) => sum + (log.totalVolume || 0), 0)
       return { progress: Math.min(totalVolume, 1000), target: 1000, completed: totalVolume >= 1000 }
@@ -475,7 +475,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     description: 'Lift 10,000 kg total volume',
     icon: '💪',
     rarity: 'epic',
-    checkProgress: (user, habits, transactions, workoutLogs) => {
+    checkProgress: (_user, _habits, _transactions, workoutLogs) => {
       const completedWorkouts = workoutLogs?.filter((log) => log.completed) || []
       const totalVolume = completedWorkouts.reduce((sum, log) => sum + (log.totalVolume || 0), 0)
       return { progress: Math.min(totalVolume, 10000), target: 10000, completed: totalVolume >= 10000 }
@@ -487,7 +487,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     description: 'Lift 50,000 kg total volume',
     icon: '👑',
     rarity: 'legendary',
-    checkProgress: (user, habits, transactions, workoutLogs) => {
+    checkProgress: (_user, _habits, _transactions, workoutLogs) => {
       const completedWorkouts = workoutLogs?.filter((log) => log.completed) || []
       const totalVolume = completedWorkouts.reduce((sum, log) => sum + (log.totalVolume || 0), 0)
       return { progress: Math.min(totalVolume, 50000), target: 50000, completed: totalVolume >= 50000 }
@@ -499,7 +499,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     description: 'Workout 7 times in a week',
     icon: '📅',
     rarity: 'rare',
-    checkProgress: (user, habits, transactions, workoutLogs) => {
+    checkProgress: (_user, _habits, _transactions, workoutLogs) => {
       const completedWorkouts = workoutLogs?.filter((log) => log.completed) || []
       if (completedWorkouts.length === 0) return { progress: 0, target: 7, completed: false }
       

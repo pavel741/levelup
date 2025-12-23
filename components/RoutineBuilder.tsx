@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, X, GripVertical, Trash2, Save, ArrowUp, ArrowDown, RefreshCw, Info } from 'lucide-react'
-import { EXERCISE_DATABASE, getExerciseById, findSimilarExercises } from '@/lib/exerciseDatabase'
+import { Plus, X, Trash2, Save, ArrowUp, ArrowDown, RefreshCw, Info } from 'lucide-react'
+import { getExerciseById, findSimilarExercises } from '@/lib/exerciseDatabase'
 import ExerciseLibrary from './ExerciseLibrary'
 import ExerciseInstructions from './ExerciseInstructions'
 import type { Routine, RoutineExercise, RoutineSession, SetConfiguration, Exercise } from '@/types/workout'
+import { showWarning } from '@/lib/utils'
 
 interface RoutineBuilderProps {
   onSave?: (routine: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => void
@@ -47,9 +48,10 @@ export default function RoutineBuilder({ onSave, onCancel, initialRoutine }: Rou
   }
   
   const [sessions, setSessions] = useState<RoutineSession[]>(initializeSessions)
-  const [editingExerciseIndex, setEditingExerciseIndex] = useState<{ sessionId: string; exerciseIndex: number } | null>(null)
   const [replacingExercise, setReplacingExercise] = useState<{ sessionId: string; exerciseIndex: number } | null>(null)
   const [showingInstructions, setShowingInstructions] = useState<{ sessionId: string; exerciseIndex: number } | null>(null)
+  // Local state for weight inputs to allow free editing without interference
+  const [weightInputs, setWeightInputs] = useState<Record<string, string>>({})
 
   // Load initial routine data when it changes
   useEffect(() => {
@@ -85,7 +87,7 @@ export default function RoutineBuilder({ onSave, onCancel, initialRoutine }: Rou
 
   const handleRemoveSession = (sessionId: string) => {
     if (sessions.length === 1) {
-      alert('You must have at least one workout day')
+      showWarning('You must have at least one workout day')
       return
     }
     setSessions(sessions.filter(s => s.id !== sessionId))
@@ -275,13 +277,13 @@ export default function RoutineBuilder({ onSave, onCancel, initialRoutine }: Rou
 
   const handleSave = () => {
     if (!routineName.trim()) {
-      alert('Please enter a routine name')
+      showWarning('Please enter a routine name')
       return
     }
 
     const totalExercises = sessions.reduce((sum, s) => sum + s.exercises.length, 0)
     if (totalExercises === 0) {
-      alert('Please add at least one exercise to your routine')
+      showWarning('Please add at least one exercise to your routine')
       return
     }
 
@@ -385,7 +387,7 @@ export default function RoutineBuilder({ onSave, onCancel, initialRoutine }: Rou
 
       {/* Workout Days (Sessions) */}
       <div className="space-y-4">
-        {sessions.map((session, sessionIndex) => {
+        {sessions.map((session) => {
           const sessionDuration = calculateSessionDuration(session)
           return (
             <div
@@ -588,28 +590,121 @@ export default function RoutineBuilder({ onSave, onCancel, initialRoutine }: Rou
                               <input
                                 type="number"
                                 placeholder="Reps"
-                                value={set.targetReps || ''}
-                                onChange={(e) => handleUpdateSet(session.id, exerciseIndex, setIndex, { targetReps: e.target.value ? parseInt(e.target.value) : undefined })}
+                                value={set.targetReps ?? ''}
+                                onChange={(e) => {
+                                  const value = e.target.value
+                                  handleUpdateSet(session.id, exerciseIndex, setIndex, { 
+                                    targetReps: value === '' ? undefined : (value ? parseInt(value) : undefined)
+                                  })
+                                }}
                                 className="w-20 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
                                 min="1"
                               />
 
-                              <input
-                                type="number"
-                                placeholder="Weight (kg)"
-                                value={set.targetWeight || ''}
-                                onChange={(e) => handleUpdateSet(session.id, exerciseIndex, setIndex, { targetWeight: e.target.value ? parseFloat(e.target.value) : undefined })}
-                                className="w-24 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                                min="0"
-                                step="0.5"
-                              />
+                              {/* Show weight input only for exercises that can use weight */}
+                              {exercise && exercise.equipment.includes('bodyweight') && exercise.equipment.length === 1 ? (
+                                // Bodyweight-only exercises - show static indicator (no input, no dropdown)
+                                <div className="w-24 px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-sm text-gray-600 dark:text-gray-400 flex items-center justify-center cursor-default">
+                                  Bodyweight
+                                </div>
+                              ) : exercise && exercise.equipment.length > 0 ? (
+                                // Exercises that can use weight - show weight input
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  placeholder="Weight (kg)"
+                                  value={weightInputs[`${session.id}-${exerciseIndex}-${setIndex}`] ?? (set.targetWeight != null && set.targetWeight > 0 ? set.targetWeight.toString() : '')}
+                                  onChange={(e) => {
+                                    const inputKey = `${session.id}-${exerciseIndex}-${setIndex}`
+                                    const value = e.target.value
+                                    // Update local state immediately for free editing - no validation during typing
+                                    setWeightInputs(prev => ({ ...prev, [inputKey]: value }))
+                                  }}
+                                  onBlur={(e) => {
+                                    const inputKey = `${session.id}-${exerciseIndex}-${setIndex}`
+                                    const value = e.target.value.trim()
+                                    // Clear local state on blur
+                                    setWeightInputs(prev => {
+                                      const newState = { ...prev }
+                                      delete newState[inputKey]
+                                      return newState
+                                    })
+                                    // Update actual state with validated value
+                                    if (value === '' || value === '0') {
+                                      handleUpdateSet(session.id, exerciseIndex, setIndex, { targetWeight: undefined })
+                                    } else {
+                                      const numValue = parseFloat(value)
+                                      if (!isNaN(numValue) && numValue >= 0 && isFinite(numValue)) {
+                                        handleUpdateSet(session.id, exerciseIndex, setIndex, { targetWeight: numValue })
+                                      } else {
+                                        // Invalid input - clear it
+                                        handleUpdateSet(session.id, exerciseIndex, setIndex, { targetWeight: undefined })
+                                      }
+                                    }
+                                  }}
+                                  onFocus={(_e) => {
+                                    // Initialize local state with current value when focused
+                                    const inputKey = `${session.id}-${exerciseIndex}-${setIndex}`
+                                    if (!weightInputs[inputKey]) {
+                                      const currentValue = set.targetWeight != null && set.targetWeight > 0 ? set.targetWeight.toString() : ''
+                                      setWeightInputs(prev => ({ ...prev, [inputKey]: currentValue }))
+                                    }
+                                  }}
+                                  className="w-24 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                                />
+                              ) : (
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  placeholder="Weight (kg)"
+                                  value={weightInputs[`${session.id}-${exerciseIndex}-${setIndex}`] ?? (set.targetWeight != null && set.targetWeight > 0 ? set.targetWeight.toString() : '')}
+                                  onChange={(e) => {
+                                    const inputKey = `${session.id}-${exerciseIndex}-${setIndex}`
+                                    const value = e.target.value
+                                    // Update local state immediately for free editing - no validation during typing
+                                    setWeightInputs(prev => ({ ...prev, [inputKey]: value }))
+                                  }}
+                                  onBlur={(e) => {
+                                    const inputKey = `${session.id}-${exerciseIndex}-${setIndex}`
+                                    const value = e.target.value.trim()
+                                    // Clear local state on blur
+                                    setWeightInputs(prev => {
+                                      const newState = { ...prev }
+                                      delete newState[inputKey]
+                                      return newState
+                                    })
+                                    // Update actual state with validated value
+                                    if (value === '' || value === '0') {
+                                      handleUpdateSet(session.id, exerciseIndex, setIndex, { targetWeight: undefined })
+                                    } else {
+                                      const numValue = parseFloat(value)
+                                      if (!isNaN(numValue) && numValue >= 0 && isFinite(numValue)) {
+                                        handleUpdateSet(session.id, exerciseIndex, setIndex, { targetWeight: numValue })
+                                      } else {
+                                        // Invalid input - clear it
+                                        handleUpdateSet(session.id, exerciseIndex, setIndex, { targetWeight: undefined })
+                                      }
+                                    }
+                                  }}
+                                  onFocus={(_e) => {
+                                    // Initialize local state with current value when focused
+                                    const inputKey = `${session.id}-${exerciseIndex}-${setIndex}`
+                                    if (!weightInputs[inputKey]) {
+                                      const currentValue = set.targetWeight != null && set.targetWeight > 0 ? set.targetWeight.toString() : ''
+                                      setWeightInputs(prev => ({ ...prev, [inputKey]: currentValue }))
+                                    }
+                                  }}
+                                  className="w-24 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                                />
+                              )}
 
                               <input
                                 type="number"
                                 placeholder="Rest (sec)"
-                                value={set.restAfter || routineExercise.restTime || ''}
+                                value={set.restAfter ?? routineExercise.restTime ?? ''}
                                 onChange={(e) => {
-                                  const restTime = e.target.value ? parseInt(e.target.value) : undefined
+                                  const value = e.target.value
+                                  const restTime = value === '' ? undefined : (value ? parseInt(value) : undefined)
                                   if (setIndex === 0) {
                                     handleUpdateExercise(session.id, exerciseIndex, { restTime })
                                   }

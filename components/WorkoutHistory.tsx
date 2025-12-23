@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Calendar, Clock, TrendingUp, X, Filter } from 'lucide-react'
 import { getExerciseById } from '@/lib/exerciseDatabase'
+import PostWorkoutFeedback from '@/components/PostWorkoutFeedback'
 import type { WorkoutLog } from '@/types/workout'
 import { format } from 'date-fns'
 
@@ -13,6 +14,8 @@ interface WorkoutHistoryProps {
 
 export default function WorkoutHistory({ logs, onDelete }: WorkoutHistoryProps) {
   const [selectedLog, setSelectedLog] = useState<WorkoutLog | null>(null)
+  const [showFeedback, setShowFeedback] = useState(false)
+  const [feedbackLog, setFeedbackLog] = useState<WorkoutLog | null>(null)
   const [filterDate, setFilterDate] = useState<string>('')
 
   const filteredLogs = logs.filter((log) => {
@@ -22,8 +25,10 @@ export default function WorkoutHistory({ logs, onDelete }: WorkoutHistoryProps) 
 
   const totalWorkouts = filteredLogs.length
   const totalVolume = filteredLogs.reduce((sum, log) => sum + (log.totalVolume || 0), 0)
-  const totalDuration = filteredLogs.reduce((sum, log) => sum + log.duration, 0)
-  const avgDuration = totalWorkouts > 0 ? Math.round(totalDuration / totalWorkouts) : 0
+  // Duration is stored in seconds, convert to minutes
+  const totalDurationSeconds = filteredLogs.reduce((sum, log) => sum + log.duration, 0)
+  const totalDurationMinutes = Math.round(totalDurationSeconds / 60)
+  const avgDuration = totalWorkouts > 0 ? Math.round(totalDurationMinutes / totalWorkouts) : 0
 
   return (
     <div className="space-y-6">
@@ -46,7 +51,7 @@ export default function WorkoutHistory({ logs, onDelete }: WorkoutHistoryProps) 
         <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Time</div>
           <div className="text-2xl font-bold text-gray-900 dark:text-white">
-            {Math.round(totalDuration / 60)}h {totalDuration % 60}m
+            {Math.floor(totalDurationMinutes / 60)}h {totalDurationMinutes % 60}m
           </div>
         </div>
       </div>
@@ -102,7 +107,7 @@ export default function WorkoutHistory({ logs, onDelete }: WorkoutHistoryProps) 
                   <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400 mb-3">
                     <div className="flex items-center gap-1">
                       <Clock className="w-4 h-4" />
-                      {log.duration} min
+                      {Math.round(log.duration / 60)} min
                     </div>
                     {log.totalVolume && (
                       <div className="flex items-center gap-1">
@@ -133,10 +138,18 @@ export default function WorkoutHistory({ logs, onDelete }: WorkoutHistoryProps) 
                 </div>
                 {onDelete && (
                   <button
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.stopPropagation()
                       if (confirm('Delete this workout?')) {
-                        onDelete(log.id)
+                        // Close modals if this log is selected
+                        if (selectedLog?.id === log.id) {
+                          setSelectedLog(null)
+                        }
+                        if (feedbackLog?.id === log.id) {
+                          setShowFeedback(false)
+                          setFeedbackLog(null)
+                        }
+                        await onDelete(log.id)
                       }
                     }}
                     className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
@@ -161,7 +174,7 @@ export default function WorkoutHistory({ logs, onDelete }: WorkoutHistoryProps) 
                     {format(selectedLog.date, 'EEEE, MMMM d, yyyy')}
                   </h2>
                   <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    <span>{selectedLog.duration} minutes</span>
+                    <span>{Math.round(selectedLog.duration / 60)} minutes</span>
                     {selectedLog.totalVolume && (
                       <span>{selectedLog.totalVolume.toLocaleString()} kg total volume</span>
                     )}
@@ -187,26 +200,40 @@ export default function WorkoutHistory({ logs, onDelete }: WorkoutHistoryProps) 
                         {exIdx + 1}. {exercise?.name || 'Unknown Exercise'}
                       </h3>
                       <div className="space-y-2">
-                        {ex.sets.map((set, setIdx) => (
-                          <div
-                            key={setIdx}
-                            className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400"
-                          >
-                            <span className="font-medium w-12">Set {set.setNumber}:</span>
-                            {set.weight && set.reps && (
-                              <span>{set.reps} reps × {set.weight} kg</span>
-                            )}
-                            {set.duration && (
-                              <span>{Math.round(set.duration / 60)}:{(set.duration % 60).toString().padStart(2, '0')}</span>
-                            )}
-                            {set.distance && (
-                              <span>{set.distance} km</span>
-                            )}
-                            {set.rpe && (
-                              <span className="ml-auto">RPE: {set.rpe}</span>
-                            )}
-                          </div>
-                        ))}
+                        {ex.sets.map((set, setIdx) => {
+                          const isBodyweight = exercise && exercise.equipment.includes('bodyweight') && exercise.equipment.length === 1
+                          const hasWeight = set.weight && set.weight > 0
+                          const hasReps = set.reps && set.reps > 0
+                          
+                          return (
+                            <div
+                              key={setIdx}
+                              className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400"
+                            >
+                              <span className="font-medium w-12">Set {set.setNumber}:</span>
+                              {hasReps && (
+                                <>
+                                  {hasWeight ? (
+                                    <span>{set.reps} reps × {set.weight} kg</span>
+                                  ) : isBodyweight ? (
+                                    <span>{set.reps} reps (Bodyweight)</span>
+                                  ) : (
+                                    <span>{set.reps} reps</span>
+                                  )}
+                                </>
+                              )}
+                              {set.duration && (
+                                <span>{Math.round(set.duration / 60)}:{(set.duration % 60).toString().padStart(2, '0')}</span>
+                              )}
+                              {set.distance && (
+                                <span>{set.distance} km</span>
+                              )}
+                              {set.rpe && (
+                                <span className="ml-auto">RPE: {set.rpe}</span>
+                              )}
+                            </div>
+                          )
+                        })}
                       </div>
                       {ex.notes && (
                         <div className="mt-2 text-sm text-gray-600 dark:text-gray-400 italic">
@@ -224,9 +251,34 @@ export default function WorkoutHistory({ logs, onDelete }: WorkoutHistoryProps) 
                   <p className="text-sm text-gray-600 dark:text-gray-400">{selectedLog.notes}</p>
                 </div>
               )}
+
+              {/* Show Feedback Button */}
+              <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                <button
+                  onClick={() => {
+                    setFeedbackLog(selectedLog)
+                    setShowFeedback(true)
+                  }}
+                  className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center gap-2"
+                >
+                  <TrendingUp className="w-5 h-5" />
+                  View Workout Feedback & Recommendations
+                </button>
+              </div>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Post-Workout Feedback Modal */}
+      {showFeedback && feedbackLog && (
+        <PostWorkoutFeedback
+          workoutLog={feedbackLog}
+          onClose={() => {
+            setShowFeedback(false)
+            setFeedbackLog(null)
+          }}
+        />
       )}
     </div>
   )

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Bell, X, Trophy, Target, Award } from 'lucide-react'
+import { Bell, Trophy, Target, Award } from 'lucide-react'
 
 interface Notification {
   id: string

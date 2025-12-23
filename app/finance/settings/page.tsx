@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import AuthGuard from '@/components/AuthGuard'
-import Sidebar from '@/components/Sidebar'
-import Header from '@/components/Header'
+import AuthGuard from '@/components/common/AuthGuard'
+import Sidebar from '@/components/layout/Sidebar'
+import Header from '@/components/layout/Header'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
 import {
   getCategories,
@@ -21,6 +21,7 @@ import {
   getLastReconciliation,
   saveLastReconciliation,
 } from '@/lib/financeApi'
+import { showWarning } from '@/lib/utils'
 import type {
   FinanceCategories,
   FinanceBudgetGoals,
@@ -29,7 +30,7 @@ import type {
   FinanceReconciliationRecord,
 } from '@/types/finance'
 import { Settings, Repeat, History, ArrowLeft, Plus, Trash2, Edit2, X, Save } from 'lucide-react'
-import { formatDateTime } from '@/lib/utils/formatting'
+import { formatDateTime } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -50,7 +51,7 @@ export default function FinanceSettingsPage() {
   const [newCategoryName, setNewCategoryName] = useState('')
   const [newCategoryColor, setNewCategoryColor] = useState('#6366f1')
   const [newCategoryLimit, setNewCategoryLimit] = useState('')
-  const [isSavingCategories, setIsSavingCategories] = useState(false)
+  const [, setIsSavingCategories] = useState(false)
 
   // Budget Goals
   const [monthlySavingsTarget, setMonthlySavingsTarget] = useState('')
@@ -81,7 +82,7 @@ export default function FinanceSettingsPage() {
   const [paydayCutoffHour, setPaydayCutoffHour] = useState(13) // Default 1pm for end date
   const [paydayStartCutoffHour, setPaydayStartCutoffHour] = useState(14) // Default 2pm for start date
   const [capDateRangesToData, setCapDateRangesToData] = useState(true)
-  const [isSavingPeriod, setIsSavingPeriod] = useState(false)
+  const [isSavingPeriod] = useState(false)
 
   useEffect(() => {
     if (!user?.id) return
@@ -170,7 +171,7 @@ export default function FinanceSettingsPage() {
   const handleAddCategory = () => {
     if (!newCategoryName.trim()) return
     if (categories.some(c => c.name.toLowerCase() === newCategoryName.trim().toLowerCase())) {
-      alert('Category already exists')
+      showWarning('Category already exists')
       return
     }
     setCategories([...categories, {

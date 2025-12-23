@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { getRecipeById, deleteRecipe } from '@/lib/mealMongo'
-import { getUserIdFromRequest, validateUserId, successResponse, errorResponse, handleApiError } from '@/lib/utils/api-helpers'
+import { getUserIdFromRequest, validateUserId, successResponse, errorResponse, handleApiError } from '@/lib/utils'
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
@@ -12,7 +12,7 @@ export async function GET(
       return errorResponse('Recipe not found', 404)
     }
     return successResponse(recipe)
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleApiError(error, 'GET /api/meals/recipes/[id]')
   }
 }
@@ -28,7 +28,7 @@ export async function DELETE(
 
     await deleteRecipe(params.id, userId!)
     return successResponse()
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleApiError(error, 'DELETE /api/meals/recipes/[id]')
   }
 }

@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { User, Habit, Challenge, Achievement, DailyStats } from '@/types'
-import { format, parseISO } from 'date-fns'
+import { format } from 'date-fns'
 import { checkAndUnlockAchievements } from '@/lib/achievements'
 import { validateMissedReason } from '@/lib/missedHabitValidation'
 import { getAllTransactionsForSummary } from '@/lib/financeApi'

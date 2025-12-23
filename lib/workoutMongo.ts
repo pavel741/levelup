@@ -95,7 +95,7 @@ export const saveRoutine = async (routine: Routine): Promise<void> => {
     })
 
     // Use upsert to update if exists, insert if not
-    const result = await collection.updateOne(
+    await collection.updateOne(
       { id: routine.id, userId: routine.userId },
       { $set: routineData },
       { upsert: true }

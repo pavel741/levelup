@@ -31,7 +31,8 @@ export const subscribeToRoutines = (
         return
       }
 
-      const routines: Routine[] = await response.json()
+      const responseData = await response.json()
+      const routines: Routine[] = responseData.data || responseData || []
       
       // Convert date strings to Date objects
       const convertedRoutines = routines.map((r) => ({
@@ -115,7 +116,8 @@ export const getWorkoutLogs = async (userId: string): Promise<WorkoutLog[]> => {
     if (!response.ok) {
       throw new Error('Failed to fetch workout logs')
     }
-    const logs: WorkoutLog[] = await response.json()
+    const responseData = await response.json()
+    const logs: WorkoutLog[] = responseData.data || responseData || []
     return logs.map((log) => ({
       ...log,
       date: log.date instanceof Date ? log.date : new Date(log.date),
@@ -134,10 +136,15 @@ export const subscribeToWorkoutLogs = (
 ): (() => void) => {
   let isActive = true
   let lastDataHash: string | null = null
+  let isFirstFetch = true
 
   const hashData = (logs: WorkoutLog[]): string => {
     if (logs.length === 0) return 'empty'
-    return JSON.stringify(logs.map((l) => ({ id: l.id, date: l.date })))
+    // Use ISO string for dates to ensure consistent hashing
+    return JSON.stringify(logs.map((l) => ({ 
+      id: l.id, 
+      date: l.date instanceof Date ? l.date.toISOString() : l.date 
+    })))
   }
 
   const fetchLogs = async () => {
@@ -151,7 +158,8 @@ export const subscribeToWorkoutLogs = (
         return
       }
 
-      const logs: WorkoutLog[] = await response.json()
+      const responseData = await response.json()
+      const logs: WorkoutLog[] = responseData.data || responseData || []
       
       // Convert date strings to Date objects
       const convertedLogs = logs.map((l) => ({
@@ -162,7 +170,9 @@ export const subscribeToWorkoutLogs = (
       }))
 
       const currentHash = hashData(convertedLogs)
-      if (currentHash !== lastDataHash) {
+      // Always trigger callback on first fetch, or if data changed
+      if (isFirstFetch || currentHash !== lastDataHash) {
+        isFirstFetch = false
         lastDataHash = currentHash
         callback(convertedLogs)
       }

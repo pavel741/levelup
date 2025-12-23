@@ -1,8 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  compress: true, // Enable gzip compression
   images: {
     domains: ['firebasestorage.googleapis.com'],
+  },
+  // Experimental features for better performance
+  experimental: {
+    // optimizeCss: true, // Disabled - requires critters package
   },
   webpack: (config, { isServer }) => {
     // Exclude MongoDB and Node.js modules from client-side bundle

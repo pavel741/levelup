@@ -4,13 +4,13 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
 export const dynamic = 'force-dynamic'
-import AuthGuard from '@/components/AuthGuard'
-import Sidebar from '@/components/Sidebar'
-import Header from '@/components/Header'
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts'
-import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO } from 'date-fns'
-import { TrendingUp, Calendar, Award, Target, ArrowUpDown, ArrowUp, ArrowDown, ArrowLeft, BarChart3 } from 'lucide-react'
-import { useTheme } from '@/components/ThemeProvider'
+import AuthGuard from '@/components/common/AuthGuard'
+import Sidebar from '@/components/layout/Sidebar'
+import Header from '@/components/layout/Header'
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, parseISO } from 'date-fns'
+import { TrendingUp, Calendar, Award, Target, ArrowUp, ArrowDown, ArrowLeft, BarChart3 } from 'lucide-react'
+import { useTheme } from '@/components/common/ThemeProvider'
 
 export default function HabitsStatisticsPage() {
   const { habits, user, dailyStats } = useFirestoreStore()
@@ -333,8 +333,6 @@ export default function HabitsStatisticsPage() {
                     {/* Month labels */}
                     <div className="flex items-center gap-1 ml-6 relative min-w-[742px]" style={{ height: '15px' }}>
                       {monthLabels.map((label, idx) => {
-                        const prevWeek = idx > 0 ? monthLabels[idx - 1].week : 0
-                        const weekOffset = (label.week - prevWeek) * 14 // 14px per week (12px square + 2px gap)
                         return (
                           <div
                             key={idx}
@@ -515,7 +513,7 @@ export default function HabitsStatisticsPage() {
                           itemStyle={{
                             color: theme === 'dark' ? '#E5E7EB' : '#1F2937',
                           }}
-                          formatter={(value: number | undefined, name?: string) => {
+                          formatter={(value: number | undefined, _name?: string) => {
                             const val = value ?? 0
                             if (xpViewMode === 'daily') {
                               return [`${val} XP`, 'Daily XP']
@@ -651,7 +649,7 @@ export default function HabitsStatisticsPage() {
 
                   {stats.habitPerformance.length > 0 ? (
                     <div className="space-y-4">
-                      {stats.habitPerformance.map((habit, index) => (
+                      {stats.habitPerformance.map((habit) => (
                         <div key={habit.id} className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                           <div className="flex items-center gap-3 flex-1 min-w-0">
                             <div className={`${habit.color} w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center text-lg sm:text-xl flex-shrink-0`}>

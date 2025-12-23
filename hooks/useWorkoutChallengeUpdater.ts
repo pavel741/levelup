@@ -4,7 +4,6 @@ import { subscribeToWorkoutLogs } from '@/lib/workoutApi'
 import { calculateWorkoutChallengeProgress } from '@/lib/workoutChallengeUtils'
 import { updateChallenge } from '@/lib/firestore'
 import type { WorkoutLog } from '@/types/workout'
-import type { Challenge } from '@/types'
 
 /**
  * Hook to automatically update workout challenge progress when workout logs change

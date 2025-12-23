@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { getMealPlansByUserId, saveMealPlan } from '@/lib/mealMongo'
 import type { MealPlan } from '@/types/nutrition'
-import { getUserIdFromRequest, validateUserId, successResponse, handleApiError } from '@/lib/utils/api-helpers'
+import { getUserIdFromRequest, validateUserId, successResponse, handleApiError } from '@/lib/utils'
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
 
     const mealPlans = await getMealPlansByUserId(userId!)
     return successResponse(mealPlans)
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleApiError(error, 'GET /api/meals/plans')
   }
 }
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
 
     await saveMealPlan(mealPlan)
     return successResponse()
-  } catch (error: any) {
+  } catch (error: unknown) {
     return handleApiError(error, 'POST /api/meals/plans')
   }
 }

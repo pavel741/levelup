@@ -2,30 +2,66 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import AuthGuard from '@/components/AuthGuard'
-import Sidebar from '@/components/Sidebar'
-import Header from '@/components/Header'
+import AuthGuard from '@/components/common/AuthGuard'
+import Sidebar from '@/components/layout/Sidebar'
+import Header from '@/components/layout/Header'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
-import { FinanceCategoryChart } from '@/components/FinanceCategoryChart'
-import { FinanceTrendChart } from '@/components/FinanceTrendChart'
-import { FinanceMonthlyComparison } from '@/components/FinanceMonthlyComparison'
-import { FinanceCategoryBarChart } from '@/components/FinanceCategoryBarChart'
-import { FinanceSpendingByDayOfWeek } from '@/components/FinanceSpendingByDayOfWeek'
-import { FinanceCategoryTrends } from '@/components/FinanceCategoryTrends'
-import { FinanceYearOverYear } from '@/components/FinanceYearOverYear'
-import { FinancePaymentMethodBreakdown } from '@/components/FinancePaymentMethodBreakdown'
-import { FinanceAverageTransactionAmount } from '@/components/FinanceAverageTransactionAmount'
-import { FinanceSpendingVelocity } from '@/components/FinanceSpendingVelocity'
-import { FinanceExpenseDistribution } from '@/components/FinanceExpenseDistribution'
-import { FinanceCashFlowCalendar } from '@/components/FinanceCashFlowCalendar'
-import { FinanceCategoryForecast } from '@/components/FinanceCategoryForecast'
-import { FinanceSpendingAlerts } from '@/components/FinanceSpendingAlerts'
-import { FinanceRecurringExpenses } from '@/components/FinanceRecurringExpenses'
-import { FinanceVerificationPanel } from '@/components/FinanceVerificationPanel'
-import { subscribeToTransactions, getFinanceSettings } from '@/lib/financeApi'
+// Lazy load chart components for better performance
+import nextDynamic from 'next/dynamic'
+import { CardSkeleton } from '@/components/ui/Skeleton'
+
+const FinanceCategoryChart = nextDynamic(() => import('@/components/finance/charts/FinanceCategoryChart').then(m => ({ default: m.FinanceCategoryChart })), {
+  loading: () => <CardSkeleton />,
+})
+const FinanceTrendChart = nextDynamic(() => import('@/components/finance/charts/FinanceTrendChart').then(m => ({ default: m.FinanceTrendChart })), {
+  loading: () => <CardSkeleton />,
+})
+const FinanceMonthlyComparison = nextDynamic(() => import('@/components/finance/charts/FinanceMonthlyComparison').then(m => ({ default: m.FinanceMonthlyComparison })), {
+  loading: () => <CardSkeleton />,
+})
+const FinanceCategoryBarChart = nextDynamic(() => import('@/components/finance/charts/FinanceCategoryBarChart').then(m => ({ default: m.FinanceCategoryBarChart })), {
+  loading: () => <CardSkeleton />,
+})
+const FinanceSpendingByDayOfWeek = nextDynamic(() => import('@/components/finance/charts/FinanceSpendingByDayOfWeek').then(m => ({ default: m.FinanceSpendingByDayOfWeek })), {
+  loading: () => <CardSkeleton />,
+})
+const FinanceCategoryTrends = nextDynamic(() => import('@/components/finance/charts/FinanceCategoryTrends').then(m => ({ default: m.FinanceCategoryTrends })), {
+  loading: () => <CardSkeleton />,
+})
+const FinanceYearOverYear = nextDynamic(() => import('@/components/finance/charts/FinanceYearOverYear').then(m => ({ default: m.FinanceYearOverYear })), {
+  loading: () => <CardSkeleton />,
+})
+const FinancePaymentMethodBreakdown = nextDynamic(() => import('@/components/finance/charts/FinancePaymentMethodBreakdown').then(m => ({ default: m.FinancePaymentMethodBreakdown })), {
+  loading: () => <CardSkeleton />,
+})
+const FinanceAverageTransactionAmount = nextDynamic(() => import('@/components/finance/charts/FinanceAverageTransactionAmount').then(m => ({ default: m.FinanceAverageTransactionAmount })), {
+  loading: () => <CardSkeleton />,
+})
+const FinanceSpendingVelocity = nextDynamic(() => import('@/components/finance/charts/FinanceSpendingVelocity').then(m => ({ default: m.FinanceSpendingVelocity })), {
+  loading: () => <CardSkeleton />,
+})
+const FinanceExpenseDistribution = nextDynamic(() => import('@/components/finance/charts/FinanceExpenseDistribution').then(m => ({ default: m.FinanceExpenseDistribution })), {
+  loading: () => <CardSkeleton />,
+})
+const FinanceCashFlowCalendar = nextDynamic(() => import('@/components/finance/charts/FinanceCashFlowCalendar').then(m => ({ default: m.FinanceCashFlowCalendar })), {
+  loading: () => <CardSkeleton />,
+})
+const FinanceCategoryForecast = nextDynamic(() => import('@/components/finance/charts/FinanceCategoryForecast').then(m => ({ default: m.FinanceCategoryForecast })), {
+  loading: () => <CardSkeleton />,
+})
+const FinanceSpendingAlerts = nextDynamic(() => import('@/components/finance/charts/FinanceSpendingAlerts').then(m => ({ default: m.FinanceSpendingAlerts })), {
+  loading: () => <CardSkeleton />,
+})
+const FinanceRecurringExpenses = nextDynamic(() => import('@/components/finance/charts/FinanceRecurringExpenses').then(m => ({ default: m.FinanceRecurringExpenses })), {
+  loading: () => <CardSkeleton />,
+})
+const FinanceVerificationPanel = nextDynamic(() => import('@/components/finance/FinanceVerificationPanel').then(m => ({ default: m.FinanceVerificationPanel })), {
+  loading: () => <CardSkeleton />,
+})
+import { subscribeToTransactions, getFinanceSettings, getTransactions } from '@/lib/financeApi'
 import { parseTransactionDate } from '@/lib/financeDateUtils'
 import type { FinanceTransaction, FinanceSettings } from '@/types/finance'
-import { BarChart3, ArrowLeft, TrendingUp, TrendingDown, DollarSign, Percent } from 'lucide-react'
+import { BarChart3, ArrowLeft, TrendingUp, TrendingDown, DollarSign, Percent, Loader2 } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -53,6 +89,15 @@ export default function FinanceAnalyticsPage() {
       console.error('Error loading finance settings:', err)
     })
 
+    // Immediately fetch fresh data on mount/navigation
+    getTransactions(user.id, { limitCount: 0 }).then(txs => {
+      setTransactions(txs)
+      setIsLoading(false)
+    }).catch(error => {
+      console.error('Error fetching transactions on mount:', error)
+    })
+
+    // Then set up subscription for ongoing updates
     const unsubscribe = subscribeToTransactions(
       user.id,
       (txs) => {
@@ -291,13 +336,31 @@ export default function FinanceAnalyticsPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    {isLoading && (
+                    {isLoading && transactions.length === 0 && (
                       <span className="text-xs text-gray-500 dark:text-gray-400">Loading…</span>
                     )}
                   </div>
                 </div>
 
+                {/* Loading Screen */}
+                {isLoading && transactions.length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-20">
+                    <div className="relative">
+                      <Loader2 className="w-12 h-12 text-purple-600 dark:text-purple-400 animate-spin" />
+                      <div className="absolute inset-0 border-4 border-purple-200 dark:border-purple-800 border-t-purple-600 dark:border-t-purple-400 rounded-full animate-spin"></div>
+                    </div>
+                    <p className="mt-4 text-lg font-medium text-gray-700 dark:text-gray-300">
+                      Loading analytics data...
+                    </p>
+                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                      Processing your transaction history
+                    </p>
+                  </div>
+                )}
+
                 {/* Time Period Filter */}
+                {!isLoading || transactions.length > 0 ? (
+                <>
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
                     Time Period:
@@ -805,6 +868,8 @@ export default function FinanceAnalyticsPage() {
                     }
                   />
                 </div>
+                </>
+                ) : null}
               </div>
             </main>
           </div>

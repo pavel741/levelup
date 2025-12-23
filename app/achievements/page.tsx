@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
 export const dynamic = 'force-dynamic'
-import AuthGuard from '@/components/AuthGuard'
-import Sidebar from '@/components/Sidebar'
-import Header from '@/components/Header'
+import AuthGuard from '@/components/common/AuthGuard'
+import Sidebar from '@/components/layout/Sidebar'
+import Header from '@/components/layout/Header'
 import { ACHIEVEMENT_DEFINITIONS } from '@/lib/achievements'
 import { Trophy, Lock, CheckCircle2 } from 'lucide-react'
 import { Achievement, User } from '@/types'
@@ -69,13 +69,6 @@ export default function AchievementsPage() {
 
   const unlockedAchievements = allAchievements.filter((a) => a.unlocked)
   const lockedAchievements = allAchievements.filter((a) => !a.unlocked)
-
-  const groupedByRarity = {
-    legendary: allAchievements.filter((a) => a.rarity === 'legendary'),
-    epic: allAchievements.filter((a) => a.rarity === 'epic'),
-    rare: allAchievements.filter((a) => a.rarity === 'rare'),
-    common: allAchievements.filter((a) => a.rarity === 'common'),
-  }
 
   return (
     <AuthGuard>

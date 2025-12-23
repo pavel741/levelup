@@ -1,18 +1,21 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Play, Pause, Check, X, Plus, Minus, Clock, RotateCcw, Save, RefreshCw, Info } from 'lucide-react'
+import { Play, Pause, Check, X, Plus, Minus, Clock, Save, RefreshCw, Info, Edit2 } from 'lucide-react'
 import { getExerciseById, findSimilarExercises } from '@/lib/exerciseDatabase'
 import ExerciseInstructions from '@/components/ExerciseInstructions'
+import PostWorkoutFeedback from '@/components/PostWorkoutFeedback'
+import { getLastWeightForExercise } from '@/lib/workoutHelpers'
 import type { ActiveWorkout, ActiveWorkoutExercise, ActiveWorkoutSet, Routine, WorkoutLog } from '@/types/workout'
-import { saveWorkoutLog } from '@/lib/workoutApi'
+import { saveWorkoutLog, getWorkoutLogs } from '@/lib/workoutApi'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
-import { format } from 'date-fns'
+import { showError } from '@/lib/utils'
 
 interface ActiveWorkoutViewProps {
   routine?: Routine
   onComplete?: (logId: string) => void
   onCancel?: () => void
+  key?: string // Add key to force re-mount when routine changes
 }
 
 export default function ActiveWorkoutView({ routine, onComplete, onCancel }: ActiveWorkoutViewProps) {
@@ -21,56 +24,29 @@ export default function ActiveWorkoutView({ routine, onComplete, onCancel }: Act
   const [isPaused, setIsPaused] = useState(false)
   const [restTimer, setRestTimer] = useState<number | null>(null)
   const [restTimerActive, setRestTimerActive] = useState(false)
+  const [editingRestTime, setEditingRestTime] = useState<number | null>(null)
   const [replacingExercise, setReplacingExercise] = useState<number | null>(null)
   const [showInstructions, setShowInstructions] = useState(false)
+  const [previousLogs, setPreviousLogs] = useState<WorkoutLog[]>([])
+  const [showFeedback, setShowFeedback] = useState(false)
+  const [completedWorkoutLog, setCompletedWorkoutLog] = useState<WorkoutLog | null>(null)
   const restTimerIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const workoutStartTimeRef = useRef<Date>(new Date())
   const pausedTimeRef = useRef<number>(0)
   const pauseStartTimeRef = useRef<Date | null>(null)
 
-  // Initialize workout from routine
+  // Load previous workout logs to get last weights
   useEffect(() => {
-    if (routine && !workout) {
-      const session = routine.sessions?.[0] // Start with first session
-      if (!session || session.exercises.length === 0) {
-        // Empty routine - create empty workout
-        setWorkout({
-          routineId: routine.id,
-          routineName: routine.name,
-          startTime: new Date(),
-          exercises: [],
-          currentExerciseIndex: 0,
-          currentSetIndex: 0,
-        })
-        return
-      }
-
-      const activeExercises: ActiveWorkoutExercise[] = session.exercises.map((ex, idx) => ({
-        exerciseId: ex.exerciseId,
-        exerciseName: getExerciseById(ex.exerciseId)?.name || 'Unknown Exercise',
-        order: idx,
-        sets: ex.sets.map((set, setIdx) => ({
-          setNumber: setIdx + 1,
-          setType: set.setType,
-          targetReps: set.targetReps,
-          targetWeight: set.targetWeight,
-          targetDuration: set.targetDuration,
-          targetDistance: set.targetDistance,
-          completed: false,
-        })),
-        restTime: ex.restTime,
-        notes: ex.notes,
-      }))
-
-      setWorkout({
-        routineId: routine.id,
-        routineName: routine.name,
-        startTime: new Date(),
-        exercises: activeExercises,
-        currentExerciseIndex: 0,
-        currentSetIndex: 0,
+    if (user?.id) {
+      getWorkoutLogs(user.id).then(logs => {
+        setPreviousLogs(logs)
       })
-    } else if (!routine && !workout) {
+    }
+  }, [user?.id])
+
+  // Function to initialize workout with previous weights
+  const initializeWorkoutWithWeights = (routineToUse: Routine | undefined, logs: WorkoutLog[]) => {
+    if (!routineToUse) {
       // Freeform workout (no routine)
       setWorkout({
         routineName: 'Freeform Workout',
@@ -79,8 +55,114 @@ export default function ActiveWorkoutView({ routine, onComplete, onCancel }: Act
         currentExerciseIndex: 0,
         currentSetIndex: 0,
       })
+      return
     }
-  }, [routine, workout])
+
+    const session = routineToUse.sessions?.[0] // Start with first session
+    if (!session || session.exercises.length === 0) {
+      // Empty routine - create empty workout
+      setWorkout({
+        routineId: routineToUse.id,
+        routineName: routineToUse.name,
+        startTime: new Date(),
+        exercises: [],
+        currentExerciseIndex: 0,
+        currentSetIndex: 0,
+      })
+      return
+    }
+
+    const activeExercises: ActiveWorkoutExercise[] = session.exercises.map((ex, idx) => {
+      // Load last weight used for this exercise
+      const lastWeight = logs.length > 0 
+        ? getLastWeightForExercise(logs, ex.exerciseId)
+        : null
+
+      return {
+        exerciseId: ex.exerciseId,
+        exerciseName: getExerciseById(ex.exerciseId)?.name || 'Unknown Exercise',
+        order: idx,
+        sets: ex.sets.map((set, setIdx) => ({
+          setNumber: setIdx + 1,
+          setType: set.setType,
+          targetReps: set.targetReps,
+          targetWeight: lastWeight || set.targetWeight, // Use last weight if available
+          targetDuration: set.targetDuration,
+          targetDistance: set.targetDistance,
+          completed: false,
+        })),
+        restTime: ex.restTime,
+        notes: ex.notes,
+      }
+    })
+
+    setWorkout({
+      routineId: routineToUse.id,
+      routineName: routineToUse.name,
+      startTime: new Date(),
+      exercises: activeExercises,
+      currentExerciseIndex: 0,
+      currentSetIndex: 0,
+    })
+  }
+
+  // Reset workout when routine changes (new session started)
+  useEffect(() => {
+    if (routine) {
+      // Reset workout state when a new routine is provided
+      setWorkout(null)
+    }
+  }, [routine?.id]) // Reset when routine ID changes
+
+  // Initialize workout from routine - wait for logs to load if available
+  useEffect(() => {
+    if (routine && !workout) {
+      // Always try to load logs first if we have a user
+      if (user?.id) {
+        getWorkoutLogs(user.id).then(logs => {
+          setPreviousLogs(logs)
+          initializeWorkoutWithWeights(routine, logs)
+        })
+      } else {
+        initializeWorkoutWithWeights(routine, [])
+      }
+    } else if (!routine && !workout) {
+      initializeWorkoutWithWeights(undefined, [])
+    }
+  }, [routine, workout, user?.id])
+
+  // Update weights when previous logs are loaded (if workout already exists)
+  useEffect(() => {
+    if (workout && previousLogs.length > 0 && workout.exercises.length > 0) {
+      const updatedExercises = workout.exercises.map(ex => {
+        const lastWeight = getLastWeightForExercise(previousLogs, ex.exerciseId)
+        if (lastWeight !== null) {
+          // Update all sets with the last weight if they don't have a weight set
+          const updatedSets = ex.sets.map(set => ({
+            ...set,
+            targetWeight: set.targetWeight || lastWeight,
+          }))
+          return { ...ex, sets: updatedSets }
+        }
+        return ex
+      })
+
+      // Only update if weights actually changed
+      const weightsChanged = updatedExercises.some((ex, idx) => {
+        const originalEx = workout.exercises[idx]
+        return ex.sets.some((set, setIdx) => 
+          set.targetWeight !== originalEx.sets[setIdx].targetWeight
+        )
+      })
+
+      if (weightsChanged) {
+        setWorkout({
+          ...workout,
+          exercises: updatedExercises,
+        })
+      }
+    }
+  }, [previousLogs])
 
   // Cleanup rest timer on unmount
   useEffect(() => {
@@ -170,6 +252,14 @@ export default function ActiveWorkoutView({ routine, onComplete, onCancel }: Act
     if (set.completed && exercise.restTime && setIndex < exercise.sets.length - 1) {
       startRestTimer(exercise.restTime)
     }
+
+    // If this was the last set of the exercise, auto-start rest timer for next exercise
+    if (set.completed && setIndex === exercise.sets.length - 1 && exerciseIndex < workout.exercises.length - 1) {
+      const nextExercise = workout.exercises[exerciseIndex + 1]
+      if (nextExercise.restTime) {
+        startRestTimer(nextExercise.restTime)
+      }
+    }
   }
 
   const handleSetUpdate = (exerciseIndex: number, setIndex: number, updates: Partial<ActiveWorkoutSet>) => {
@@ -251,10 +341,21 @@ export default function ActiveWorkoutView({ routine, onComplete, onCancel }: Act
 
     try {
       await saveWorkoutLog(workoutLog)
-      onComplete?.(workoutLog.id)
+      setCompletedWorkoutLog(workoutLog)
+      setShowFeedback(true)
+      // Don't call onComplete immediately - wait for user to close feedback
     } catch (error) {
       console.error('Error saving workout:', error)
-      alert('Failed to save workout. Please try again.')
+      showError(error, { component: 'ActiveWorkoutView', action: 'saveWorkout' })
+    }
+  }
+
+  const handleFeedbackClose = () => {
+    setShowFeedback(false)
+    setCompletedWorkoutLog(null)
+    // Navigate away after feedback is closed
+    if (completedWorkoutLog) {
+      onComplete?.(completedWorkoutLog.id)
     }
   }
 
@@ -297,7 +398,10 @@ export default function ActiveWorkoutView({ routine, onComplete, onCancel }: Act
           <div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{workout.routineName}</h2>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              {workout.currentExerciseIndex + 1} of {workout.exercises.length} exercises
+              Exercise {workout.currentExerciseIndex + 1} of {workout.exercises.length}
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+              {workout.exercises.length - workout.currentExerciseIndex - 1} exercise{workout.exercises.length - workout.currentExerciseIndex - 1 !== 1 ? 's' : ''} remaining
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -336,9 +440,46 @@ export default function ActiveWorkoutView({ routine, onComplete, onCancel }: Act
                 <span className="font-semibold text-blue-900 dark:text-blue-100">Rest Timer</span>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                  {formatTime(restTimer)}
-                </span>
+                {editingRestTime !== null ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      value={editingRestTime}
+                      onChange={(e) => setEditingRestTime(parseInt(e.target.value) || 0)}
+                      onBlur={() => {
+                        if (editingRestTime !== null && editingRestTime > 0) {
+                          setRestTimer(editingRestTime)
+                          setEditingRestTime(null)
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          if (editingRestTime !== null && editingRestTime > 0) {
+                            setRestTimer(editingRestTime)
+                            setEditingRestTime(null)
+                          }
+                        }
+                      }}
+                      className="w-20 px-2 py-1 border border-blue-300 dark:border-blue-700 rounded bg-white dark:bg-gray-800 text-blue-900 dark:text-blue-100 text-center font-bold"
+                      autoFocus
+                      min="0"
+                    />
+                    <span className="text-sm text-blue-700 dark:text-blue-300">seconds</span>
+                  </div>
+                ) : (
+                  <>
+                    <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                      {formatTime(restTimer)}
+                    </span>
+                    <button
+                      onClick={() => setEditingRestTime(restTimer)}
+                      className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded"
+                      title="Edit rest time"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                  </>
+                )}
                 <button
                   onClick={stopRestTimer}
                   className="p-1 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded"
@@ -582,14 +723,64 @@ export default function ActiveWorkoutView({ routine, onComplete, onCancel }: Act
                 </div>
               )}
 
-              {set.completed && (
-                <div className="text-sm text-gray-600 dark:text-gray-400">
-                  {set.completedReps || set.targetReps} reps
-                  {(set.completedWeight ?? set.targetWeight ?? 0) > 0 && (
-                    <span> × {set.completedWeight ?? set.targetWeight} kg</span>
+              {/* RPE Input - Show for both completed and uncompleted sets */}
+              <div className="mt-3">
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  RPE (Rate of Perceived Exertion) {set.completed && set.rpe && (
+                    <span className="text-gray-500 dark:text-gray-400">
+                      - {set.rpe <= 3 ? 'Very Easy' : set.rpe <= 6 ? 'Easy' : set.rpe <= 8 ? 'Moderate' : 'Very Hard'}
+                    </span>
                   )}
-                  {(set.completedWeight ?? set.targetWeight ?? 0) === 0 && exercise && exercise.equipment.includes('bodyweight') && (
-                    <span> (Bodyweight)</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleSetUpdate(workout.currentExerciseIndex, setIndex, {
+                      rpe: Math.max(1, (set.rpe || 0) - 1)
+                    })}
+                    className="p-1 bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </button>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    placeholder="1-10"
+                    value={set.rpe ?? ''}
+                    onChange={(e) => handleSetUpdate(workout.currentExerciseIndex, setIndex, {
+                      rpe: Math.max(1, Math.min(10, parseInt(e.target.value) || 0))
+                    })}
+                    className="w-20 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-center"
+                  />
+                  <button
+                    onClick={() => handleSetUpdate(workout.currentExerciseIndex, setIndex, {
+                      rpe: Math.min(10, (set.rpe || 0) + 1)
+                    })}
+                    className="p-1 bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                  <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                    (1=Very Easy, 10=Max Effort)
+                  </span>
+                </div>
+              </div>
+
+              {set.completed && (
+                <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                  <div>
+                    {set.completedReps || set.targetReps} reps
+                    {(set.completedWeight ?? set.targetWeight ?? 0) > 0 && (
+                      <span> × {set.completedWeight ?? set.targetWeight} kg</span>
+                    )}
+                    {(set.completedWeight ?? set.targetWeight ?? 0) === 0 && exercise && exercise.equipment.includes('bodyweight') && (
+                      <span> (Bodyweight)</span>
+                    )}
+                  </div>
+                  {set.rpe && (
+                    <div className="text-xs">
+                      RPE: {set.rpe} {set.rpe <= 3 ? '(Very Easy)' : set.rpe <= 6 ? '(Easy)' : set.rpe <= 8 ? '(Moderate)' : '(Very Hard)'}
+                    </div>
                   )}
                 </div>
               )}
@@ -626,11 +817,19 @@ export default function ActiveWorkoutView({ routine, onComplete, onCancel }: Act
         <button
           onClick={() => {
             if (workout.currentExerciseIndex < workout.exercises.length - 1) {
+              const nextIndex = workout.currentExerciseIndex + 1
+              const nextExercise = workout.exercises[nextIndex]
+              
               setWorkout({
                 ...workout,
-                currentExerciseIndex: workout.currentExerciseIndex + 1,
+                currentExerciseIndex: nextIndex,
                 currentSetIndex: 0,
               })
+
+              // Auto-start rest timer for next exercise if it has rest time
+              if (nextExercise.restTime) {
+                startRestTimer(nextExercise.restTime)
+              }
             }
           }}
           disabled={workout.currentExerciseIndex === workout.exercises.length - 1}
@@ -648,6 +847,14 @@ export default function ActiveWorkoutView({ routine, onComplete, onCancel }: Act
         <Save className="w-6 h-6" />
         Complete Workout
       </button>
+
+      {/* Post-Workout Feedback Modal */}
+      {showFeedback && completedWorkoutLog && (
+        <PostWorkoutFeedback
+          workoutLog={completedWorkoutLog}
+          onClose={handleFeedbackClose}
+        />
+      )}
     </div>
   )
 }

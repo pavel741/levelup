@@ -13,6 +13,7 @@ import {
   onSnapshot,
   writeBatch,
   Timestamp,
+  type QueryDocumentSnapshot,
 } from 'firebase/firestore'
 import { db } from './firebase'
 import {
@@ -37,12 +38,12 @@ type WithId<T> = T & { id: string }
 interface TransactionPage {
   transactions: WithId<FinanceTransaction>[]
   hasMore: boolean
-  lastDoc: any | null
+  lastDoc: QueryDocumentSnapshot | null
 }
 
 interface TransactionSubscribeMeta {
   hasMore: boolean
-  lastDoc: any | null
+  lastDoc: QueryDocumentSnapshot | null
 }
 
 type TransactionSubscribeCallback = (
@@ -52,40 +53,42 @@ type TransactionSubscribeCallback = (
 
 // Convert Firestore Timestamp and nested objects into plain JS values,
 // turning Timestamps into "yyyy-MM-dd" strings when possible.
-export const convertFirestoreData = (data: any): any => {
-  if (data === null || data === undefined) return data
+export const convertFirestoreData = <T = unknown>(data: unknown): T | null | undefined => {
+  if (data === null || data === undefined) return data as T | null | undefined
 
   // Handle Timestamp or Timestamp-like
-  if (
-    data instanceof Timestamp ||
-    (typeof data === 'object' &&
-      data !== null &&
-      typeof (data as any).toDate === 'function' &&
-      (typeof (data as any).seconds === 'number' ||
-        typeof (data as any).nanoseconds === 'number'))
-  ) {
+  const isTimestampLike = (obj: unknown): obj is { toDate: () => Date; seconds?: number; nanoseconds?: number } => {
+    return typeof obj === 'object' &&
+      obj !== null &&
+      'toDate' in obj &&
+      typeof (obj as { toDate: unknown }).toDate === 'function' &&
+      (typeof (obj as { seconds?: unknown }).seconds === 'number' ||
+        typeof (obj as { nanoseconds?: unknown }).nanoseconds === 'number')
+  }
+  
+  if (data instanceof Timestamp || isTimestampLike(data)) {
     try {
       const date = (data as Timestamp).toDate()
-      return date.toISOString().split('T')[0]
+      return date.toISOString().split('T')[0] as T
     } catch (e) {
       console.warn('Error converting Timestamp to Date in financeFirestore:', e)
-      return data
+      return data as T
     }
   }
 
   if (Array.isArray(data)) {
-    return data.map((item) => convertFirestoreData(item))
+    return data.map((item) => convertFirestoreData(item)) as T
   }
 
   if (typeof data === 'object' && data.constructor === Object) {
-    const converted: Record<string, any> = {}
+    const converted: Record<string, unknown> = {}
     for (const [key, value] of Object.entries(data)) {
       converted[key] = convertFirestoreData(value)
     }
-    return converted
+    return converted as T
   }
 
-  return data
+  return data as T
 }
 
 // Very small retry helper for important write operations
@@ -99,18 +102,19 @@ const retryOperation = async <T>(
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       return await operation()
-    } catch (error: any) {
+    } catch (error: unknown) {
       lastError = error
 
-      const code = error?.code
+      const code = error && typeof error === 'object' && 'code' in error ? (error as { code?: string }).code : undefined
+      const message = error && typeof error === 'object' && 'message' in error && typeof (error as { message: unknown }).message === 'string' ? (error as { message: string }).message : undefined
       const isRetryable =
         code === 'unavailable' ||
         code === 'deadline-exceeded' ||
         code === 'resource-exhausted' ||
         code === 'aborted' ||
         code === 'cancelled' ||
-        error?.message?.includes('network') ||
-        error?.message?.includes('timeout')
+        (message?.includes('network') ?? false) ||
+        (message?.includes('timeout') ?? false)
 
       if (!isRetryable || attempt === maxRetries) {
         throw error
@@ -213,7 +217,7 @@ export const getAllTransactionsForSummary = async (
 
   const transactionsRef = getTransactionsRef(userId)
   const allTransactions: WithId<FinanceTransaction>[] = []
-  let lastDoc: any = null
+  let lastDoc: QueryDocumentSnapshot | null = null
   const batchSize = 1000 // Firestore limit per query
 
   while (true) {
@@ -230,8 +234,11 @@ export const getAllTransactionsForSummary = async (
 
     snapshot.forEach((docSnap) => {
       const data = docSnap.data()
-      const converted = convertFirestoreData(data) as FinanceTransaction
-      const { id: _ignoreId, ...rest } = converted as any
+      const converted = convertFirestoreData<FinanceTransaction & { id?: string }>(data)
+      if (converted === null || converted === undefined) {
+        return // Skip null/undefined conversions
+      }
+      const { id: _ignoreId, ...rest } = converted
       allTransactions.push({
         ...(rest as FinanceTransaction),
         id: docSnap.id,
@@ -251,7 +258,7 @@ export const getAllTransactionsForSummary = async (
 
 export const loadMoreTransactions = async (
   userId: string,
-  lastDoc: any,
+  lastDoc: QueryDocumentSnapshot | null,
   limitCount = 200
 ): Promise<TransactionPage> => {
   if (!db) {
@@ -376,11 +383,12 @@ export const batchAddTransactions = async (
         // Free tier allows ~1 write/second sustained, so we need longer delays
         await new Promise(resolve => setTimeout(resolve, 3000))
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error in finance batchAddTransactions chunk:', error)
       
       // If quota exceeded, wait longer before retrying
-      if (error?.code === 'resource-exhausted') {
+      const errorCode = error && typeof error === 'object' && 'code' in error ? (error as { code?: string }).code : undefined
+      if (errorCode === 'resource-exhausted') {
         consecutiveQuotaErrors++
         
         if (consecutiveQuotaErrors >= maxConsecutiveQuotaErrors) {
@@ -407,7 +415,7 @@ export const batchAddTransactions = async (
 
             chunk.forEach((tx) => {
               const docRef = doc(transactionsRef)
-              batch.set(docRef, tx as any)
+              batch.set(docRef, tx as Omit<FinanceTransaction, 'id'>)
             })
 
             await batch.commit()
@@ -415,9 +423,10 @@ export const batchAddTransactions = async (
           successCount += chunk.length
           consecutiveQuotaErrors = 0 // Reset on successful retry
           progressCallback?.(Math.min(i + chunk.length, total), total)
-        } catch (retryError: any) {
+        } catch (retryError: unknown) {
           console.error('Retry failed for chunk:', retryError)
-          if (retryError?.code === 'resource-exhausted') {
+          const retryErrorCode = retryError && typeof retryError === 'object' && 'code' in retryError ? (retryError as { code?: string }).code : undefined
+          if (retryErrorCode === 'resource-exhausted') {
             // Still quota error, increment counter
             errorCount += chunk.length
           } else {

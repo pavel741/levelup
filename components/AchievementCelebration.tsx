@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Achievement } from '@/types'
-import { Trophy, X } from 'lucide-react'
+import { Trophy } from 'lucide-react'
 
 interface AchievementCelebrationProps {
   achievement: Achievement

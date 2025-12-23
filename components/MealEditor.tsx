@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { X, Save, Trash2 } from 'lucide-react'
-import type { PlannedMeal, NutritionInfo } from '@/types/nutrition'
+import type { PlannedMeal } from '@/types/nutrition'
+import { showWarning } from '@/lib/utils'
 
 interface MealEditorProps {
   dayDate: Date
@@ -27,7 +28,7 @@ export default function MealEditor({ dayDate, existingMeals, onSave, onClose }: 
 
   const handleAddMeal = () => {
     if (!mealName.trim()) {
-      alert('Please enter a meal name')
+      showWarning('Please enter a meal name')
       return
     }
 

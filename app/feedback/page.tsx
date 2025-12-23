@@ -1,9 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import AuthGuard from '@/components/AuthGuard'
-import Sidebar from '@/components/Sidebar'
-import Header from '@/components/Header'
+import AuthGuard from '@/components/common/AuthGuard'
+import Sidebar from '@/components/layout/Sidebar'
+import Header from '@/components/layout/Header'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
 import { MessageCircle, Send } from 'lucide-react'
 

@@ -18,7 +18,6 @@ type ColumnMapping = {
 }
 
 export class CSVImportService {
-  private _debugLogged = false
   private _detectedBank: BankProfile | null = null
 
   /**
@@ -605,9 +604,6 @@ export class CSVImportService {
 
       rows.push(this.mapRowToTransaction(row, columnMap, bankProfile || this._detectedBank))
     }
-
-
-    this._debugLogged = false
 
     return {
       transactions: rows,

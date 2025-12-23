@@ -1,8 +1,10 @@
 import type { Metadata } from 'next'
 import './globals.css'
-import { ThemeProvider } from '@/components/ThemeProvider'
+import { ThemeProvider } from '@/components/common/ThemeProvider'
 import ClientNotificationManager from '@/components/ClientNotificationManager'
-import ErrorDisplay from '@/components/ErrorDisplay'
+import ErrorDisplay from '@/components/common/ErrorDisplay'
+import ToastContainer from '@/components/common/Toast'
+import ErrorBoundary from '@/components/common/ErrorBoundary'
 
 export const metadata: Metadata = {
   title: 'LevelUp - Level Up Life',
@@ -21,9 +23,12 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className="font-sans antialiased">
         <ThemeProvider>
-          {children}
-          <ClientNotificationManager />
-          <ErrorDisplay />
+          <ErrorBoundary>
+            {children}
+            <ClientNotificationManager />
+            <ErrorDisplay />
+            <ToastContainer />
+          </ErrorBoundary>
         </ThemeProvider>
       </body>
     </html>

@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Search, Filter, X, Play, Info } from 'lucide-react'
-import { EXERCISE_DATABASE, searchExercises, getExercisesByCategory, getExercisesByMuscleGroup, getExercisesByEquipment } from '@/lib/exerciseDatabase'
+import { Search, Filter, Play } from 'lucide-react'
+import { EXERCISE_DATABASE, searchExercises } from '@/lib/exerciseDatabase'
 import ExerciseInstructions from '@/components/ExerciseInstructions'
 import type { Exercise } from '@/types/workout'
 
