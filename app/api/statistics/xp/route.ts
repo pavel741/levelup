@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest } from 'next/server'
 import { getUserIdFromRequest, validateUserId, successResponse, handleApiError } from '@/lib/utils'
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, subMonths, subDays, format } from 'date-fns'
-import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore'
+import { collection, query, where, getDocs } from 'firebase/firestore'
 import { db, waitForFirebaseInit } from '@/lib/firebase'
 
 export async function GET(request: NextRequest) {

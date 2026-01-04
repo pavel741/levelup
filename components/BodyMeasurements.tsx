@@ -1,11 +1,10 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { useFirestoreStore } from '@/store/useFirestoreStore'
 import { getBodyMeasurements, addBodyMeasurement, updateBodyMeasurement, deleteBodyMeasurement } from '@/lib/bodyMeasurementsApi'
 import type { BodyMeasurement } from '@/types/bodyMeasurements'
 import { format } from 'date-fns'
-import { Plus, Edit2, Trash2, TrendingUp, TrendingDown, Camera, X } from 'lucide-react'
+import { Plus, Edit2, Trash2, X } from 'lucide-react'
 import { showError, showSuccess } from '@/lib/utils'
 
 interface BodyMeasurementsProps {

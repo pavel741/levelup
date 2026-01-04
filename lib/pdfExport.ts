@@ -4,7 +4,7 @@
  */
 
 import type { FinanceTransaction } from '@/types/finance'
-import { format, startOfMonth, endOfMonth } from 'date-fns'
+import { format } from 'date-fns'
 
 export interface MonthlyReportData {
   period: { start: Date; end: Date; label: string }

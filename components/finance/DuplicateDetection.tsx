@@ -132,7 +132,7 @@ export default function DuplicateDetection({ transactions }: DuplicateDetectionP
               <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Similar transactions ({alert.similarTransactions.length}):
               </div>
-              {alert.similarTransactions.slice(0, 3).map((tx, idx) => (
+              {alert.similarTransactions.slice(0, 3).map((tx) => (
                 <div
                   key={tx.id}
                   className="bg-white/60 dark:bg-gray-900/60 rounded p-2 text-xs"

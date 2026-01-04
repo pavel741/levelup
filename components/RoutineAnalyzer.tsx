@@ -3,11 +3,10 @@
 import { useState, useEffect } from 'react'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
 import { useWorkoutStore } from '@/store/useWorkoutStore'
-import { Dumbbell, TrendingUp, AlertCircle, CheckCircle, BarChart3, Calendar, Target, Activity, TrendingDown, Sparkles, X } from 'lucide-react'
+import { TrendingUp, AlertCircle, CheckCircle, BarChart3, Calendar, Target, Activity, TrendingDown, Sparkles, X } from 'lucide-react'
 import type { WorkoutHistoryInsights } from '@/scripts/analyzeWorkoutHistory'
 import ProgressiveOverloadChart from '@/components/ProgressiveOverloadChart'
 import { improveRoutine, type ImproveRoutineResult } from '@/lib/workoutApi'
-import { subscribeToRoutines } from '@/lib/workoutApi'
 
 interface MuscleGroupCoverage {
   muscleGroup: string
@@ -477,7 +476,7 @@ export default function RoutineAnalyzer() {
                       </div>
                     </div>
                     <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                      {mg.totalSets} sets ({mg.frequency}x/week)
+                      {mg.totalSets} sets
                     </div>
                     <div className="text-xs text-gray-500 dark:text-gray-500 mt-0.5">
                       {mg.directWork > 0 ? 'Direct' : 'Indirect'}
@@ -672,11 +671,11 @@ export default function RoutineAnalyzer() {
                             <div className="text-sm font-medium text-gray-900 dark:text-white">
                               {change.description}
                             </div>
-                            {change.details && typeof change.details === 'object' && 'reason' in change.details && (
+                            {change.details && typeof change.details === 'object' && 'reason' in change.details ? (
                               <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                                Reason: {change.details.reason as string}
+                                Reason: {String((change.details as { reason?: unknown }).reason ?? '')}
                               </div>
-                            )}
+                            ) : null}
                           </div>
                         </div>
                       </div>

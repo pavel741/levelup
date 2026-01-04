@@ -162,12 +162,13 @@ export async function GET(request: NextRequest) {
       { $sort: { date: 1 } }
     ]
 
-    let workoutChart
+    let workoutChart: Array<{ date: string; count: number; volume: number; duration: number }> = []
     try {
-      workoutChart = await collection.aggregate(chartDataPipeline).toArray()
+      const result = await collection.aggregate(chartDataPipeline).toArray()
+      workoutChart = result as unknown as Array<{ date: string; count: number; volume: number; duration: number }>
     } catch (error: unknown) {
       console.error('Error in workoutChart aggregation:', error)
-      console.error('Error message:', error.message)
+      console.error('Error message:', error instanceof Error ? error.message : String(error))
       console.error('chartDataPipeline:', JSON.stringify(chartDataPipeline, null, 2))
       // Return empty chart data if aggregation fails
       workoutChart = []

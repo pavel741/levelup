@@ -7,7 +7,7 @@ import { EXERCISE_DATABASE } from '../lib/exerciseDatabase'
 import type { Routine, RoutineSession, RoutineExercise } from '../types/workout'
 import type { Exercise } from '../types/workout'
 import { analyzeRoutine } from './analyzeRoutine'
-import { getSuggestedExerciseConfig } from './analyzeRoutine'
+// import { getSuggestedExerciseConfig } from './analyzeRoutine' // Unused
 
 interface ImprovementResult {
   routine: Routine
@@ -208,7 +208,7 @@ function addMissingExercises(
     }
 
     // Add exercise to session
-    const newExercise = addExerciseToSession(targetSession, suggestedExercise.id, sets, reps, restTime)
+    addExerciseToSession(targetSession, suggestedExercise.id, sets, reps, restTime)
     addedMuscleGroups.add(muscleGroup)
 
     changes.push({

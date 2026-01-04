@@ -3,7 +3,7 @@
 import { useMemo } from 'react'
 import type { FinanceTransaction } from '@/types/finance'
 import { parseTransactionDate } from '@/lib/financeDateUtils'
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, isSameMonth, subMonths } from 'date-fns'
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, isSameMonth } from 'date-fns'
 
 interface SpendingHeatmapProps {
   transactions: FinanceTransaction[]

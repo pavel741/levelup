@@ -267,7 +267,7 @@ export const deleteWorkoutLog = async (logId: string, userId: string): Promise<v
   }
 }
 
-export const deleteAllWorkoutLogs = async (userId: string): Promise<number> => {
+export const deleteAllWorkoutLogs = async (_userId: string): Promise<number> => {
   const response = await authenticatedFetch(`${API_BASE}/logs/delete-all`, {
     method: 'DELETE',
     headers: {

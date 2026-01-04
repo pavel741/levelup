@@ -5,7 +5,7 @@
 
 import type { FinanceTransaction } from '@/types/finance'
 import { parseTransactionDate } from '@/lib/financeDateUtils'
-import { startOfMonth, endOfMonth, format, subMonths, isAfter, isBefore } from 'date-fns'
+import { startOfMonth, format } from 'date-fns'
 
 export interface SavingsStreak {
   currentStreak: number // Consecutive months with positive savings

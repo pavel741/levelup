@@ -5,7 +5,7 @@
 
 import type { FinanceRecurringTransaction, FinanceTransaction } from '@/types/finance'
 import { parseTransactionDate } from '@/lib/financeDateUtils'
-import { differenceInDays, isPast, addMonths } from 'date-fns'
+import { differenceInDays, addMonths } from 'date-fns'
 
 export interface SubscriptionSuggestion {
   subscription: FinanceRecurringTransaction
@@ -39,7 +39,7 @@ export function analyzeSubscriptions(
     // Find related transactions
     const relatedTransactions = allTransactions.filter((tx) => {
       const txAmount = Math.abs(Number(tx.amount) || 0)
-      const txDate = parseTransactionDate(tx.date)
+      // const txDate = parseTransactionDate(tx.date) // Unused
       
       // Match by amount (within 5% tolerance)
       const amountMatch = Math.abs(txAmount - amount) / amount < 0.05

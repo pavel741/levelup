@@ -436,7 +436,7 @@ export const HABIT_BUNDLES: HabitBundle[] = [
  */
 export function createHabitFromTemplate(
   template: HabitTemplate,
-  userId: string,
+  _userId: string,
   customizations?: {
     reminderTime?: string
     targetDays?: number[]

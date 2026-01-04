@@ -64,7 +64,8 @@ if (process.env.NODE_ENV === 'development') {
       console.error('💡 URI being used:', cleanUri.replace(/\/\/[^:]+:[^@]+@/, '//***:***@'))
       
       // Check for DNS resolution errors
-      if (error.message?.includes('ENOTFOUND') || error.message?.includes('querySrv') || error.message?.includes('getaddrinfo')) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      if (errorMsg.includes('ENOTFOUND') || errorMsg.includes('querySrv') || errorMsg.includes('getaddrinfo')) {
         console.error('💡 DNS resolution failed. Possible causes:')
         console.error('   1. MongoDB Atlas cluster is PAUSED (free tier auto-pauses after inactivity)')
         console.error('   2. Network/DNS connectivity issues')
@@ -118,7 +119,7 @@ export async function getDatabase(): Promise<Db> {
     const errorMessage = error instanceof Error ? error.message : String(error)
     console.error('❌ Error getting MongoDB database:', errorMessage)
     
-    if (error.message?.includes('ENOTFOUND') || error.message?.includes('querySrv') || error.message?.includes('getaddrinfo')) {
+    if (errorMessage.includes('ENOTFOUND') || errorMessage.includes('querySrv') || errorMessage.includes('getaddrinfo')) {
       console.error('💡 DNS resolution failed. Possible causes:')
       console.error('   1. MongoDB Atlas cluster is PAUSED (free tier auto-pauses after inactivity)')
       console.error('   2. Network/DNS connectivity issues')

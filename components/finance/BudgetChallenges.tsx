@@ -3,26 +3,18 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
 import { getCategories } from '@/lib/financeApi'
-import type { Challenge, FinanceCategories } from '@/types'
+import type { Challenge } from '@/types'
+import type { FinanceCategories } from '@/types/finance'
 import { format, addDays } from 'date-fns'
 import { Target, Plus, X, TrendingDown } from 'lucide-react'
-// Note: showSuccess/showError should be imported from your notification system
-// For now, using console.log - replace with your notification system
-const showSuccess = (message: string) => {
-  console.log('Success:', message)
-  // TODO: Replace with actual notification system
-}
-const showError = (error: unknown, _context?: string) => {
-  console.error('Error:', error)
-  // TODO: Replace with actual notification system
-}
+import { showError as showErrorUtil, showSuccess as showSuccessUtil } from '@/lib/utils'
 
 interface BudgetChallengesProps {
   transactions: any[]
 }
 
 export default function BudgetChallenges({ transactions }: BudgetChallengesProps) {
-  const { user, challenges } = useFirestoreStore()
+  const { user, challenges, addChallenge } = useFirestoreStore()
   const [showAddModal, setShowAddModal] = useState(false)
   const [categories, setCategories] = useState<string[]>([])
   const [financeChallenges, setFinanceChallenges] = useState<Challenge[]>([])
@@ -85,7 +77,7 @@ export default function BudgetChallenges({ transactions }: BudgetChallengesProps
       challenge.financeTarget = targetAmount
 
       await addChallenge(challenge)
-      showSuccess('Budget challenge created!')
+      showSuccessUtil('Budget challenge created!')
       setShowAddModal(false)
       setNewChallenge({
         title: '',
@@ -97,7 +89,7 @@ export default function BudgetChallenges({ transactions }: BudgetChallengesProps
       })
     } catch (error) {
       console.error('Error creating challenge:', error)
-      showError(error, { component: 'BudgetChallenges', action: 'createChallenge' })
+      showErrorUtil(error, { component: 'BudgetChallenges', action: 'createChallenge' })
     }
   }
 
@@ -240,7 +232,7 @@ export default function BudgetChallenges({ transactions }: BudgetChallengesProps
                     </p>
                     <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-500">
                       <span>{daysLeft} days left</span>
-                      <span>{Math.round(timeProgress)}% of time elapsed</span>
+                      <span>{Math.round(timeProgress ?? 0)}% of time elapsed</span>
                       <span>{challenge.xpReward} XP reward</span>
                     </div>
                   </div>
@@ -299,7 +291,7 @@ export default function BudgetChallenges({ transactions }: BudgetChallengesProps
                     <div>
                       <span className="text-gray-500 dark:text-gray-500">Expected: </span>
                       <span className="font-medium text-gray-700 dark:text-gray-300">
-                        {new Intl.NumberFormat('et-EE', { style: 'currency', currency: 'EUR' }).format(expectedSpendingAtThisPoint)}
+                        {new Intl.NumberFormat('et-EE', { style: 'currency', currency: 'EUR' }).format(expectedSpendingAtThisPoint ?? 0)}
                       </span>
                     </div>
                     <div>

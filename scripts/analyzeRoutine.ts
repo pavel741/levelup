@@ -253,7 +253,7 @@ export function analyzeRoutine(routine: Routine): RoutineAnalysis {
     const totalSets = coverage?.totalSets || 0
     const minSets = MIN_SETS_PER_WEEK[muscleGroup] || 6
     const maxSets = MAX_SETS_PER_WEEK[muscleGroup] || 20
-    const hasDirectWork = coverage?.directWork > 0
+    const hasDirectWork = (coverage?.directWork ?? 0) > 0
 
     if (totalSets === 0) {
       underTrained.push(muscleGroup)
@@ -395,7 +395,7 @@ export function analyzeRoutine(routine: Routine): RoutineAnalysis {
   }
 
   // 5. Check rest periods
-  const averageRestTime = exerciseAnalysis.reduce((sum, ex) => sum + ex.restTime, 0) / exerciseAnalysis.length
+  // const averageRestTime = exerciseAnalysis.reduce((sum, ex) => sum + ex.restTime, 0) / exerciseAnalysis.length // Unused
   const shortRestExercises = exerciseAnalysis.filter(ex => ex.isCompound && ex.restTime < 90)
   
   if (shortRestExercises.length > 0) {
@@ -444,7 +444,7 @@ export function analyzeRoutine(routine: Routine): RoutineAnalysis {
     'rows': ['back']
   }
 
-  const exerciseIds = new Set(exerciseAnalysis.map(ex => ex.exerciseId))
+  // const exerciseIds = new Set(exerciseAnalysis.map(ex => ex.exerciseId)) // Unused
   const missingMovements: string[] = []
 
   Object.entries(essentialMovements).forEach(([movement, muscleGroups]) => {
@@ -575,7 +575,7 @@ export function generateReport(analysis: RoutineAnalysis): string {
       report += `📋 ${category.toUpperCase()}:\n`
       report += '-'.repeat(60) + '\n'
       
-      categoryImprovements.forEach((imp, idx) => {
+      categoryImprovements.forEach((imp) => {
         const priorityEmoji = imp.priority === 'high' ? '🔴' : imp.priority === 'medium' ? '🟡' : '🟢'
         report += `\n${priorityEmoji} ${imp.priority.toUpperCase()} PRIORITY\n`
         report += `   Issue: ${imp.issue}\n`

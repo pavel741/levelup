@@ -150,9 +150,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Category breakdown
-    let categoryData
+    let categoryData: Array<{ name: string; value: number }> = []
     try {
-      categoryData = await collection.aggregate([
+      const result = await collection.aggregate([
         {
           $match: {
             ...currentMatch,
@@ -178,9 +178,10 @@ export async function GET(request: NextRequest) {
       { $sort: { value: -1 } },
       { $limit: 6 }
     ]).toArray()
+      categoryData = result as unknown as Array<{ name: string; value: number }>
     } catch (error: unknown) {
       console.error('Error in categoryData aggregation:', error)
-      console.error('Error message:', error.message)
+      console.error('Error message:', error instanceof Error ? error.message : String(error))
       categoryData = []
     }
 
@@ -250,13 +251,14 @@ export async function GET(request: NextRequest) {
       { $sort: { date: 1 } }
     ]
 
-    let financeChart
+    let financeChart: Array<{ date: string; income: number; expenses: number; balance: number }> = []
     try {
-      financeChart = await collection.aggregate(chartDataPipeline).toArray()
+      const result = await collection.aggregate(chartDataPipeline).toArray()
+      financeChart = result as unknown as Array<{ date: string; income: number; expenses: number; balance: number }>
     } catch (error: unknown) {
       console.error('Error in financeChart aggregation:', error)
-      console.error('Error message:', error.message)
-      console.error('Error stack:', error.stack)
+      console.error('Error message:', error instanceof Error ? error.message : String(error))
+      console.error('Error stack:', error instanceof Error ? error.stack : undefined)
       console.error('chartDataPipeline:', JSON.stringify(chartDataPipeline, null, 2))
       // Return empty chart data if aggregation fails
       financeChart = []

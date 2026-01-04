@@ -67,8 +67,6 @@ export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'u
     ],
     estimatedDuration: 5,
     difficulty: 'easy',
-    isTemplate: true,
-    isPublic: true,
     tags: ['morning', 'stretch', 'flexibility', 'quick', 'daily']
   },
   {
@@ -185,8 +183,6 @@ export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'u
     ],
     estimatedDuration: 10,
     difficulty: 'easy',
-    isTemplate: true,
-    isPublic: true,
     tags: ['morning', 'stretch', 'flexibility', 'full-body', 'mobility']
   },
   {
@@ -300,8 +296,6 @@ export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'u
     ],
     estimatedDuration: 15,
     difficulty: 'easy',
-    isTemplate: true,
-    isPublic: true,
     tags: ['morning', 'yoga', 'stretch', 'flexibility', 'mobility', 'mindfulness']
   },
   {
@@ -392,8 +386,6 @@ export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'u
     ],
     estimatedDuration: 7,
     difficulty: 'easy',
-    isTemplate: true,
-    isPublic: true,
     tags: ['morning', 'stretch', 'desk-worker', 'office', 'posture', 'flexibility']
   },
   // Push/Pull/Legs (3 days per week)

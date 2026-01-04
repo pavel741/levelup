@@ -95,7 +95,7 @@ export default function SpendingMoodBoard({ transactions }: SpendingMoodBoardPro
       {/* Visual Collage */}
       <div className="relative min-h-[400px] bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50 dark:from-purple-900/20 dark:via-blue-900/20 dark:to-pink-900/20 rounded-lg p-8 overflow-hidden">
         <div className="flex flex-wrap items-center justify-center gap-4">
-          {moodBoardData.visuals.map((visual, idx) => {
+          {moodBoardData.visuals.map((visual) => {
             const size = getSize(visual.percentage)
             return (
               <div

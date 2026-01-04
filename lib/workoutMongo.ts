@@ -70,11 +70,13 @@ export const getRoutinesByUserId = async (userId: string): Promise<Routine[]> =>
     }
 
     return routines.map((doc) => {
-      const data = convertMongoData(doc)
+      const data = convertMongoData<Record<string, unknown>>(doc) as Record<string, unknown>
+      const createdAt = data.createdAt instanceof Date ? data.createdAt : new Date(data.createdAt as string | number | Date)
+      const updatedAt = data.updatedAt instanceof Date ? data.updatedAt : new Date(data.updatedAt as string | number | Date)
       return {
-        ...data,
-        createdAt: data.createdAt instanceof Date ? data.createdAt : new Date(data.createdAt),
-        updatedAt: data.updatedAt instanceof Date ? data.updatedAt : new Date(data.updatedAt),
+        ...(data as Record<string, unknown>),
+        createdAt,
+        updatedAt,
       } as Routine
     })
   } catch (error) {
@@ -102,9 +104,10 @@ export const saveRoutine = async (routine: Routine): Promise<void> => {
     delete (routineData as Partial<Routine>).id
 
     // Remove undefined fields
-    Object.keys(routineData).forEach(key => {
-      if (routineData[key] === undefined) {
-        delete routineData[key]
+    const routineDataRecord = routineData as Record<string, unknown>
+    Object.keys(routineDataRecord).forEach(key => {
+      if (routineDataRecord[key] === undefined) {
+        delete routineDataRecord[key]
       }
     })
 
@@ -134,9 +137,10 @@ export const updateRoutine = async (routineId: string, userId: string, updates: 
     }
 
     // Remove undefined fields
-    Object.keys(updateData).forEach(key => {
-      if (updateData[key] === undefined) {
-        delete updateData[key]
+    const updateDataRecord = updateData as Record<string, unknown>
+    Object.keys(updateDataRecord).forEach(key => {
+      if (updateDataRecord[key] === undefined) {
+        delete updateDataRecord[key]
       }
     })
 
@@ -172,12 +176,15 @@ export const getWorkoutLogsByUserId = async (userId: string): Promise<WorkoutLog
       .toArray()
 
     return logs.map((doc) => {
-      const data = convertMongoData(doc)
+      const data = convertMongoData<Record<string, unknown>>(doc) as Record<string, unknown>
+      const date = data.date instanceof Date ? data.date : new Date(data.date as string | number | Date)
+      const startTime = data.startTime instanceof Date ? data.startTime : new Date(data.startTime as string | number | Date)
+      const endTime = data.endTime ? (data.endTime instanceof Date ? data.endTime : new Date(data.endTime as string | number | Date)) : undefined
       return {
-        ...data,
-        date: data.date instanceof Date ? data.date : new Date(data.date),
-        startTime: data.startTime instanceof Date ? data.startTime : new Date(data.startTime),
-        endTime: data.endTime ? (data.endTime instanceof Date ? data.endTime : new Date(data.endTime)) : undefined,
+        ...(data as Record<string, unknown>),
+        date,
+        startTime,
+        endTime,
       } as WorkoutLog
     })
   } catch (error) {
@@ -205,9 +212,10 @@ export const saveWorkoutLog = async (log: WorkoutLog): Promise<void> => {
     }
 
     // Remove undefined fields
-    Object.keys(logData).forEach(key => {
-      if (logData[key] === undefined) {
-        delete logData[key]
+    const logDataRecord = logData as Record<string, unknown>
+    Object.keys(logDataRecord).forEach(key => {
+      if (logDataRecord[key] === undefined) {
+        delete logDataRecord[key]
       }
     })
 
@@ -239,9 +247,10 @@ export const updateWorkoutLog = async (logId: string, userId: string, updates: P
     }
 
     // Remove undefined fields
-    Object.keys(updateData).forEach(key => {
-      if (updateData[key] === undefined) {
-        delete updateData[key]
+    const updateDataRecord = updateData as Record<string, unknown>
+    Object.keys(updateDataRecord).forEach(key => {
+      if (updateDataRecord[key] === undefined) {
+        delete updateDataRecord[key]
       }
     })
 

@@ -131,7 +131,7 @@ export function detectDuplicates(
       const tx2 = sortedTransactions[j]
       if (processed.has(tx2.id)) continue
 
-      const { score, reasons } = calculateSimilarity(tx1, tx2)
+      const { score } = calculateSimilarity(tx1, tx2)
 
       if (score >= similarityThreshold) {
         similar.push(tx2)

@@ -2,12 +2,12 @@
 
 import { useMemo } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
-import { Repeat, TrendingUp, AlertCircle, X } from 'lucide-react'
+import { Repeat, TrendingUp, AlertCircle } from 'lucide-react'
 import type { FinanceRecurringTransaction, FinanceTransaction } from '@/types/finance'
 import { formatCurrency } from '@/lib/utils'
 import { parseTransactionDate } from '@/lib/financeDateUtils'
 import { format, addMonths } from 'date-fns'
-import { analyzeSubscriptions } from '@/lib/subscriptionAnalyzer'
+// import { analyzeSubscriptions } from '@/lib/subscriptionAnalyzer' // Unused
 
 interface SubscriptionCostAnalysisProps {
   recurringTransactions: FinanceRecurringTransaction[]
@@ -30,7 +30,7 @@ const COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4'
 
 export default function SubscriptionCostAnalysis({
   recurringTransactions,
-  transactions = [],
+  transactions: _transactions = [],
   months = 12,
 }: SubscriptionCostAnalysisProps) {
   const subscriptionData = useMemo(() => {
@@ -95,11 +95,11 @@ export default function SubscriptionCostAnalysis({
       .sort((a, b) => b.yearlyCost - a.yearlyCost)
   }, [recurringTransactions])
 
-  // Analyze subscriptions for cancellation suggestions
-  const cancellationSuggestions = useMemo(() => {
-    if (transactions.length === 0) return null
-    return analyzeSubscriptions(recurringTransactions, transactions)
-  }, [recurringTransactions, transactions])
+  // Analyze subscriptions for cancellation suggestions (computed but not currently displayed)
+  // const cancellationSuggestions = useMemo(() => {
+  //   if (transactions.length === 0) return null
+  //   return analyzeSubscriptions(recurringTransactions, transactions)
+  // }, [recurringTransactions, transactions])
 
   const totals = useMemo(() => {
     const totalMonthly = subscriptionData.reduce((sum, sub) => sum + sub.monthlyEquivalent, 0)

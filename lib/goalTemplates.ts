@@ -227,7 +227,7 @@ export const GOAL_TEMPLATES: GoalTemplate[] = [
  */
 export function createGoalFromTemplate(
   template: GoalTemplate,
-  userId: string,
+  _userId: string,
   customizations?: {
     targetValue?: number
     deadline?: Date

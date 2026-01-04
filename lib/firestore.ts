@@ -13,6 +13,8 @@ import {
   writeBatch,
   orderBy,
   limit,
+  type QuerySnapshot,
+  type DocumentSnapshot,
   startAfter,
   type QueryDocumentSnapshot
 } from 'firebase/firestore'
@@ -206,10 +208,12 @@ export const updateHabit = async (habitId: string, updates: Partial<Habit>): Pro
         // If explicitly set to null, remove it
         delete cleanUpdates.startDate
       } else {
-        const startDate = cleanUpdates.startDate instanceof Date 
-          ? cleanUpdates.startDate 
-          : new Date(cleanUpdates.startDate)
-        cleanUpdates.startDate = Timestamp.fromDate(startDate)
+        const startDateValue = cleanUpdates.startDate
+        if (startDateValue instanceof Date) {
+          cleanUpdates.startDate = Timestamp.fromDate(startDateValue)
+        } else if (typeof startDateValue === 'string' || typeof startDateValue === 'number') {
+          cleanUpdates.startDate = Timestamp.fromDate(new Date(startDateValue))
+        }
       }
     }
     
@@ -710,7 +714,7 @@ export const deleteAllWorkoutLogs = async (userId: string): Promise<number> => {
       )
     }
 
-    const snapshot = await getDocs(logsQuery)
+    const snapshot: QuerySnapshot = await getDocs(logsQuery)
     
     if (snapshot.empty) {
       break
@@ -722,7 +726,7 @@ export const deleteAllWorkoutLogs = async (userId: string): Promise<number> => {
       
       await retryOperation(async () => {
         const batch = writeBatch(dbInstance)
-        chunk.forEach((doc) => {
+        chunk.forEach((doc: DocumentSnapshot) => {
           batch.delete(doc.ref)
         })
         await batch.commit()

@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import type { FinanceTransaction } from '@/types/finance'
 import { analyzeMoneyMilestones } from '@/lib/moneyMilestones'
-import { Trophy, Target, TrendingUp, Sparkles } from 'lucide-react'
+import { Trophy, Target, Sparkles } from 'lucide-react'
 import { format } from 'date-fns'
 
 interface MoneyMilestonesProps {

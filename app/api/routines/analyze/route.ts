@@ -7,7 +7,6 @@
  * - Rate Limit: 20 requests per 15 minutes
  */
 
-import { NextRequest } from 'next/server'
 import { getRoutinesByUserId, getWorkoutLogsByUserId } from '@/lib/workoutMongo'
 import { analyzeRoutines, generateReport } from '@/scripts/analyzeRoutine'
 import { analyzeWorkoutHistory } from '@/scripts/analyzeWorkoutHistory'

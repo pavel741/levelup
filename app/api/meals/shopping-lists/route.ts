@@ -11,7 +11,6 @@
  * - Returns: Success response
  */
 
-import { NextRequest } from 'next/server'
 import { getShoppingListsByUserId, saveShoppingList } from '@/lib/mealMongo'
 import type { ShoppingList } from '@/types/nutrition'
 import { createGetHandler, createPostHandler } from '@/lib/utils'

@@ -3,8 +3,8 @@
 import { useMemo } from 'react'
 import type { FinanceTransaction } from '@/types/finance'
 import { parseTransactionDate } from '@/lib/financeDateUtils'
-import { format, startOfMonth, endOfMonth, eachMonthOfInterval } from 'date-fns'
-import { Calendar, TrendingUp, TrendingDown, DollarSign } from 'lucide-react'
+import { format } from 'date-fns'
+import { Calendar } from 'lucide-react'
 
 interface FinancialTimelineProps {
   transactions: FinanceTransaction[]
@@ -170,7 +170,6 @@ export default function FinancialTimeline({ transactions }: FinancialTimelinePro
           {timelineEvents.map((event, idx) => {
             const isIncome = event.type === 'income'
             const isExpense = event.type === 'expense'
-            const isMilestone = event.type === 'milestone'
 
             return (
               <div key={idx} className="relative flex items-start gap-4">

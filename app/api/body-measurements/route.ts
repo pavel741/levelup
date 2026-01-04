@@ -2,7 +2,6 @@
  * Body Measurements API Routes
  */
 
-import { NextRequest } from 'next/server'
 import {
   getBodyMeasurements,
   addBodyMeasurement,

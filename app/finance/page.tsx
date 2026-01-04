@@ -5,7 +5,7 @@ import { useFirestoreStore } from '@/store/useFirestoreStore'
 import AuthGuard from '@/components/common/AuthGuard'
 import Sidebar from '@/components/layout/Sidebar'
 import Header from '@/components/layout/Header'
-import { Wallet, TrendingUp, TrendingDown, DollarSign, Target, Bell, Calendar, Clock, AlertCircle } from 'lucide-react'
+import { Wallet, TrendingUp, TrendingDown, DollarSign, Target, Bell, Calendar, Clock, AlertCircle, Edit2, Trash2 } from 'lucide-react'
 // Using MongoDB for finance data (no quota limits!)
 // Client-side API wrapper (calls server-side MongoDB via API routes)
 import {
@@ -17,7 +17,6 @@ import {
   getCategories,
   saveCategories,
   batchAddTransactions,
-  batchDeleteTransactions,
   deleteAllTransactions,
   getFinanceSettings,
   getTransactions,
@@ -942,7 +941,6 @@ export default function FinancePage() {
             })
           }
           const hasPsd2Klix = /psd2|klix/i.test(effectiveDescription) || hasPsd2KlixInCategory
-          const hasOtherPaymentRef = /makse\s*\/|blid/i.test(effectiveDescription)
           // Check for loan patterns in both description and category
           const hasLoanPatternInDesc = /laenu\s+\d+|kodulaen/i.test(effectiveDescription)
           const hasLoanPatternInCategory = /laenu\s+\d+|kodulaen/i.test(currentCategory)
@@ -2225,24 +2223,25 @@ export default function FinancePage() {
 
                   {/* Right Panel - Transaction List */}
                   <div className="flex flex-col gap-6">
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
-                      <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Recent Transactions</h2>
-                        <div className="flex gap-2">
+                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0 mb-4 sm:mb-6">
+                        <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">Recent Transactions</h2>
+                        <div className="flex gap-2 flex-wrap">
                           <button
                             type="button"
                             onClick={handleRecategorizeAll}
                             disabled={transactions.length === 0 || isSubmitting}
-                            className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs sm:text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-1 sm:flex-none"
                             title="Recategorize all transactions based on patterns (POS, reference numbers, etc.)"
                           >
-                            🔄 Recategorize All
+                            <span className="hidden sm:inline">🔄 Recategorize All</span>
+                            <span className="sm:hidden">🔄 Recategorize</span>
                           </button>
                           <button
                             type="button"
                             onClick={handleDeleteAll}
                             disabled={transactions.length === 0 || isSubmitting}
-                            className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs sm:text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-1 sm:flex-none"
                           >
                             Delete All
                           </button>
@@ -2251,8 +2250,8 @@ export default function FinancePage() {
 
                       {/* Date Range Filter */}
                       <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Date Range:</label>
-                        <div className="flex gap-2 flex-wrap mb-3">
+                        <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Date Range:</label>
+                        <div className="grid grid-cols-3 sm:flex sm:gap-2 gap-1.5 sm:gap-2 mb-3">
                           {(['month', 'today', 'week', 'year', 'all'] as const).map((range) => (
                             <button
                               key={range}
@@ -2261,13 +2260,13 @@ export default function FinancePage() {
                                 setDateRange(range)
                                 setShowCustomDateRange(false)
                               }}
-                              className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                              className={`px-2 sm:px-3 py-1.5 text-xs sm:text-sm rounded-lg border transition-colors ${
                                 dateRange === range && !showCustomDateRange
                                   ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white border-transparent shadow-md'
                                   : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400'
                               }`}
                             >
-                              {range === 'month' ? 'This Month' : range === 'today' ? 'Today' : range === 'week' ? 'This Week' : range === 'year' ? 'This Year' : 'All Time'}
+                              {range === 'month' ? 'Month' : range === 'today' ? 'Today' : range === 'week' ? 'Week' : range === 'year' ? 'Year' : 'All'}
                             </button>
                           ))}
                           <button
@@ -2276,7 +2275,7 @@ export default function FinancePage() {
                               setDateRange('custom')
                               setShowCustomDateRange(true)
                             }}
-                            className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                            className={`px-2 sm:px-3 py-1.5 text-xs sm:text-sm rounded-lg border transition-colors col-span-3 sm:col-span-1 ${
                               dateRange === 'custom' && showCustomDateRange
                                 ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white border-transparent shadow-md'
                                 : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400'
@@ -2286,26 +2285,26 @@ export default function FinancePage() {
                           </button>
                         </div>
                         {showCustomDateRange && (
-                          <div className="flex gap-2 items-end flex-wrap p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
-                            <div>
+                          <div className="flex flex-col sm:flex-row gap-3 sm:gap-2 sm:items-end p-3 sm:p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                            <div className="flex-1 sm:flex-none">
                               <label className="block text-xs mb-1 text-gray-600 dark:text-gray-400">From:</label>
                               <input
                                 type="date"
                                 value={customDateFrom}
                                 onChange={(e) => setCustomDateFrom(e.target.value)}
-                                className="px-3 py-1.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full sm:w-auto px-3 py-1.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                               />
                             </div>
-                            <div>
+                            <div className="flex-1 sm:flex-none">
                               <label className="block text-xs mb-1 text-gray-600 dark:text-gray-400">To:</label>
                               <input
                                 type="date"
                                 value={customDateTo}
                                 onChange={(e) => setCustomDateTo(e.target.value)}
-                                className="px-3 py-1.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full sm:w-auto px-3 py-1.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                               />
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 sm:flex-none">
                               <button
                                 type="button"
                                 onClick={() => {
@@ -2313,7 +2312,7 @@ export default function FinancePage() {
                                     setDateRange('custom')
                                   }
                                 }}
-                                className="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg text-sm font-medium hover:shadow-md transition-all"
+                                className="flex-1 sm:flex-none px-3 py-1.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg text-xs sm:text-sm font-medium hover:shadow-md transition-all"
                               >
                                 Apply
                               </button>
@@ -2323,7 +2322,7 @@ export default function FinancePage() {
                                   setShowCustomDateRange(false)
                                   setDateRange('month')
                                 }}
-                                className="px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                className="flex-1 sm:flex-none px-3 py-1.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                               >
                                 Cancel
                               </button>
@@ -2364,8 +2363,8 @@ export default function FinancePage() {
                           {showAdvancedFilters ? 'Hide Advanced Filters' : 'Show Advanced Filters'}
                         </button>
                         {showAdvancedFilters && (
-                          <div className="mt-3 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
-                            <div className="grid grid-cols-2 gap-4 mb-4">
+                          <div className="mt-3 p-3 sm:p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
                               <div>
                                 <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                                   Min Amount
@@ -2442,7 +2441,7 @@ export default function FinancePage() {
                             key={filter}
                             type="button"
                             onClick={() => setCurrentFilter(filter)}
-                            className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                            className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 rounded-lg font-medium text-xs sm:text-sm transition-colors ${
                               currentFilter === filter
                                 ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
                                 : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
@@ -2454,7 +2453,7 @@ export default function FinancePage() {
                       </div>
 
                       {/* Transaction List */}
-                      <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                      <div className="space-y-2 sm:space-y-3 max-h-[600px] overflow-y-auto">
                         {isLoading ? (
                           <div className="text-center py-10 text-gray-500 dark:text-gray-400">Loading...</div>
                         ) : filteredTransactions.length === 0 ? (
@@ -2506,10 +2505,10 @@ export default function FinancePage() {
                               // Use virtual scrolling for large lists
                               <VirtualList
                                 items={filteredTransactions}
-                                itemHeight={120} // Approximate height of each transaction card
+                                itemHeight={100} // Reduced height for mobile-optimized cards
                                 containerHeight={600} // Fixed container height
                                 overscan={5} // Render 5 extra items above/below for smooth scrolling
-                                className="space-y-4"
+                                className="space-y-3 sm:space-y-4"
                                 renderItem={(tx) => {
                                   const txType = (tx.type || '').toLowerCase()
                                   const amount = Number(tx.amount) || 0
@@ -2543,41 +2542,39 @@ export default function FinancePage() {
                                   }
                                   
                                   return (
-                                    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-all">
-                                      <div className="flex items-start justify-between gap-4">
+                                    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 sm:p-4 hover:shadow-md transition-all">
+                                      {/* Mobile: Stacked layout, Desktop: Side by side */}
+                                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                                         <div className="flex-1 min-w-0">
-                                          <div className="flex items-start gap-3 mb-2">
-                                            <div className="flex-1 min-w-0">
-                                              <h3 className="font-semibold text-gray-900 dark:text-white text-base mb-1 truncate">
-                                                {cleanDescription}
-                                              </h3>
-                                              <div className="flex items-center gap-2 flex-wrap">
-                                                <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                  {formatDisplayDate(tx.date)}
+                                          <h3 className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base mb-1.5 sm:mb-1 truncate">
+                                            {cleanDescription}
+                                          </h3>
+                                          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap mb-2 sm:mb-0">
+                                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                                              {formatDisplayDate(tx.date)}
+                                            </span>
+                                            {tx.category && (
+                                              <>
+                                                <span className="text-gray-400 dark:text-gray-500">•</span>
+                                                <span className="text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 sm:px-2 py-0.5 rounded-md">
+                                                  {tx.category}
                                                 </span>
-                                                {tx.category && (
-                                                  <>
-                                                    <span className="text-gray-400 dark:text-gray-500">•</span>
-                                                    <span className="text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-md">
-                                                      {tx.category}
-                                                    </span>
-                                                  </>
-                                                )}
-                                                {(tx as any).sourceBank && (
-                                                  <>
-                                                    <span className="text-gray-400 dark:text-gray-500">•</span>
-                                                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                      {(tx as any).sourceBank}
-                                                    </span>
-                                                  </>
-                                                )}
-                                              </div>
-                                            </div>
+                                              </>
+                                            )}
+                                            {(tx as any).sourceBank && (
+                                              <>
+                                                <span className="text-gray-400 dark:text-gray-500 hidden sm:inline">•</span>
+                                                <span className="text-xs text-gray-500 dark:text-gray-400 hidden sm:inline">
+                                                  {(tx as any).sourceBank}
+                                                </span>
+                                              </>
+                                            )}
                                           </div>
                                         </div>
-                                        <div className="flex items-center gap-3 flex-shrink-0">
+                                        {/* Amount and Actions */}
+                                        <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-3 flex-shrink-0">
                                           <span
-                                            className={`text-xl font-bold font-mono tabular-nums ${
+                                            className={`text-lg sm:text-xl font-bold font-mono tabular-nums ${
                                               isIncome
                                                 ? 'text-green-600 dark:text-green-400'
                                                 : 'text-red-600 dark:text-red-400'
@@ -2585,20 +2582,24 @@ export default function FinancePage() {
                                           >
                                             {formatCurrency(displayAmount)}
                                           </span>
-                                          <div className="flex gap-2">
+                                          <div className="flex gap-1.5 sm:gap-2">
                                             <button
                                               type="button"
                                               onClick={() => handleEdit(tx as FinanceTransaction & { id: string })}
-                                              className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                              className="p-2 sm:px-3 sm:py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center"
+                                              aria-label="Edit transaction"
                                             >
-                                              Edit
+                                              <Edit2 className="w-4 h-4 sm:hidden" />
+                                              <span className="hidden sm:inline">Edit</span>
                                             </button>
                                             <button
                                               type="button"
                                               onClick={() => handleDelete(tx.id!)}
-                                              className="px-3 py-1.5 text-xs font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                                              className="p-2 sm:px-3 sm:py-1.5 text-xs font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center"
+                                              aria-label="Delete transaction"
                                             >
-                                              Delete
+                                              <Trash2 className="w-4 h-4 sm:hidden" />
+                                              <span className="hidden sm:inline">Delete</span>
                                             </button>
                                           </div>
                                         </div>
@@ -2644,42 +2645,40 @@ export default function FinancePage() {
                                 return (
                                   <div
                                     key={tx.id}
-                                    className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-all"
+                                    className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 sm:p-4 hover:shadow-md transition-all"
                                   >
-                                    <div className="flex items-start justify-between gap-4">
+                                    {/* Mobile: Stacked layout, Desktop: Side by side */}
+                                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                                       <div className="flex-1 min-w-0">
-                                        <div className="flex items-start gap-3 mb-2">
-                                          <div className="flex-1 min-w-0">
-                                            <h3 className="font-semibold text-gray-900 dark:text-white text-base mb-1 truncate">
-                                              {cleanDescription}
-                                            </h3>
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                              <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                {formatDisplayDate(tx.date)}
+                                        <h3 className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base mb-1.5 sm:mb-1 truncate">
+                                          {cleanDescription}
+                                        </h3>
+                                        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap mb-2 sm:mb-0">
+                                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                                            {formatDisplayDate(tx.date)}
+                                          </span>
+                                          {tx.category && (
+                                            <>
+                                              <span className="text-gray-400 dark:text-gray-500">•</span>
+                                              <span className="text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 sm:px-2 py-0.5 rounded-md">
+                                                {tx.category}
                                               </span>
-                                              {tx.category && (
-                                                <>
-                                                  <span className="text-gray-400 dark:text-gray-500">•</span>
-                                                  <span className="text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-md">
-                                                    {tx.category}
-                                                  </span>
-                                                </>
-                                              )}
-                                              {(tx as any).sourceBank && (
-                                                <>
-                                                  <span className="text-gray-400 dark:text-gray-500">•</span>
-                                                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                    {(tx as any).sourceBank}
-                                                  </span>
-                                                </>
-                                              )}
-                                            </div>
-                                          </div>
+                                            </>
+                                          )}
+                                          {(tx as any).sourceBank && (
+                                            <>
+                                              <span className="text-gray-400 dark:text-gray-500 hidden sm:inline">•</span>
+                                              <span className="text-xs text-gray-500 dark:text-gray-400 hidden sm:inline">
+                                                {(tx as any).sourceBank}
+                                              </span>
+                                            </>
+                                          )}
                                         </div>
                                       </div>
-                                      <div className="flex items-center gap-3 flex-shrink-0">
+                                      {/* Amount and Actions */}
+                                      <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-3 flex-shrink-0">
                                         <span
-                                          className={`text-xl font-bold font-mono tabular-nums ${
+                                          className={`text-lg sm:text-xl font-bold font-mono tabular-nums ${
                                             isIncome
                                               ? 'text-green-600 dark:text-green-400'
                                               : 'text-red-600 dark:text-red-400'
@@ -2687,20 +2686,24 @@ export default function FinancePage() {
                                         >
                                           {formatCurrency(displayAmount)}
                                         </span>
-                                        <div className="flex gap-2">
+                                        <div className="flex gap-1.5 sm:gap-2">
                                           <button
                                             type="button"
                                             onClick={() => handleEdit(tx as FinanceTransaction & { id: string })}
-                                            className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                            className="p-2 sm:px-3 sm:py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center"
+                                            aria-label="Edit transaction"
                                           >
-                                            Edit
+                                            <Edit2 className="w-4 h-4 sm:hidden" />
+                                            <span className="hidden sm:inline">Edit</span>
                                           </button>
                                           <button
                                             type="button"
                                             onClick={() => handleDelete(tx.id!)}
-                                            className="px-3 py-1.5 text-xs font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                                            className="p-2 sm:px-3 sm:py-1.5 text-xs font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center"
+                                            aria-label="Delete transaction"
                                           >
-                                            Delete
+                                            <Trash2 className="w-4 h-4 sm:hidden" />
+                                            <span className="hidden sm:inline">Delete</span>
                                           </button>
                                         </div>
                                       </div>

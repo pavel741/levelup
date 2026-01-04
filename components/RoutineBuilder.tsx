@@ -316,7 +316,7 @@ export default function RoutineBuilder({ onSave, onCancel, initialRoutine }: Rou
         enabled: true,
         reminderEnabled,
         reminderTime: reminderEnabled ? reminderTime : undefined,
-        workoutDays: workoutDays.length > 0 ? workoutDays : undefined,
+        workoutDays: workoutDays.length > 0 ? workoutDays : [],
         restDayReminders,
       } : undefined
     }

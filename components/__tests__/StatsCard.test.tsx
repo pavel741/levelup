@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
-import StatsCard from '../StatsCard'
+import '@testing-library/jest-dom'
+import StatsCard from '../common/StatsCard'
 import { Target } from 'lucide-react'
 
 describe('StatsCard', () => {

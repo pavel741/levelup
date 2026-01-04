@@ -164,7 +164,11 @@ export default function MultiCurrencySupport({
                           {tx.description || 'No description'}
                         </div>
                         <div className="text-xs text-gray-500 dark:text-gray-500">
-                          {typeof tx.date === 'string' ? tx.date : new Date(tx.date).toLocaleDateString()}
+                          {typeof tx.date === 'string' 
+                            ? tx.date 
+                            : tx.date && typeof tx.date === 'object' && 'toDate' in tx.date
+                            ? new Date((tx.date as { toDate: () => Date }).toDate()).toLocaleDateString()
+                            : new Date(tx.date as Date | string).toLocaleDateString()}
                         </div>
                       </div>
                       <div className="text-right ml-4">

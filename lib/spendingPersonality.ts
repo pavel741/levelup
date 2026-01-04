@@ -4,7 +4,6 @@
  */
 
 import type { FinanceTransaction } from '@/types/finance'
-import { parseTransactionDate } from '@/lib/financeDateUtils'
 import { getSuggestedCategory } from '@/lib/transactionCategorizer'
 
 export interface SpendingPersonality {
@@ -217,7 +216,7 @@ export function analyzeSpendingPersonality(transactions: FinanceTransaction[]): 
   }
 
   // Build personality objects
-  const allPersonalities: SpendingPersonality[] = personalityScores.map(({ type, score, data }) => {
+  const allPersonalities: SpendingPersonality[] = personalityScores.map(({ score, data }) => {
     const traits: string[] = []
     if (score > 50) traits.push('Strong preference')
     if (score > 30) traits.push('Regular spending')

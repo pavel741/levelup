@@ -10,7 +10,6 @@ export const CATEGORY_EMOJIS: Record<string, string> = {
   'Utilities': '💡',
   'Electricity': '⚡',
   'Water': '💧',
-  'Gas': '🔥',
   'Internet': '📶',
   'Phone': '📱',
   

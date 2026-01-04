@@ -390,7 +390,7 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
     description: 'Stay within budget for a full month',
     icon: '✅',
     rarity: 'rare',
-    checkProgress: (_user, _habits, transactions) => {
+    checkProgress: (_user, _habits, _transactions) => {
       // This would need budget data - simplified for now
       return { progress: 0, target: 1, completed: false }
     },

@@ -138,14 +138,16 @@ The variables must be present BEFORE the build runs.`
     const errorCode = (error as { code?: string })?.code
     console.error('❌ Firebase initialization failed:', error)
     console.error('Error code:', errorCode)
-    console.error('Error message:', error.message)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    console.error('Error message:', errorMessage)
     
     // Store error for ErrorDisplay component (browser only)
     if (typeof window !== 'undefined') {
       try {
+        const errorCode = error && typeof error === 'object' && 'code' in error ? String(error.code) : 'firebase_init_failed'
         localStorage.setItem('firebase_error', JSON.stringify({
-          code: error.code || 'firebase_init_failed',
-          message: error.message || 'Failed to initialize Firebase',
+          code: errorCode,
+          message: errorMessage || 'Failed to initialize Firebase',
           timestamp: new Date().toISOString(),
           source: 'firebase_init',
           fullError: error,

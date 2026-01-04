@@ -139,45 +139,49 @@ export default function ProgressiveOverloadChart({ workoutLogs, exerciseId }: Pr
       </div>
 
       {/* Stats Summary */}
-      {chartData.length >= 2 && (
-        <div className="grid grid-cols-3 gap-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-            <div className="text-sm text-gray-600 dark:text-gray-400">Weight Progress</div>
-            <div className="text-lg font-semibold text-gray-900 dark:text-white mt-1">
-              {chartData[0].avgWeight} → {chartData[chartData.length - 1].avgWeight} kg
+      {chartData.length >= 2 && (() => {
+        const firstData = chartData[0]!
+        const lastData = chartData[chartData.length - 1]!
+        return (
+          <div className="grid grid-cols-3 gap-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+              <div className="text-sm text-gray-600 dark:text-gray-400">Weight Progress</div>
+              <div className="text-lg font-semibold text-gray-900 dark:text-white mt-1">
+                {firstData.avgWeight} → {lastData.avgWeight} kg
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                {lastData.avgWeight > firstData.avgWeight ? (
+                  <span className="text-green-600">+{((lastData.avgWeight - firstData.avgWeight) / firstData.avgWeight * 100).toFixed(1)}%</span>
+                ) : (
+                  <span className="text-red-600">{((lastData.avgWeight - firstData.avgWeight) / firstData.avgWeight * 100).toFixed(1)}%</span>
+                )}
+              </div>
             </div>
-            <div className="text-xs text-gray-500 mt-1">
-              {chartData[chartData.length - 1].avgWeight > chartData[0].avgWeight ? (
-                <span className="text-green-600">+{((chartData[chartData.length - 1].avgWeight - chartData[0].avgWeight) / chartData[0].avgWeight * 100).toFixed(1)}%</span>
-              ) : (
-                <span className="text-red-600">{((chartData[chartData.length - 1].avgWeight - chartData[0].avgWeight) / chartData[0].avgWeight * 100).toFixed(1)}%</span>
-              )}
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+              <div className="text-sm text-gray-600 dark:text-gray-400">Max Weight</div>
+              <div className="text-lg font-semibold text-gray-900 dark:text-white mt-1">
+                {lastData.maxWeight} kg
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                Best: {Math.max(...chartData.map(d => d?.maxWeight ?? 0))} kg
+              </div>
+            </div>
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+              <div className="text-sm text-gray-600 dark:text-gray-400">Volume Progress</div>
+              <div className="text-lg font-semibold text-gray-900 dark:text-white mt-1">
+                {firstData.totalVolume} → {lastData.totalVolume} kg
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                {lastData.totalVolume > firstData.totalVolume ? (
+                  <span className="text-green-600">+{((lastData.totalVolume - firstData.totalVolume) / firstData.totalVolume * 100).toFixed(1)}%</span>
+                ) : (
+                  <span className="text-red-600">{((lastData.totalVolume - firstData.totalVolume) / firstData.totalVolume * 100).toFixed(1)}%</span>
+                )}
+              </div>
             </div>
           </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-            <div className="text-sm text-gray-600 dark:text-gray-400">Max Weight</div>
-            <div className="text-lg font-semibold text-gray-900 dark:text-white mt-1">
-              {chartData[chartData.length - 1].maxWeight} kg
-            </div>
-            <div className="text-xs text-gray-500 mt-1">
-              Best: {Math.max(...chartData.map(d => d.maxWeight))} kg
-            </div>
-          </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-            <div className="text-sm text-gray-600 dark:text-gray-400">Volume Progress</div>
-            <div className="text-lg font-semibold text-gray-900 dark:text-white mt-1">
-              {chartData[0].totalVolume} → {chartData[chartData.length - 1].totalVolume} kg
-            </div>
-            <div className="text-xs text-gray-500 mt-1">
-              {chartData[chartData.length - 1].totalVolume > chartData[0].totalVolume ? (
-                <span className="text-green-600">+{((chartData[chartData.length - 1].totalVolume - chartData[0].totalVolume) / chartData[0].totalVolume * 100).toFixed(1)}%</span>
-              ) : (
-                <span className="text-red-600">{((chartData[chartData.length - 1].totalVolume - chartData[0].totalVolume) / chartData[0].totalVolume * 100).toFixed(1)}%</span>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+        )
+      })()}
     </div>
   )
 }

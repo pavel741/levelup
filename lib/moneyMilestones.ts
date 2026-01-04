@@ -5,7 +5,7 @@
 
 import type { FinanceTransaction } from '@/types/finance'
 import { parseTransactionDate } from '@/lib/financeDateUtils'
-import { format, startOfMonth, endOfMonth, subDays, isAfter, isBefore } from 'date-fns'
+import { format, subDays } from 'date-fns'
 
 export interface MoneyMilestone {
   id: string
@@ -97,7 +97,7 @@ export function analyzeMoneyMilestones(
   })
 
   // 2. No-Spend Streaks
-  const sortedDays = Object.keys(dailySpending).sort()
+  // const sortedDays = Object.keys(dailySpending).sort() // Unused
   let currentStreak = 0
   let maxStreak = 0
   let streakStart: Date | null = null

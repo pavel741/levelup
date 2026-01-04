@@ -98,9 +98,9 @@ export async function GET(request: NextRequest) {
       const completedDates = (data.completedDates || []).map((date: unknown) => {
         if (typeof date === 'string') {
           return date
-        } else if (date?.toDate) {
+        } else if (date && typeof date === 'object' && 'toDate' in date && typeof (date as { toDate: () => Date }).toDate === 'function') {
           // Firestore Timestamp
-          return format(date.toDate(), 'yyyy-MM-dd')
+          return format((date as { toDate: () => Date }).toDate(), 'yyyy-MM-dd')
         } else if (date instanceof Date) {
           return format(date, 'yyyy-MM-dd')
         } else {

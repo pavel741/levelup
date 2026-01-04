@@ -13,6 +13,8 @@ import {
   startAfter,
   onSnapshot,
   writeBatch,
+  type QuerySnapshot,
+  type DocumentSnapshot,
   Timestamp,
   type QueryDocumentSnapshot,
 } from 'firebase/firestore'
@@ -507,14 +509,14 @@ export const deleteTransactionsByDateRange = async (
       )
     }
 
-    const snapshot = await getDocs(transactionsQuery)
+    const snapshot: QuerySnapshot = await getDocs(transactionsQuery)
     
     if (snapshot.empty) {
       break
     }
 
     // Filter by userId and delete in batches
-    const userDocs = snapshot.docs.filter(doc => doc.data().userId === userId)
+    const userDocs = snapshot.docs.filter((doc: DocumentSnapshot) => doc.data()?.userId === userId)
     
     if (userDocs.length === 0) {
       // No more matching docs
@@ -580,7 +582,7 @@ export const deleteAllTransactions = async (
       )
     }
 
-    const snapshot = await getDocs(transactionsQuery)
+    const snapshot: QuerySnapshot = await getDocs(transactionsQuery)
     
     if (snapshot.empty) {
       break
@@ -592,7 +594,7 @@ export const deleteAllTransactions = async (
       
       await retryOperation(async () => {
         const batch = writeBatch(dbInstance)
-        chunk.forEach((doc) => {
+        chunk.forEach((doc: DocumentSnapshot) => {
           batch.delete(doc.ref)
         })
         await batch.commit()

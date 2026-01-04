@@ -2,7 +2,7 @@
  * Tests for Goals API routes
  */
 
-import { GET, POST } from '../route'
+import { GET } from '../route'
 import { NextRequest } from 'next/server'
 
 // Mock MongoDB operations
