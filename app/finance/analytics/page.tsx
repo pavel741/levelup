@@ -58,9 +58,62 @@ const FinanceRecurringExpenses = nextDynamic(() => import('@/components/finance/
 const FinanceVerificationPanel = nextDynamic(() => import('@/components/finance/FinanceVerificationPanel').then(m => ({ default: m.FinanceVerificationPanel })), {
   loading: () => <CardSkeleton />,
 })
-import { subscribeToTransactions, getFinanceSettings, getTransactions } from '@/lib/financeApi'
+const BudgetVsActualDashboard = nextDynamic(() => import('@/components/finance/charts/BudgetVsActualDashboard').then(m => ({ default: m.default })), {
+  loading: () => <CardSkeleton />,
+})
+const FinancialHealthScore = nextDynamic(() => import('@/components/finance/charts/FinancialHealthScore').then(m => ({ default: m.default })), {
+  loading: () => <CardSkeleton />,
+})
+const MerchantAnalysis = nextDynamic(() => import('@/components/finance/charts/MerchantAnalysis').then(m => ({ default: m.default })), {
+  loading: () => <CardSkeleton />,
+})
+const SubscriptionCostAnalysis = nextDynamic(() => import('@/components/finance/charts/SubscriptionCostAnalysis').then(m => ({ default: m.default })), {
+  loading: () => <CardSkeleton />,
+})
+const SpendingPersonality = nextDynamic(() => import('@/components/finance/charts/SpendingPersonality').then(m => ({ default: m.default })), {
+  loading: () => <CardSkeleton />,
+})
+const SpendingHeatmap = nextDynamic(() => import('@/components/finance/charts/SpendingHeatmap').then(m => ({ default: m.default })), {
+  loading: () => <CardSkeleton />,
+})
+const MoneyMilestones = nextDynamic(() => import('@/components/finance/charts/MoneyMilestones').then(m => ({ default: m.default })), {
+  loading: () => <CardSkeleton />,
+})
+const SavingsStreaks = nextDynamic(() => import('@/components/finance/charts/SavingsStreaks').then(m => ({ default: m.default })), {
+  loading: () => <CardSkeleton />,
+})
+const BudgetChallenges = nextDynamic(() => import('@/components/finance/BudgetChallenges').then(m => ({ default: m.default })), {
+  loading: () => <CardSkeleton />,
+})
+const DuplicateDetection = nextDynamic(() => import('@/components/finance/DuplicateDetection').then(m => ({ default: m.default })), {
+  loading: () => <CardSkeleton />,
+})
+const SpendingMoodBoard = nextDynamic(() => import('@/components/finance/charts/SpendingMoodBoard').then(m => ({ default: m.default })), {
+  loading: () => <CardSkeleton />,
+})
+const FinancialTimeline = nextDynamic(() => import('@/components/finance/charts/FinancialTimeline').then(m => ({ default: m.default })), {
+  loading: () => <CardSkeleton />,
+})
+const CategoryEmojiMap = nextDynamic(() => import('@/components/finance/charts/CategoryEmojiMap').then(m => ({ default: m.default })), {
+  loading: () => <CardSkeleton />,
+})
+const SpendingStory = nextDynamic(() => import('@/components/finance/charts/SpendingStory').then(m => ({ default: m.default })), {
+  loading: () => <CardSkeleton />,
+})
+const PDFExport = nextDynamic(() => import('@/components/finance/PDFExport').then(m => ({ default: m.default })), {
+  loading: () => <CardSkeleton />,
+})
+const MultiCurrencySupport = nextDynamic(() => import('@/components/finance/MultiCurrencySupport').then(m => ({ default: m.default })), {
+  loading: () => <CardSkeleton />,
+})
+const EnhancedSavingsGoals = nextDynamic(() => import('@/components/finance/EnhancedSavingsGoals').then(m => ({ default: m.default })), {
+  loading: () => <CardSkeleton />,
+})
+import { subscribeToTransactions, getFinanceSettings, getAllTransactionsForSummary, subscribeToRecurringTransactions, getCategories } from '@/lib/financeApi'
+import { startOfMonth, endOfMonth } from 'date-fns'
+import { subscribeToSavingsGoals } from '@/lib/savingsGoalsApi'
 import { parseTransactionDate } from '@/lib/financeDateUtils'
-import type { FinanceTransaction, FinanceSettings } from '@/types/finance'
+import type { FinanceTransaction, FinanceSettings, FinanceRecurringTransaction, BudgetCategoryLimit, FinanceCategories } from '@/types/finance'
 import { BarChart3, ArrowLeft, TrendingUp, TrendingDown, DollarSign, Percent, Loader2 } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
@@ -72,10 +125,16 @@ export default function FinanceAnalyticsPage() {
   const [transactions, setTransactions] = useState<FinanceTransaction[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [financeSettings, setFinanceSettings] = useState<FinanceSettings | null>(null)
+  const [budgetGoals, setBudgetGoals] = useState<BudgetCategoryLimit[]>([])
+  const [recurringTransactions, setRecurringTransactions] = useState<FinanceRecurringTransaction[]>([])
+  const [savingsGoals, setSavingsGoals] = useState<any[]>([])
   const [timeRange, setTimeRange] = useState<'today' | 'week' | 'month' | '6months' | '12months' | 'year' | 'all' | 'custom'>('month')
   const [customDateFrom, setCustomDateFrom] = useState('')
   const [customDateTo, setCustomDateTo] = useState('')
   const [showCustomDateRange, setShowCustomDateRange] = useState(false)
+  
+  // Stable reference date to prevent flickering in BudgetVsActualDashboard
+  const referenceDate = useMemo(() => new Date(), [])
 
   useEffect(() => {
     if (!user?.id) return
@@ -89,29 +148,132 @@ export default function FinanceAnalyticsPage() {
       console.error('Error loading finance settings:', err)
     })
 
-    // Immediately fetch fresh data on mount/navigation
-    getTransactions(user.id, { limitCount: 0 }).then(txs => {
-      setTransactions(txs)
-      setIsLoading(false)
-    }).catch(error => {
-      console.error('Error fetching transactions on mount:', error)
+    // Load budget goals from categories
+    getCategories(user.id).then((categories: FinanceCategories | null) => {
+      if (categories && categories.expense) {
+        const categoryLimits: BudgetCategoryLimit[] = Object.entries(categories.expense)
+          .filter(([_category, data]: [string, any]) => data?.monthlyLimit || data?.limit)
+          .map(([category, data]: [string, any]) => ({
+            category,
+            monthlyLimit: data.monthlyLimit || data.limit || 0,
+            weeklyLimit: data.weeklyLimit,
+            alertThreshold: data.alertThreshold || 80,
+          }))
+        // Only update if the content actually changed (prevent unnecessary re-renders)
+        setBudgetGoals(prev => {
+          const prevKey = prev.map(g => `${g.category}:${g.monthlyLimit}:${g.weeklyLimit}`).sort().join('|')
+          const newKey = categoryLimits.map(g => `${g.category}:${g.monthlyLimit}:${g.weeklyLimit}`).sort().join('|')
+          if (prevKey === newKey) return prev
+          return categoryLimits
+        })
+      }
+    }).catch(err => {
+      console.error('Error loading budget goals:', err)
     })
 
-    // Then set up subscription for ongoing updates
+    // Subscribe to recurring transactions
+    let unsubscribeRecurring: (() => void) | null = null
+    unsubscribeRecurring = subscribeToRecurringTransactions(
+      user.id,
+      (recurring) => {
+        setRecurringTransactions(recurring)
+      }
+    )
+
+    // Subscribe to savings goals
+    const unsubscribeGoals = subscribeToSavingsGoals(user.id, (goals) => {
+      setSavingsGoals(goals)
+    })
+
+    // Immediately fetch ALL transactions for analytics (no limit)
+    getAllTransactionsForSummary(user.id).then(txs => {
+      setTransactions(txs)
+      setIsLoading(false)
+      console.log(`✅ Analytics: Loaded ${txs.length} transactions for analytics`)
+      
+      // Calculate total amount for verification
+      const totalAmount = txs.reduce((sum, tx) => {
+        const amount = Math.abs(Number(tx.amount) || 0)
+        return sum + amount
+      }, 0)
+      console.log(`💰 Analytics: Total transaction amount sum: ${totalAmount.toFixed(2)}`)
+    }).catch(error => {
+      console.error('Error fetching transactions on mount:', error)
+      setIsLoading(false)
+    })
+
+    // Then set up subscription for ongoing updates (load recent transactions)
+    // Note: We keep the initial full load separate from the subscription
+    // to ensure we have all historical data for analytics
+    // For analytics, we want ALL transactions, so we use a high limit or 0 for unlimited
     const unsubscribe = subscribeToTransactions(
       user.id,
       (txs) => {
-        setTransactions(txs)
+        // Merge new transactions into existing set
+        setTransactions(prev => {
+          // Create a map of existing transactions by ID for quick lookup
+          const existingMap = new Map(prev.map(tx => [tx.id, tx]))
+          let hasChanges = false
+          
+          // Add/update transactions from subscription
+          txs.forEach(tx => {
+            const existing = existingMap.get(tx.id)
+            // Simple comparison: check if transaction exists and if key fields changed
+            if (!existing || 
+                existing.amount !== tx.amount || 
+                existing.category !== tx.category ||
+                existing.date !== tx.date ||
+                existing.type !== tx.type) {
+              existingMap.set(tx.id, tx)
+              hasChanges = true
+            }
+          })
+          
+          // Only update state if there are actual changes
+          if (!hasChanges && existingMap.size === prev.length) {
+            return prev
+          }
+          
+          // Convert back to array and sort by date descending
+          const newTransactions = Array.from(existingMap.values()).sort((a, b) => {
+            const dateA = parseTransactionDate(a.date).getTime()
+            const dateB = parseTransactionDate(b.date).getTime()
+            return dateB - dateA
+          })
+          
+          // Quick check: if same length and same IDs in same order, likely no change
+          if (newTransactions.length === prev.length && 
+              newTransactions.every((tx, idx) => tx.id === prev[idx]?.id)) {
+            // Still check if amounts changed (most important for budget calculations)
+            const amountsChanged = newTransactions.some((tx, idx) => {
+              const prevTx = prev[idx]
+              return !prevTx || tx.amount !== prevTx.amount || tx.category !== prevTx.category
+            })
+            if (!amountsChanged) {
+              return prev
+            }
+          }
+          
+          return newTransactions
+        })
         setIsLoading(false)
         // Log how many transactions are loaded
         if (txs.length > 0) {
-          console.log(`📊 Analytics: Loaded ${txs.length} transactions from MongoDB (no limit)`)
+          console.log(`📊 Analytics: Subscription updated with ${txs.length} transactions`)
         }
       },
-      { limitCount: 0 } // 0 = no limit, load ALL transactions (MongoDB can handle it!)
+      { limitCount: 0 } // Load ALL transactions for analytics (no limit)
     )
 
-    return () => unsubscribe()
+    return () => {
+      unsubscribe()
+      if (unsubscribeRecurring) {
+        unsubscribeRecurring()
+      }
+      if (unsubscribeGoals) {
+        unsubscribeGoals()
+      }
+    }
   }, [user?.id])
 
   // Filter transactions by time range
@@ -578,6 +740,91 @@ export default function FinanceAnalyticsPage() {
                   dateRange={dateRangeInfo}
                 />
 
+                {/* New Analytics Sections */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                  {/* Financial Health Score */}
+                  <FinancialHealthScore
+                    transactions={filteredTransactions}
+                    periodMonths={
+                      timeRange === 'month' ? 3 :
+                      timeRange === '6months' ? 6 :
+                      timeRange === '12months' || timeRange === 'year' ? 12 :
+                      timeRange === 'all' ? 24 : 6
+                    }
+                  />
+
+                  {/* Budget vs Actual */}
+                  <BudgetVsActualDashboard
+                    transactions={filteredTransactions}
+                    budgetGoals={budgetGoals}
+                    period="monthly"
+                    referenceDate={referenceDate}
+                  />
+                </div>
+
+                {/* Spending Personality & Milestones */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                  {/* Spending Personality */}
+                  <SpendingPersonality transactions={filteredTransactions} />
+
+                  {/* Money Milestones */}
+                  <MoneyMilestones
+                    transactions={filteredTransactions}
+                    periodMonths={
+                      timeRange === 'month' ? 1 :
+                      timeRange === '6months' ? 6 :
+                      timeRange === '12months' || timeRange === 'year' ? 12 :
+                      timeRange === 'all' ? 24 : 3
+                    }
+                  />
+                </div>
+
+                {/* Gamification Section */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                  {/* Savings Streaks */}
+                  <SavingsStreaks transactions={filteredTransactions} />
+
+                  {/* Budget Challenges */}
+                  <BudgetChallenges transactions={filteredTransactions} />
+                </div>
+
+                {/* Spending Heatmap */}
+                <div className="mb-6">
+                  <SpendingHeatmap
+                    transactions={filteredTransactions}
+                    months={
+                      timeRange === 'today' || timeRange === 'week' ? 1 :
+                      timeRange === 'month' ? 3 :
+                      timeRange === 'year' ? 6 :
+                      timeRange === '6months' ? 3 :
+                      timeRange === '12months' ? 6 :
+                      timeRange === 'custom' ? 3 :
+                      3
+                    }
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                  {/* Merchant Analysis */}
+                  <MerchantAnalysis
+                    transactions={filteredTransactions}
+                    topN={10}
+                    months={
+                      timeRange === 'month' ? 3 :
+                      timeRange === '6months' ? 6 :
+                      timeRange === '12months' || timeRange === 'year' ? 12 :
+                      timeRange === 'all' ? 24 : 6
+                    }
+                  />
+
+                  {/* Subscription Cost Analysis */}
+                  <SubscriptionCostAnalysis
+                    recurringTransactions={recurringTransactions}
+                    transactions={filteredTransactions}
+                    months={12}
+                  />
+                </div>
+
                 {/* Charts Grid */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                   {/* Spending Trends */}
@@ -867,6 +1114,90 @@ export default function FinanceAnalyticsPage() {
                       6
                     }
                   />
+                </div>
+
+                {/* Duplicate Detection */}
+                <div className="mb-6">
+                  <DuplicateDetection transactions={filteredTransactions} />
+                </div>
+
+                {/* Visual & Fun Section */}
+                <div className="mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+                    Visual & Fun
+                  </h2>
+                  
+                  {/* Spending Mood Board */}
+                  <div className="mb-6">
+                    <SpendingMoodBoard transactions={filteredTransactions} />
+                  </div>
+
+                  {/* Category Emoji Map */}
+                  <div className="mb-6">
+                    <CategoryEmojiMap transactions={filteredTransactions} />
+                  </div>
+
+                  {/* Spending Story */}
+                  <div className="mb-6">
+                    <SpendingStory 
+                      transactions={filteredTransactions}
+                      periodStart={
+                        timeRange === 'month' ? startOfMonth(new Date()) :
+                        timeRange === 'year' ? new Date(new Date().getFullYear(), 0, 1) :
+                        dateRangeInfo.start || startOfMonth(new Date())
+                      }
+                      periodEnd={
+                        timeRange === 'month' ? endOfMonth(new Date()) :
+                        timeRange === 'year' ? new Date(new Date().getFullYear(), 11, 31) :
+                        dateRangeInfo.end || endOfMonth(new Date())
+                      }
+                    />
+                  </div>
+
+                  {/* Financial Timeline */}
+                  <div className="mb-6">
+                    <FinancialTimeline transactions={filteredTransactions} />
+                  </div>
+                </div>
+
+                {/* Practical & Useful Section */}
+                <div className="mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+                    Practical & Useful
+                  </h2>
+                  
+                  {/* PDF Export */}
+                  <div className="mb-6">
+                    <PDFExport 
+                      transactions={filteredTransactions}
+                      periodStart={
+                        timeRange === 'month' ? startOfMonth(new Date()) :
+                        timeRange === 'year' ? new Date(new Date().getFullYear(), 0, 1) :
+                        dateRangeInfo.start || startOfMonth(new Date())
+                      }
+                      periodEnd={
+                        timeRange === 'month' ? endOfMonth(new Date()) :
+                        timeRange === 'year' ? new Date(new Date().getFullYear(), 11, 31) :
+                        dateRangeInfo.end || endOfMonth(new Date())
+                      }
+                      periodLabel={dateRangeInfo.label}
+                    />
+                  </div>
+
+                  {/* Multi-Currency Support */}
+                  <div className="mb-6">
+                    <MultiCurrencySupport 
+                      transactions={filteredTransactions}
+                      baseCurrency="EUR"
+                    />
+                  </div>
+
+                  {/* Enhanced Savings Goals Visualization */}
+                  {savingsGoals.length > 0 && (
+                    <div className="mb-6">
+                      <EnhancedSavingsGoals goals={savingsGoals} />
+                    </div>
+                  )}
                 </div>
                 </>
                 ) : null}

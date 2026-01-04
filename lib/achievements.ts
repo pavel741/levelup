@@ -341,6 +341,139 @@ export const ACHIEVEMENT_DEFINITIONS: AchievementDefinition[] = [
       return { progress: Math.min(transactionDates.size, 30), target: 30, completed: transactionDates.size >= 30 }
     },
   },
+  {
+    id: 'savings_streak_3',
+    name: '3-Month Saver',
+    description: 'Save money for 3 consecutive months',
+    icon: '🔥',
+    rarity: 'rare',
+    checkProgress: (_user, _habits, transactions) => {
+      if (!transactions || transactions.length === 0) return { progress: 0, target: 3, completed: false }
+      
+      // Import calculateSavingsStreak
+      const { calculateSavingsStreak } = require('@/lib/savingsStreaks')
+      const streak = calculateSavingsStreak(transactions)
+      return { progress: Math.min(streak.currentStreak, 3), target: 3, completed: streak.currentStreak >= 3 }
+    },
+  },
+  {
+    id: 'savings_streak_6',
+    name: '6-Month Saver',
+    description: 'Save money for 6 consecutive months',
+    icon: '💎',
+    rarity: 'epic',
+    checkProgress: (_user, _habits, transactions) => {
+      if (!transactions || transactions.length === 0) return { progress: 0, target: 6, completed: false }
+      
+      const { calculateSavingsStreak } = require('@/lib/savingsStreaks')
+      const streak = calculateSavingsStreak(transactions)
+      return { progress: Math.min(streak.currentStreak, 6), target: 6, completed: streak.currentStreak >= 6 }
+    },
+  },
+  {
+    id: 'savings_streak_12',
+    name: 'Year Saver',
+    description: 'Save money for 12 consecutive months',
+    icon: '👑',
+    rarity: 'legendary',
+    checkProgress: (_user, _habits, transactions) => {
+      if (!transactions || transactions.length === 0) return { progress: 0, target: 12, completed: false }
+      
+      const { calculateSavingsStreak } = require('@/lib/savingsStreaks')
+      const streak = calculateSavingsStreak(transactions)
+      return { progress: Math.min(streak.currentStreak, 12), target: 12, completed: streak.currentStreak >= 12 }
+    },
+  },
+  {
+    id: 'budget_adherence',
+    name: 'Budget Adherent',
+    description: 'Stay within budget for a full month',
+    icon: '✅',
+    rarity: 'rare',
+    checkProgress: (_user, _habits, transactions) => {
+      // This would need budget data - simplified for now
+      return { progress: 0, target: 1, completed: false }
+    },
+  },
+  {
+    id: 'savings_rate_20',
+    name: '20% Saver',
+    description: 'Achieve 20% savings rate',
+    icon: '💹',
+    rarity: 'rare',
+    checkProgress: (_user, _habits, transactions) => {
+      if (!transactions || transactions.length === 0) return { progress: 0, target: 20, completed: false }
+      
+      let income = 0
+      let expenses = 0
+      transactions.forEach((tx) => {
+        const amount = Number(tx.amount) || 0
+        const type = (tx.type || '').toLowerCase()
+        if (type === 'income' || amount > 0) {
+          income += Math.abs(amount)
+        } else {
+          expenses += Math.abs(amount)
+        }
+      })
+      
+      const savingsRate = income > 0 ? ((income - expenses) / income) * 100 : 0
+      return { progress: Math.min(savingsRate, 20), target: 20, completed: savingsRate >= 20 }
+    },
+  },
+  {
+    id: 'savings_rate_30',
+    name: '30% Saver',
+    description: 'Achieve 30% savings rate',
+    icon: '🚀',
+    rarity: 'epic',
+    checkProgress: (_user, _habits, transactions) => {
+      if (!transactions || transactions.length === 0) return { progress: 0, target: 30, completed: false }
+      
+      let income = 0
+      let expenses = 0
+      transactions.forEach((tx) => {
+        const amount = Number(tx.amount) || 0
+        const type = (tx.type || '').toLowerCase()
+        if (type === 'income' || amount > 0) {
+          income += Math.abs(amount)
+        } else {
+          expenses += Math.abs(amount)
+        }
+      })
+      
+      const savingsRate = income > 0 ? ((income - expenses) / income) * 100 : 0
+      return { progress: Math.min(savingsRate, 30), target: 30, completed: savingsRate >= 30 }
+    },
+  },
+  {
+    id: 'no_impulse_30',
+    name: '30 Days No Impulse',
+    description: 'Go 30 days without impulse purchases',
+    icon: '🛡️',
+    rarity: 'epic',
+    checkProgress: (_user, _habits, transactions) => {
+      if (!transactions || transactions.length === 0) return { progress: 0, target: 30, completed: false }
+      
+      const today = new Date()
+      const thirtyDaysAgo = new Date(today)
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+      
+      const recentExpenses = transactions.filter((tx) => {
+        const amount = Number(tx.amount) || 0
+        const type = (tx.type || '').toLowerCase()
+        const isExpense = type === 'expense' || amount < 0
+        if (!isExpense) return false
+        
+        const txDate = toDate(tx.date)
+        return txDate >= thirtyDaysAgo && txDate <= today
+      })
+      
+      // Count days with expenses
+      const expenseDates = new Set(recentExpenses.map((tx) => toDate(tx.date).toISOString().split('T')[0]))
+      const noSpendDays = 30 - expenseDates.size
+      return { progress: Math.min(noSpendDays, 30), target: 30, completed: noSpendDays >= 30 }
+    },
+  },
   
   // ---------- Workout Achievements ----------
   {

@@ -25,6 +25,9 @@ const WorkoutHistory = nextDynamic(() => import('@/components/WorkoutHistory'), 
 const MealPlanner = nextDynamic(() => import('@/components/MealPlanner'), {
   loading: () => <CardSkeleton />,
 })
+const BodyMeasurements = nextDynamic(() => import('@/components/BodyMeasurements'), {
+  loading: () => <CardSkeleton />,
+})
 const RoutineAnalyzer = nextDynamic(() => import('@/components/RoutineAnalyzer'), {
   loading: () => <CardSkeleton />,
 })
@@ -33,6 +36,7 @@ import TemplateModal from '@/components/workouts/TemplateModal'
 import ViewTabs, { type WorkoutView } from '@/components/workouts/ViewTabs'
 import EmptyState from '@/components/workouts/EmptyState'
 import { subscribeToRoutines, saveRoutine, deleteRoutine, deleteWorkoutLog, getWorkoutLogs } from '@/lib/workoutApi'
+import { useWorkoutStore } from '@/store/useWorkoutStore'
 import type { Routine, WorkoutLog } from '@/types/workout'
 import { showError } from '@/lib/utils'
 
@@ -40,6 +44,7 @@ export const dynamic = 'force-dynamic'
 
 export default function WorkoutsPage() {
   const { user } = useFirestoreStore()
+  const { subscribeRoutines, loadWorkoutLogs } = useWorkoutStore()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [currentView, setCurrentView] = useState<WorkoutView>('routines')
   const [showRoutineBuilder, setShowRoutineBuilder] = useState(false)
@@ -52,20 +57,28 @@ export default function WorkoutsPage() {
   const [isLoadingRoutines, setIsLoadingRoutines] = useState(true)
   const [isLoadingLogs, setIsLoadingLogs] = useState(false)
 
-  // Subscribe to routines only (most important data)
+  // Subscribe to routines using workout store
   useEffect(() => {
     if (!user?.id) return
 
     setIsLoadingRoutines(true)
-    const unsubscribeRoutines = subscribeToRoutines(user.id, (routines) => {
-      setRoutines(routines)
-      setIsLoadingRoutines(false)
-    })
+    const unsubscribe = subscribeRoutines(user.id)
+    // Also load workout logs for analysis
+    loadWorkoutLogs(user.id)
+
+    // Subscribe to store changes
+    const unsubscribeStore = useWorkoutStore.subscribe(
+      (state) => {
+        setRoutines(state.routines)
+        setIsLoadingRoutines(state.isLoadingRoutines)
+      }
+    )
 
     return () => {
-      unsubscribeRoutines()
+      unsubscribe()
+      unsubscribeStore()
     }
-  }, [user?.id])
+  }, [user?.id, subscribeRoutines, loadWorkoutLogs])
 
   // Lazy load workout logs only when viewing history
   useEffect(() => {
@@ -300,6 +313,7 @@ export default function WorkoutsPage() {
 
                   {currentView === 'exercises' && <ExerciseLibrary />}
                   {currentView === 'meals' && user?.id && <MealPlanner userId={user.id} />}
+                  {currentView === 'measurements' && user?.id && <BodyMeasurements userId={user.id} />}
                   {currentView === 'analyze' && <RoutineAnalyzer />}
                 </div>
               </div>

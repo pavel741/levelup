@@ -1,8 +1,8 @@
 'use client'
 
-import { List, Play, History, Search, UtensilsCrossed, TrendingUp } from 'lucide-react'
+import { List, Play, History, Search, UtensilsCrossed, TrendingUp, Ruler } from 'lucide-react'
 
-type WorkoutView = 'routines' | 'active' | 'history' | 'exercises' | 'meals' | 'analyze'
+type WorkoutView = 'routines' | 'active' | 'history' | 'exercises' | 'meals' | 'analyze' | 'measurements'
 
 interface ViewTabsProps {
   currentView: WorkoutView
@@ -15,6 +15,7 @@ const VIEWS = [
   { id: 'history' as WorkoutView, label: 'History', icon: History },
   { id: 'exercises' as WorkoutView, label: 'Exercises', icon: Search },
   { id: 'meals' as WorkoutView, label: 'Meal Planner', icon: UtensilsCrossed },
+  { id: 'measurements' as WorkoutView, label: 'Measurements', icon: Ruler },
   { id: 'analyze' as WorkoutView, label: 'Analyze', icon: TrendingUp },
 ]
 

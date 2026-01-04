@@ -38,6 +38,14 @@ export interface Routine {
   tags: string[]
   rating?: number // Community rating
   timesUsed?: number // How many times used
+  // Workout schedule
+  schedule?: {
+    enabled: boolean
+    reminderEnabled: boolean
+    reminderTime?: string // Format: "HH:mm" (e.g., "09:00")
+    workoutDays: number[] // Days of week (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
+    restDayReminders?: boolean // Remind on rest days to take it easy
+  }
   createdAt: Date
   updatedAt: Date
 }

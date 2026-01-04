@@ -3079,6 +3079,466 @@ export const EXERCISE_DATABASE: Exercise[] = [
       'Repeat'
     ],
     videoUrl: 'https://www.youtube.com/embed/_kGESn8ArrU'
+  },
+
+  // Stretching & Flexibility Exercises
+  {
+    id: 'neck-stretch',
+    name: 'Neck Stretch',
+    description: 'Gentle neck mobility stretch to relieve tension.',
+    category: 'flexibility',
+    muscleGroups: {
+      primary: ['neck'],
+      secondary: ['shoulders']
+    },
+    equipment: ['bodyweight'],
+    difficulty: 'beginner',
+    instructions: [
+      'Sit or stand tall',
+      'Slowly tilt head to one side',
+      'Hold for 15-30 seconds',
+      'Return to center',
+      'Repeat on other side'
+    ],
+    tips: [
+      'Move slowly and gently',
+      'Don\'t force the stretch',
+      'Breathe deeply'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/2NOsE-VPpkE'
+  },
+  {
+    id: 'shoulder-stretch',
+    name: 'Shoulder Stretch',
+    description: 'Stretches the shoulders and upper back.',
+    category: 'flexibility',
+    muscleGroups: {
+      primary: ['shoulders'],
+      secondary: ['back', 'chest']
+    },
+    equipment: ['bodyweight'],
+    difficulty: 'beginner',
+    instructions: [
+      'Bring one arm across your chest',
+      'Use other arm to gently pull',
+      'Hold for 20-30 seconds',
+      'Repeat on other side'
+    ],
+    tips: [
+      'Keep shoulders relaxed',
+      'Don\'t pull too hard',
+      'Feel stretch in shoulder'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/2NOsE-VPpkE'
+  },
+  {
+    id: 'chest-stretch',
+    name: 'Chest Stretch',
+    description: 'Opens up the chest and front shoulders.',
+    category: 'flexibility',
+    muscleGroups: {
+      primary: ['chest'],
+      secondary: ['shoulders']
+    },
+    equipment: ['bodyweight'],
+    difficulty: 'beginner',
+    instructions: [
+      'Stand in doorway or corner',
+      'Place forearm on wall',
+      'Lean forward gently',
+      'Hold for 20-30 seconds',
+      'Repeat on other side'
+    ],
+    tips: [
+      'Keep back straight',
+      'Feel stretch in chest',
+      'Don\'t overstretch'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/2NOsE-VPpkE'
+  },
+  {
+    id: 'tricep-stretch',
+    name: 'Tricep Stretch',
+    description: 'Stretches the back of the upper arm.',
+    category: 'flexibility',
+    muscleGroups: {
+      primary: ['triceps'],
+      secondary: ['shoulders']
+    },
+    equipment: ['bodyweight'],
+    difficulty: 'beginner',
+    instructions: [
+      'Raise one arm overhead',
+      'Bend elbow, hand behind head',
+      'Use other hand to gently pull elbow',
+      'Hold for 20-30 seconds',
+      'Repeat on other side'
+    ],
+    tips: [
+      'Keep head straight',
+      'Feel stretch in tricep',
+      'Don\'t force it'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/2NOsE-VPpkE'
+  },
+  {
+    id: 'standing-forward-fold',
+    name: 'Standing Forward Fold',
+    description: 'Stretches hamstrings, calves, and lower back.',
+    category: 'flexibility',
+    muscleGroups: {
+      primary: ['hamstrings'],
+      secondary: ['back', 'calves']
+    },
+    equipment: ['bodyweight'],
+    difficulty: 'beginner',
+    instructions: [
+      'Stand with feet hip-width apart',
+      'Hinge at hips and fold forward',
+      'Let arms hang or grab opposite elbows',
+      'Hold for 30-60 seconds',
+      'Slowly return to standing'
+    ],
+    tips: [
+      'Bend knees slightly if needed',
+      'Let gravity do the work',
+      'Breathe deeply'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/2NOsE-VPpkE'
+  },
+  {
+    id: 'quad-stretch',
+    name: 'Quad Stretch',
+    description: 'Stretches the front of the thigh.',
+    category: 'flexibility',
+    muscleGroups: {
+      primary: ['quadriceps'],
+      secondary: ['hip-flexors']
+    },
+    equipment: ['bodyweight'],
+    difficulty: 'beginner',
+    instructions: [
+      'Stand and hold onto wall for balance',
+      'Bend one knee, bring heel to glute',
+      'Hold ankle with hand',
+      'Keep knees together',
+      'Hold for 20-30 seconds',
+      'Repeat on other side'
+    ],
+    tips: [
+      'Keep standing leg slightly bent',
+      'Don\'t arch back',
+      'Feel stretch in front of thigh'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/2NOsE-VPpkE'
+  },
+  {
+    id: 'hamstring-stretch',
+    name: 'Hamstring Stretch',
+    description: 'Stretches the back of the thigh.',
+    category: 'flexibility',
+    muscleGroups: {
+      primary: ['hamstrings'],
+      secondary: ['glutes']
+    },
+    equipment: ['bodyweight'],
+    difficulty: 'beginner',
+    instructions: [
+      'Sit on floor with one leg extended',
+      'Other leg bent, foot against inner thigh',
+      'Reach forward toward extended foot',
+      'Hold for 30-45 seconds',
+      'Repeat on other side'
+    ],
+    tips: [
+      'Keep back straight',
+      'Don\'t round shoulders',
+      'Feel stretch in back of leg'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/2NOsE-VPpkE'
+  },
+  {
+    id: 'hip-flexor-stretch',
+    name: 'Hip Flexor Stretch',
+    description: 'Stretches the front of the hip.',
+    category: 'flexibility',
+    muscleGroups: {
+      primary: ['hip-flexors'],
+      secondary: ['quadriceps']
+    },
+    equipment: ['bodyweight'],
+    difficulty: 'beginner',
+    instructions: [
+      'Step into lunge position',
+      'Back knee on ground',
+      'Push hips forward',
+      'Keep front knee over ankle',
+      'Hold for 30-45 seconds',
+      'Repeat on other side'
+    ],
+    tips: [
+      'Keep torso upright',
+      'Feel stretch in front of hip',
+      'Don\'t let front knee go past toes'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/2NOsE-VPpkE'
+  },
+  {
+    id: 'calf-stretch',
+    name: 'Calf Stretch',
+    description: 'Stretches the calf muscles.',
+    category: 'flexibility',
+    muscleGroups: {
+      primary: ['calves'],
+      secondary: []
+    },
+    equipment: ['bodyweight'],
+    difficulty: 'beginner',
+    instructions: [
+      'Step one foot forward',
+      'Keep back leg straight',
+      'Lean forward, bending front knee',
+      'Feel stretch in back calf',
+      'Hold for 30 seconds',
+      'Repeat on other side'
+    ],
+    tips: [
+      'Keep back heel on ground',
+      'Don\'t bounce',
+      'Feel stretch in calf'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/2NOsE-VPpkE'
+  },
+  {
+    id: 'spinal-twist',
+    name: 'Seated Spinal Twist',
+    description: 'Rotational stretch for the spine and core.',
+    category: 'flexibility',
+    muscleGroups: {
+      primary: ['back'],
+      secondary: ['core', 'obliques']
+    },
+    equipment: ['bodyweight'],
+    difficulty: 'beginner',
+    instructions: [
+      'Sit with legs extended',
+      'Cross one leg over the other',
+      'Twist torso toward bent knee',
+      'Use opposite arm to deepen stretch',
+      'Hold for 30-45 seconds',
+      'Repeat on other side'
+    ],
+    tips: [
+      'Keep spine tall',
+      'Breathe deeply',
+      'Don\'t force the twist'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/2NOsE-VPpkE'
+  },
+  {
+    id: 'childs-pose',
+    name: 'Child\'s Pose',
+    description: 'Restorative stretch for back and hips.',
+    category: 'flexibility',
+    muscleGroups: {
+      primary: ['back'],
+      secondary: ['hips', 'shoulders']
+    },
+    equipment: ['bodyweight'],
+    difficulty: 'beginner',
+    instructions: [
+      'Start on hands and knees',
+      'Sit back on heels',
+      'Reach arms forward',
+      'Rest forehead on ground',
+      'Hold for 60 seconds',
+      'Breathe deeply'
+    ],
+    tips: [
+      'Relax completely',
+      'Let gravity do the work',
+      'Great for stress relief'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/2NOsE-VPpkE'
+  },
+  {
+    id: 'cat-cow',
+    name: 'Cat-Cow Stretch',
+    description: 'Dynamic spinal mobility exercise.',
+    category: 'flexibility',
+    muscleGroups: {
+      primary: ['back'],
+      secondary: ['core']
+    },
+    equipment: ['bodyweight'],
+    difficulty: 'beginner',
+    instructions: [
+      'Start on hands and knees',
+      'Arch back, look up (cow)',
+      'Round back, tuck chin (cat)',
+      'Move slowly between positions',
+      'Repeat 10-15 times'
+    ],
+    tips: [
+      'Move with breath',
+      'Feel movement in entire spine',
+      'Go slowly and smoothly'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/2NOsE-VPpkE'
+  },
+  {
+    id: 'figure-four-stretch',
+    name: 'Figure Four Stretch',
+    description: 'Stretches glutes and hip rotators.',
+    category: 'flexibility',
+    muscleGroups: {
+      primary: ['glutes'],
+      secondary: ['hips']
+    },
+    equipment: ['bodyweight'],
+    difficulty: 'beginner',
+    instructions: [
+      'Lie on back',
+      'Cross one ankle over opposite knee',
+      'Pull thigh toward chest',
+      'Hold for 30-45 seconds',
+      'Repeat on other side'
+    ],
+    tips: [
+      'Keep head on ground',
+      'Feel stretch in glute',
+      'Don\'t force it'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/2NOsE-VPpkE'
+  },
+  {
+    id: 'knee-to-chest',
+    name: 'Knee to Chest Stretch',
+    description: 'Stretches lower back and glutes.',
+    category: 'flexibility',
+    muscleGroups: {
+      primary: ['back'],
+      secondary: ['glutes']
+    },
+    equipment: ['bodyweight'],
+    difficulty: 'beginner',
+    instructions: [
+      'Lie on back',
+      'Bring one knee to chest',
+      'Hold with hands',
+      'Keep other leg extended',
+      'Hold for 30-45 seconds',
+      'Repeat on other side'
+    ],
+    tips: [
+      'Relax shoulders',
+      'Feel stretch in lower back',
+      'Breathe deeply'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/2NOsE-VPpkE'
+  },
+  {
+    id: 'butterfly-stretch',
+    name: 'Butterfly Stretch',
+    description: 'Stretches inner thighs and hips.',
+    category: 'flexibility',
+    muscleGroups: {
+      primary: ['hips'],
+      secondary: ['inner-thighs']
+    },
+    equipment: ['bodyweight'],
+    difficulty: 'beginner',
+    instructions: [
+      'Sit on floor',
+      'Bring soles of feet together',
+      'Let knees fall to sides',
+      'Gently press knees down',
+      'Hold for 30-60 seconds'
+    ],
+    tips: [
+      'Keep back straight',
+      'Don\'t bounce',
+      'Feel stretch in inner thighs'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/2NOsE-VPpkE'
+  },
+  {
+    id: 'pigeon-pose',
+    name: 'Pigeon Pose',
+    description: 'Deep hip and glute stretch.',
+    category: 'flexibility',
+    muscleGroups: {
+      primary: ['hips'],
+      secondary: ['glutes', 'hip-flexors']
+    },
+    equipment: ['bodyweight'],
+    difficulty: 'intermediate',
+    instructions: [
+      'Start in plank position',
+      'Bring one knee forward to wrist',
+      'Extend back leg straight',
+      'Square hips forward',
+      'Hold for 30-60 seconds',
+      'Repeat on other side'
+    ],
+    tips: [
+      'Use props if needed',
+      'Don\'t force the stretch',
+      'Feel stretch in hip'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/2NOsE-VPpkE'
+  },
+  {
+    id: 'standing-side-stretch',
+    name: 'Standing Side Stretch',
+    description: 'Stretches the side body and obliques.',
+    category: 'flexibility',
+    muscleGroups: {
+      primary: ['obliques'],
+      secondary: ['back', 'shoulders']
+    },
+    equipment: ['bodyweight'],
+    difficulty: 'beginner',
+    instructions: [
+      'Stand with feet hip-width apart',
+      'Raise one arm overhead',
+      'Lean to opposite side',
+      'Feel stretch in side body',
+      'Hold for 20-30 seconds',
+      'Repeat on other side'
+    ],
+    tips: [
+      'Keep hips centered',
+      'Don\'t lean forward or back',
+      'Breathe deeply'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/2NOsE-VPpkE'
+  },
+  {
+    id: 'wrist-stretch',
+    name: 'Wrist Stretch',
+    description: 'Stretches wrists and forearms.',
+    category: 'flexibility',
+    muscleGroups: {
+      primary: ['forearms'],
+      secondary: ['wrists']
+    },
+    equipment: ['bodyweight'],
+    difficulty: 'beginner',
+    instructions: [
+      'Extend one arm forward',
+      'Point fingers down',
+      'Use other hand to gently pull fingers',
+      'Hold for 20-30 seconds',
+      'Flip hand and repeat',
+      'Repeat on other side'
+    ],
+    tips: [
+      'Be gentle',
+      'Great for desk workers',
+      'Feel stretch in forearm'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/2NOsE-VPpkE'
   }
 ]
 

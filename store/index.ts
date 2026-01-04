@@ -15,7 +15,10 @@ export { useFirestoreStore } from './useFirestoreStore'
 // Feature stores
 export { useFinanceStore } from './useFinanceStore'
 export { useWorkoutStore } from './useWorkoutStore'
+export { useTodosStore } from './useTodosStore'
+export { useFocusStore } from './useFocusStore'
+export { useGoalsStore } from './useGoalsStore'
 
 // Re-export types for convenience
-export type { User, Habit, Challenge, Achievement, DailyStats } from '@/types'
+export type { User, Habit, Challenge, Achievement, DailyStats, Todo, Goal } from '@/types'
 

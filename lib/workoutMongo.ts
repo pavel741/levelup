@@ -2,26 +2,28 @@ import { ObjectId } from 'mongodb'
 import { getDatabase } from './mongodb'
 import type { Routine, WorkoutLog } from '@/types/workout'
 
+type MongoValue = string | number | boolean | Date | ObjectId | null | undefined | MongoValue[] | { [key: string]: MongoValue }
+
 // Convert MongoDB ObjectId to string and handle dates
-const convertMongoData = (data: any): any => {
-  if (data === null || data === undefined) return data
+function convertMongoData<T>(data: MongoValue): T {
+  if (data === null || data === undefined) return data as T
 
   // Handle ObjectId
   if (data instanceof ObjectId) {
-    return data.toString()
+    return data.toString() as T
   }
 
   // Handle Date
   if (data instanceof Date) {
-    return data
+    return data as T
   }
 
   if (Array.isArray(data)) {
-    return data.map((item) => convertMongoData(item))
+    return data.map((item) => convertMongoData(item)) as T
   }
 
   if (typeof data === 'object' && data.constructor === Object) {
-    const converted: Record<string, any> = {}
+    const converted: Record<string, unknown> = {}
     for (const [key, value] of Object.entries(data)) {
       if (key === '_id' && value instanceof ObjectId) {
         converted.id = value.toString()
@@ -29,10 +31,10 @@ const convertMongoData = (data: any): any => {
         converted[key] = convertMongoData(value)
       }
     }
-    return converted
+    return converted as T
   }
 
-  return data
+  return data as T
 }
 
 // ---------- Collection helpers ----------
@@ -53,10 +55,19 @@ const getWorkoutLogsCollection = async () => {
 export const getRoutinesByUserId = async (userId: string): Promise<Routine[]> => {
   try {
     const collection = await getRoutinesCollection()
+    console.log('[getRoutinesByUserId] Querying for userId:', userId)
+    
     const routines = await collection
       .find({ userId })
       .sort({ updatedAt: -1 })
       .toArray()
+
+    console.log('[getRoutinesByUserId] Found', routines.length, 'routines')
+    if (routines.length === 0) {
+      // Debug: Check if there are any routines with different userId formats
+      const allRoutines = await collection.find({}).limit(5).toArray()
+      console.log('[getRoutinesByUserId] Sample routines userIds:', allRoutines.map(r => r.userId))
+    }
 
     return routines.map((doc) => {
       const data = convertMongoData(doc)
@@ -80,12 +91,15 @@ export const saveRoutine = async (routine: Routine): Promise<void> => {
 
     const collection = await getRoutinesCollection()
     
-    const routineData: any = {
+    const routineData: Omit<Routine, 'id'> & { _id?: ObjectId } = {
       ...routine,
       userId: routine.userId, // Ensure userId is set
       createdAt: routine.createdAt instanceof Date ? routine.createdAt : new Date(routine.createdAt),
       updatedAt: routine.updatedAt instanceof Date ? routine.updatedAt : new Date(routine.updatedAt),
     }
+    
+    // Remove id field for MongoDB storage
+    delete (routineData as Partial<Routine>).id
 
     // Remove undefined fields
     Object.keys(routineData).forEach(key => {
@@ -106,11 +120,11 @@ export const saveRoutine = async (routine: Routine): Promise<void> => {
   }
 }
 
-export const updateRoutine = async (routineId: string, userId: string, updates: Partial<Routine>): Promise<void> => {
+export const updateRoutine = async (routineId: string, userId: string, updates: Partial<Omit<Routine, 'id' | 'userId'>>): Promise<void> => {
   try {
     const collection = await getRoutinesCollection()
     
-    const updateData: any = { ...updates, updatedAt: new Date() }
+    const updateData: Partial<Routine> = { ...updates, updatedAt: new Date() }
     
     if (updates.createdAt) {
       updateData.createdAt = updates.createdAt instanceof Date ? updates.createdAt : new Date(updates.createdAt)
@@ -176,12 +190,15 @@ export const saveWorkoutLog = async (log: WorkoutLog): Promise<void> => {
   try {
     const collection = await getWorkoutLogsCollection()
     
-    const logData: any = {
+    const logData: Omit<WorkoutLog, 'id'> & { _id?: ObjectId } = {
       ...log,
       userId: log.userId,
       date: log.date instanceof Date ? log.date : new Date(log.date),
       startTime: log.startTime instanceof Date ? log.startTime : new Date(log.startTime),
     }
+    
+    // Remove id field for MongoDB storage
+    delete (logData as Partial<WorkoutLog>).id
 
     if (log.endTime) {
       logData.endTime = log.endTime instanceof Date ? log.endTime : new Date(log.endTime)
@@ -205,11 +222,11 @@ export const saveWorkoutLog = async (log: WorkoutLog): Promise<void> => {
   }
 }
 
-export const updateWorkoutLog = async (logId: string, userId: string, updates: Partial<WorkoutLog>): Promise<void> => {
+export const updateWorkoutLog = async (logId: string, userId: string, updates: Partial<Omit<WorkoutLog, 'id' | 'userId'>>): Promise<void> => {
   try {
     const collection = await getWorkoutLogsCollection()
     
-    const updateData: any = { ...updates }
+    const updateData: Partial<WorkoutLog> = { ...updates }
     
     if (updates.date) {
       updateData.date = updates.date instanceof Date ? updates.date : new Date(updates.date)
@@ -244,6 +261,17 @@ export const deleteWorkoutLog = async (logId: string, userId: string): Promise<v
     await collection.deleteOne({ id: logId, userId })
   } catch (error) {
     console.error('Error deleting workout log from MongoDB:', error)
+    throw error
+  }
+}
+
+export const deleteAllWorkoutLogs = async (userId: string): Promise<number> => {
+  try {
+    const collection = await getWorkoutLogsCollection()
+    const result = await collection.deleteMany({ userId })
+    return result.deletedCount || 0
+  } catch (error) {
+    console.error('Error deleting all workout logs from MongoDB:', error)
     throw error
   }
 }

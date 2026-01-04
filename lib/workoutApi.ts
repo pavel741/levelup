@@ -4,6 +4,7 @@
  */
 
 import type { Routine, WorkoutLog } from '@/types/workout'
+import { authenticatedFetch } from '@/lib/utils/api/api-client'
 
 const API_BASE = '/api/workouts'
 
@@ -69,7 +70,7 @@ export const subscribeToRoutines = (
 }
 
 export const saveRoutine = async (routine: Routine): Promise<void> => {
-  const response = await fetch(`${API_BASE}/routines`, {
+  const response = await authenticatedFetch(`${API_BASE}/routines`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -84,7 +85,7 @@ export const saveRoutine = async (routine: Routine): Promise<void> => {
 }
 
 export const updateRoutine = async (routineId: string, userId: string, updates: Partial<Routine>): Promise<void> => {
-  const response = await fetch(`${API_BASE}/routines/${routineId}`, {
+  const response = await authenticatedFetch(`${API_BASE}/routines/${routineId}`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -99,7 +100,7 @@ export const updateRoutine = async (routineId: string, userId: string, updates: 
 }
 
 export const deleteRoutine = async (routineId: string, userId: string): Promise<void> => {
-  const response = await fetch(`${API_BASE}/routines/${routineId}?userId=${userId}`, {
+  const response = await authenticatedFetch(`${API_BASE}/routines/${routineId}?userId=${userId}`, {
     method: 'DELETE',
   })
 
@@ -107,6 +108,33 @@ export const deleteRoutine = async (routineId: string, userId: string): Promise<
     const error = await response.json()
     throw new Error(error.error || 'Failed to delete routine')
   }
+}
+
+export interface ImproveRoutineResult {
+  routine: Routine
+  changes: Array<{
+    type: 'exercise_added' | 'rest_adjusted' | 'sets_adjusted' | 'exercise_removed'
+    description: string
+    details?: unknown
+  }>
+  summary: string
+}
+
+export const improveRoutine = async (routineId: string): Promise<ImproveRoutineResult> => {
+  const response = await authenticatedFetch(`${API_BASE}/routines/${routineId}/improve`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to improve routine')
+  }
+
+  const result = await response.json()
+  return result.data || result
 }
 
 // Workout Logs
@@ -199,7 +227,7 @@ export const subscribeToWorkoutLogs = (
 }
 
 export const saveWorkoutLog = async (log: WorkoutLog): Promise<void> => {
-  const response = await fetch(`${API_BASE}/logs`, {
+  const response = await authenticatedFetch(`${API_BASE}/logs`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -214,7 +242,7 @@ export const saveWorkoutLog = async (log: WorkoutLog): Promise<void> => {
 }
 
 export const updateWorkoutLog = async (logId: string, userId: string, updates: Partial<WorkoutLog>): Promise<void> => {
-  const response = await fetch(`${API_BASE}/logs/${logId}`, {
+  const response = await authenticatedFetch(`${API_BASE}/logs/${logId}`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -229,7 +257,7 @@ export const updateWorkoutLog = async (logId: string, userId: string, updates: P
 }
 
 export const deleteWorkoutLog = async (logId: string, userId: string): Promise<void> => {
-  const response = await fetch(`${API_BASE}/logs/${logId}?userId=${userId}`, {
+  const response = await authenticatedFetch(`${API_BASE}/logs/${logId}?userId=${userId}`, {
     method: 'DELETE',
   })
 
@@ -237,5 +265,22 @@ export const deleteWorkoutLog = async (logId: string, userId: string): Promise<v
     const error = await response.json()
     throw new Error(error.error || 'Failed to delete workout log')
   }
+}
+
+export const deleteAllWorkoutLogs = async (userId: string): Promise<number> => {
+  const response = await authenticatedFetch(`${API_BASE}/logs/delete-all`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  })
+
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to delete all workout logs')
+  }
+
+  const result = await response.json()
+  return result.data?.deletedCount || 0
 }
 

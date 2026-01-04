@@ -1,7 +1,6 @@
 import { Timestamp } from 'firebase/firestore'
 
-// Generic, forward-compatible types based on the Budget_app schema.
-// Firestore is schemaless, so we keep these flexible and add fields as needed.
+
 
 export interface FinanceTransaction {
   id: string
@@ -13,29 +12,24 @@ export interface FinanceTransaction {
   type?: 'income' | 'expense' | 'transfer' | string
   currency?: string
   tags?: string[]
-  // Allow extra fields from legacy data
   [key: string]: any
 }
 
 export interface FinanceCategories {
-  // e.g. { "Groceries": { limit: 300, color: "#..." }, ... }
   [category: string]: any
 }
 
 export interface FinanceBudgetGoals {
-  // e.g. { monthlySavingsTarget: 500, emergencyFundTarget: 3000, ... }
   [key: string]: any
 }
 
 export interface FinanceSettings {
-  // Arbitrary app settings from the budget app (language, defaults, toggles, etc.)
   [key: string]: any
 }
 
 export interface FinanceReconciliationRecord {
   id: string
   timestamp: string | Date | Timestamp
-  // other reconciliation fields (balances, notes, etc.)
   [key: string]: any
 }
 
@@ -47,7 +41,64 @@ export interface FinanceRecurringTransaction {
   description?: string
   interval?: string
   nextDate?: string | Date | Timestamp
+  dueDate?: string | Date | Timestamp // Bill due date
+  reminderDaysBefore?: number // Days before due date to send reminder
+  isPaid?: boolean // Whether this bill has been paid
+  lastPaidDate?: string | Date | Timestamp // Last payment date
+  paymentHistory?: Array<{
+    date: string | Date | Timestamp
+    amount: number
+    notes?: string
+  }>
   [key: string]: any
+}
+
+export interface SavingsGoal {
+  id: string
+  userId: string
+  name: string
+  targetAmount: number
+  currentAmount: number
+  targetDate?: string | Date | Timestamp
+  category?: string // e.g., 'vacation', 'emergency', 'house', etc.
+  icon?: string // Icon identifier
+  color?: string // Color for UI
+  createdAt: Date | string
+  updatedAt: Date | string
+}
+
+export interface BudgetCategoryLimit {
+  category: string
+  monthlyLimit: number
+  weeklyLimit?: number
+  alertThreshold?: number // Percentage (e.g., 80) to alert when reached
+}
+
+export interface BudgetAnalysis {
+  category: string
+  limit: number
+  spent: number
+  remaining: number
+  percentageUsed: number
+  isOverBudget: boolean
+  period: 'monthly' | 'weekly'
+  periodStart: Date
+  periodEnd: Date
+}
+
+export interface ExpenseForecast {
+  period: 'month' | 'quarter' | 'year'
+  predictedExpenses: number
+  predictedIncome: number
+  predictedSavings: number
+  confidence: number // 0-100, confidence in prediction
+  basedOnMonths: number // Number of months of data used
+  breakdown: Array<{
+    category: string
+    predictedAmount: number
+    averageAmount: number
+    trend: 'increasing' | 'decreasing' | 'stable'
+  }>
 }
 
 

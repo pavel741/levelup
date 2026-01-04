@@ -7,6 +7,7 @@ import {
   getDocs,
   getDoc,
   query,
+  where,
   orderBy,
   limit,
   startAfter,
@@ -466,6 +467,149 @@ export const batchDeleteTransactions = async (
       await batch.commit()
     })
   }
+}
+
+export const deleteTransactionsByDateRange = async (
+  userId: string,
+  beforeDate: Date
+): Promise<number> => {
+  if (!db) {
+    throw new Error('Firestore is not initialized')
+  }
+
+  const dbInstance = db
+  const transactionsRef = getTransactionsRef(userId)
+  const batchSize = 500
+  let deletedCount = 0
+  let lastDoc: QueryDocumentSnapshot | null = null
+
+  // Query transactions before the specified date
+  // Note: Firestore requires an index for queries with where + orderBy on different fields
+  // We'll query by date only and filter userId in memory if needed, or use date field for both
+  const beforeTimestamp = Timestamp.fromDate(beforeDate)
+
+  while (true) {
+    let transactionsQuery
+    if (lastDoc) {
+      transactionsQuery = query(
+        transactionsRef,
+        where('date', '<', beforeTimestamp),
+        orderBy('date', 'desc'),
+        startAfter(lastDoc),
+        limit(batchSize)
+      )
+    } else {
+      transactionsQuery = query(
+        transactionsRef,
+        where('date', '<', beforeTimestamp),
+        orderBy('date', 'desc'),
+        limit(batchSize)
+      )
+    }
+
+    const snapshot = await getDocs(transactionsQuery)
+    
+    if (snapshot.empty) {
+      break
+    }
+
+    // Filter by userId and delete in batches
+    const userDocs = snapshot.docs.filter(doc => doc.data().userId === userId)
+    
+    if (userDocs.length === 0) {
+      // No more matching docs
+      break
+    }
+
+    // Delete in batches of 500 (Firestore batch limit)
+    for (let i = 0; i < userDocs.length; i += batchSize) {
+      const chunk = userDocs.slice(i, i + batchSize)
+      
+      await retryOperation(async () => {
+        const batch = writeBatch(dbInstance)
+        chunk.forEach((doc) => {
+          batch.delete(doc.ref)
+        })
+        await batch.commit()
+        deletedCount += chunk.length
+      })
+    }
+
+    // Update lastDoc for pagination
+    lastDoc = snapshot.docs[snapshot.docs.length - 1]
+
+    // If we got fewer docs than batchSize, we're done
+    if (snapshot.docs.length < batchSize) {
+      break
+    }
+  }
+
+  return deletedCount
+}
+
+export const deleteAllTransactions = async (
+  userId: string
+): Promise<number> => {
+  if (!db) {
+    throw new Error('Firestore is not initialized')
+  }
+
+  const dbInstance = db
+  const transactionsRef = getTransactionsRef(userId)
+  const batchSize = 500
+  let deletedCount = 0
+  let lastDoc: QueryDocumentSnapshot | null = null
+
+  // Query all transactions for this user
+  while (true) {
+    let transactionsQuery
+    if (lastDoc) {
+      transactionsQuery = query(
+        transactionsRef,
+        where('userId', '==', userId),
+        orderBy('date', 'desc'),
+        startAfter(lastDoc),
+        limit(batchSize)
+      )
+    } else {
+      transactionsQuery = query(
+        transactionsRef,
+        where('userId', '==', userId),
+        orderBy('date', 'desc'),
+        limit(batchSize)
+      )
+    }
+
+    const snapshot = await getDocs(transactionsQuery)
+    
+    if (snapshot.empty) {
+      break
+    }
+
+    // Delete in batches of 500 (Firestore batch limit)
+    for (let i = 0; i < snapshot.docs.length; i += batchSize) {
+      const chunk = snapshot.docs.slice(i, i + batchSize)
+      
+      await retryOperation(async () => {
+        const batch = writeBatch(dbInstance)
+        chunk.forEach((doc) => {
+          batch.delete(doc.ref)
+        })
+        await batch.commit()
+        deletedCount += chunk.length
+      })
+    }
+
+    // Update lastDoc for pagination
+    lastDoc = snapshot.docs[snapshot.docs.length - 1]
+
+    // If we got fewer docs than batchSize, we're done
+    if (snapshot.docs.length < batchSize) {
+      break
+    }
+  }
+
+  return deletedCount
 }
 
 export const getTransaction = async (

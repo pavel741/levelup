@@ -2,8 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
-import { Dumbbell, TrendingUp, AlertCircle, CheckCircle, BarChart3, Calendar, Target, Activity, TrendingDown } from 'lucide-react'
+import { useWorkoutStore } from '@/store/useWorkoutStore'
+import { Dumbbell, TrendingUp, AlertCircle, CheckCircle, BarChart3, Calendar, Target, Activity, TrendingDown, Sparkles, X } from 'lucide-react'
 import type { WorkoutHistoryInsights } from '@/scripts/analyzeWorkoutHistory'
+import ProgressiveOverloadChart from '@/components/ProgressiveOverloadChart'
+import { improveRoutine, type ImproveRoutineResult } from '@/lib/workoutApi'
+import { subscribeToRoutines } from '@/lib/workoutApi'
 
 interface MuscleGroupCoverage {
   muscleGroup: string
@@ -13,35 +17,54 @@ interface MuscleGroupCoverage {
   totalSets: number
 }
 
+interface Improvement {
+  category: string
+  priority: 'high' | 'medium' | 'low'
+  issue: string
+  recommendation: string
+  suggestedExercises?: Array<{
+    id: string
+    name: string
+    description: string
+    difficulty: string
+    equipment: string[]
+    reason: string
+  }>
+}
+
 interface RoutineAnalysis {
   routineId: string
   routineName: string
   muscleGroups: MuscleGroupCoverage[]
-  bicepsAnalysis: {
-    hasDirectBicepsWork: boolean
-    hasIndirectBicepsWork: boolean
-    bicepsExercises: string[]
-    indirectBicepsExercises: string[]
-    totalBicepsSets: number
-    recommendation: 'add' | 'sufficient' | 'excessive'
-    suggestedExercises: Array<{
-      id: string
-      name: string
-      description: string
-      difficulty: string
-      equipment: string[]
-    }>
-  }
+  exerciseAnalysis: Array<{
+    exerciseId: string
+    exerciseName: string
+    sets: number
+    averageReps: number
+    restTime: number
+    isCompound: boolean
+    isIsolation: boolean
+    muscleGroups: string[]
+  }>
+  improvements: Improvement[]
+  overallScore: number
+  strengths: string[]
+  weaknesses: string[]
   overallRecommendations: string[]
   report: string
 }
 
 export default function RoutineAnalyzer() {
   const { user } = useFirestoreStore()
+  const { workoutLogs, loadWorkoutLogs } = useWorkoutStore()
   const [analyses, setAnalyses] = useState<RoutineAnalysis[]>([])
   const [historyInsights, setHistoryInsights] = useState<WorkoutHistoryInsights | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [selectedExerciseForChart, setSelectedExerciseForChart] = useState<string | null>(null)
+  const [improvingRoutineId, setImprovingRoutineId] = useState<string | null>(null)
+  const [improvementPreview, setImprovementPreview] = useState<ImproveRoutineResult | null>(null)
+  const [showPreviewModal, setShowPreviewModal] = useState(false)
 
   const analyzeRoutines = async () => {
     if (!user?.id) return
@@ -50,14 +73,33 @@ export default function RoutineAnalyzer() {
     setError(null)
 
     try {
-      const response = await fetch(`/api/routines/analyze?userId=${user.id}`)
+      const { authenticatedFetch } = await import('@/lib/utils')
+      const response = await authenticatedFetch('/api/routines/analyze')
+      
       if (!response.ok) {
-        throw new Error('Failed to analyze routines')
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }))
+        console.error('Failed to analyze routines:', response.status, errorData)
+        throw new Error(errorData.message || `Failed to analyze routines: ${response.status}`)
       }
 
-      const data = await response.json()
+      const responseData = await response.json()
+      console.log('Routine analysis response:', responseData)
+      
+      // Handle response wrapped in 'data' property (from createGetHandler)
+      const data = responseData.data || responseData
+      console.log('Extracted data:', data)
+      console.log('Analyses array:', data.analyses)
+      console.log('Analyses length:', data.analyses?.length)
+      console.log('History insights:', data.historyInsights)
+      console.log('Summary:', data.summary)
+      
       setAnalyses(data.analyses || [])
       setHistoryInsights(data.historyInsights || null)
+      
+      // Debug: Log state after setting
+      setTimeout(() => {
+        console.log('State after update - analyses:', data.analyses?.length, 'historyInsights:', !!data.historyInsights)
+      }, 100)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
     } finally {
@@ -65,11 +107,45 @@ export default function RoutineAnalyzer() {
     }
   }
 
+  const handleImproveRoutine = async (routineId: string) => {
+    if (!user?.id) return
+
+    setImprovingRoutineId(routineId)
+    setError(null)
+
+    try {
+      const result = await improveRoutine(routineId)
+      setImprovementPreview(result)
+      setShowPreviewModal(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to improve routine')
+    } finally {
+      setImprovingRoutineId(null)
+    }
+  }
+
+  const applyImprovements = async () => {
+    if (!improvementPreview || !user?.id) return
+
+    try {
+      // The improvements are already applied on the server
+      // Just refresh the routines and analysis
+      setShowPreviewModal(false)
+      setImprovementPreview(null)
+      
+      // Refresh analysis to show updated routine
+      await analyzeRoutines()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to apply improvements')
+    }
+  }
+
   useEffect(() => {
     if (user?.id) {
       analyzeRoutines()
+      loadWorkoutLogs(user.id)
     }
-  }, [user?.id])
+  }, [user?.id, loadWorkoutLogs])
 
   if (!user) {
     return null
@@ -102,7 +178,7 @@ export default function RoutineAnalyzer() {
         </div>
       )}
 
-      {analyses.length === 0 && !loading && !historyInsights && (
+      {analyses.length === 0 && !loading && !historyInsights && !error && (
         <div className="p-8 text-center text-gray-500 dark:text-gray-400">
           No routines found. Create a routine to get analysis and suggestions.
         </div>
@@ -215,13 +291,28 @@ export default function RoutineAnalyzer() {
                 <div className="text-sm font-medium text-gray-900 dark:text-white mb-2">
                   Strength Progression (Last 5 Workouts):
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1 mb-4">
                   {historyInsights.progressIndicators.strengthProgression.map((prog, idx) => (
-                    <div key={idx} className="text-sm text-gray-700 dark:text-gray-300">
+                    <div 
+                      key={idx} 
+                      className="text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
+                      onClick={() => setSelectedExerciseForChart(prog.exerciseId)}
+                    >
                       <span className="font-medium">{prog.name}:</span> {prog.progression}
+                      <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">(click to view chart)</span>
                     </div>
                   ))}
                 </div>
+                
+                {/* Progressive Overload Chart */}
+                {selectedExerciseForChart && (
+                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <ProgressiveOverloadChart 
+                      workoutLogs={workoutLogs} 
+                      exerciseId={selectedExerciseForChart}
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -298,23 +389,62 @@ export default function RoutineAnalyzer() {
       {analyses.map((analysis) => (
         <div
           key={analysis.routineId}
-          className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 space-y-4"
+          className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 space-y-6"
         >
+          {/* Header with Score */}
           <div className="flex items-center justify-between">
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-              {analysis.routineName}
-            </h3>
-            {analysis.bicepsAnalysis.recommendation === 'add' && (
-              <span className="px-3 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 rounded-full text-sm font-medium flex items-center gap-1">
-                <AlertCircle className="w-4 h-4" />
-                Needs Biceps Work
-              </span>
+            <div>
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                {analysis.routineName}
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                Comprehensive Routine Analysis
+              </p>
+            </div>
+            <div className="text-right">
+              <div className={`text-3xl font-bold ${
+                analysis.overallScore >= 85 ? 'text-green-600 dark:text-green-400' :
+                analysis.overallScore >= 70 ? 'text-yellow-600 dark:text-yellow-400' :
+                'text-red-600 dark:text-red-400'
+              }`}>
+                {analysis.overallScore}
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">/ 100</div>
+            </div>
+          </div>
+
+          {/* Strengths & Weaknesses */}
+          <div className="grid md:grid-cols-2 gap-4">
+            {analysis.strengths.length > 0 && (
+              <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+                  <h4 className="font-semibold text-gray-900 dark:text-white">Strengths</h4>
+                </div>
+                <ul className="space-y-1">
+                  {analysis.strengths.map((strength, idx) => (
+                    <li key={idx} className="text-sm text-gray-700 dark:text-gray-300">
+                      • {strength}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
-            {analysis.bicepsAnalysis.recommendation === 'sufficient' && (
-              <span className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 rounded-full text-sm font-medium flex items-center gap-1">
-                <CheckCircle className="w-4 h-4" />
-                Biceps Coverage Good
-              </span>
+            
+            {analysis.weaknesses.length > 0 && (
+              <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                  <h4 className="font-semibold text-gray-900 dark:text-white">Areas for Improvement</h4>
+                </div>
+                <ul className="space-y-1">
+                  {analysis.weaknesses.map((weakness, idx) => (
+                    <li key={idx} className="text-sm text-gray-700 dark:text-gray-300">
+                      • {weakness}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
 
@@ -324,22 +454,37 @@ export default function RoutineAnalyzer() {
               🎯 Muscle Group Coverage
             </h4>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-              {analysis.muscleGroups.slice(0, 12).map((mg) => (
-                <div
-                  key={mg.muscleGroup}
-                  className="p-2 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700"
-                >
-                  <div className="text-xs font-medium text-gray-900 dark:text-white capitalize">
-                    {mg.muscleGroup}
+              {analysis.muscleGroups.slice(0, 12).map((mg) => {
+                const minSets = 6 // Default minimum
+                const isAdequate = mg.totalSets >= minSets
+                return (
+                  <div
+                    key={mg.muscleGroup}
+                    className={`p-2 rounded border ${
+                      isAdequate
+                        ? 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                        : 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1">
+                      {isAdequate ? (
+                        <CheckCircle className="w-3 h-3 text-green-600 dark:text-green-400" />
+                      ) : (
+                        <AlertCircle className="w-3 h-3 text-yellow-600 dark:text-yellow-400" />
+                      )}
+                      <div className="text-xs font-medium text-gray-900 dark:text-white capitalize">
+                        {mg.muscleGroup}
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                      {mg.totalSets} sets ({mg.frequency}x/week)
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-500 mt-0.5">
+                      {mg.directWork > 0 ? 'Direct' : 'Indirect'}
+                    </div>
                   </div>
-                  <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                    {mg.totalSets} sets
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-500 mt-0.5">
-                    {mg.directWork > 0 ? 'Direct' : 'Indirect'}
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
             {analysis.muscleGroups.length > 12 && (
               <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
@@ -348,83 +493,114 @@ export default function RoutineAnalyzer() {
             )}
           </div>
 
-          {/* Biceps Analysis */}
-          <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 space-y-3">
-            <div className="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white">
-              <Dumbbell className="w-5 h-5" />
-              Biceps Analysis
+          {/* Improve Routine Button */}
+          {analysis.improvements.filter(imp => imp.priority === 'high' || imp.priority === 'medium').length > 0 && (
+            <div className="flex justify-end">
+              <button
+                onClick={() => handleImproveRoutine(analysis.routineId)}
+                disabled={improvingRoutineId === analysis.routineId || loading}
+                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 shadow-lg"
+              >
+                {improvingRoutineId === analysis.routineId ? (
+                  <>
+                    <Activity className="w-4 h-4 animate-spin" />
+                    Improving...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    Auto-Improve Routine
+                  </>
+                )}
+              </button>
             </div>
+          )}
 
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-gray-600 dark:text-gray-400">Direct Work:</span>
-                <span className={`ml-2 font-medium ${
-                  analysis.bicepsAnalysis.hasDirectBicepsWork
-                    ? 'text-green-600 dark:text-green-400'
-                    : 'text-red-600 dark:text-red-400'
-                }`}>
-                  {analysis.bicepsAnalysis.hasDirectBicepsWork ? 'Yes' : 'No'}
-                </span>
-              </div>
-              <div>
-                <span className="text-gray-600 dark:text-gray-400">Total Sets:</span>
-                <span className="ml-2 font-medium text-gray-900 dark:text-white">
-                  {analysis.bicepsAnalysis.totalBicepsSets}
-                </span>
-              </div>
-            </div>
-
-            {analysis.bicepsAnalysis.bicepsExercises.length > 0 && (
-              <div>
-                <span className="text-gray-600 dark:text-gray-400 text-sm">Direct Exercises: </span>
-                <span className="text-gray-900 dark:text-white text-sm font-medium">
-                  {analysis.bicepsAnalysis.bicepsExercises.join(', ')}
-                </span>
-              </div>
-            )}
-
-            {analysis.bicepsAnalysis.indirectBicepsExercises.length > 0 && (
-              <div>
-                <span className="text-gray-600 dark:text-gray-400 text-sm">Indirect Exercises: </span>
-                <span className="text-gray-900 dark:text-white text-sm font-medium">
-                  {analysis.bicepsAnalysis.indirectBicepsExercises.join(', ')}
-                </span>
-              </div>
-            )}
-
-            {/* Suggested Exercises */}
-            {analysis.bicepsAnalysis.recommendation === 'add' &&
-             analysis.bicepsAnalysis.suggestedExercises.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
-                  💡 Suggested Dumbbell Biceps Exercises:
-                </h4>
-                <div className="space-y-2">
-                  {analysis.bicepsAnalysis.suggestedExercises.map((ex) => (
-                    <div
-                      key={ex.id}
-                      className="p-3 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700"
-                    >
-                      <div className="font-medium text-gray-900 dark:text-white">
-                        {ex.name}
-                      </div>
-                      <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                        {ex.description}
-                      </div>
-                      <div className="flex items-center gap-2 mt-2 text-xs">
-                        <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 rounded">
-                          {ex.difficulty}
-                        </span>
-                        <span className="text-gray-500 dark:text-gray-400">
-                          {ex.equipment.join(', ')}
-                        </span>
-                      </div>
+          {/* Comprehensive Improvements */}
+          {analysis.improvements.length > 0 && (
+            <div className="space-y-4">
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                <Target className="w-5 h-5" />
+                Improvement Suggestions
+              </h4>
+              
+              {/* Group by category */}
+              {Array.from(new Set(analysis.improvements.map(imp => imp.category))).map(category => {
+                const categoryImprovements = analysis.improvements.filter(imp => imp.category === category)
+                return (
+                  <div key={category} className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4">
+                    <h5 className="font-semibold text-gray-900 dark:text-white mb-3">
+                      {category}
+                    </h5>
+                    <div className="space-y-4">
+                      {categoryImprovements.map((improvement, idx) => (
+                        <div
+                          key={idx}
+                          className={`p-4 rounded-lg border ${
+                            improvement.priority === 'high'
+                              ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                              : improvement.priority === 'medium'
+                              ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800'
+                              : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+                          }`}
+                        >
+                          <div className="flex items-start gap-2 mb-2">
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${
+                              improvement.priority === 'high'
+                                ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                : improvement.priority === 'medium'
+                                ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                                : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                            }`}>
+                              {improvement.priority.toUpperCase()}
+                            </span>
+                          </div>
+                          <div className="text-sm font-medium text-gray-900 dark:text-white mb-1">
+                            {improvement.issue}
+                          </div>
+                          <div className="text-sm text-gray-700 dark:text-gray-300">
+                            {improvement.recommendation}
+                          </div>
+                          
+                          {/* Suggested Exercises */}
+                          {improvement.suggestedExercises && improvement.suggestedExercises.length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-gray-300 dark:border-gray-700">
+                              <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Suggested Exercises:
+                              </div>
+                              <div className="space-y-2">
+                                {improvement.suggestedExercises.map((ex) => (
+                                  <div
+                                    key={ex.id}
+                                    className="p-2 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700"
+                                  >
+                                    <div className="font-medium text-sm text-gray-900 dark:text-white">
+                                      {ex.name}
+                                    </div>
+                                    <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                                      {ex.reason}
+                                    </div>
+                                    <div className="flex items-center gap-2 mt-1 text-xs">
+                                      <span className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded">
+                                        {ex.difficulty}
+                                      </span>
+                                      <span className="text-gray-500 dark:text-gray-400">
+                                        {ex.equipment.join(', ')}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
 
           {/* Recommendations */}
           {analysis.overallRecommendations.length > 0 && (
@@ -443,6 +619,93 @@ export default function RoutineAnalyzer() {
           )}
         </div>
       ))}
+
+      {/* Improvement Preview Modal */}
+      {showPreviewModal && improvementPreview && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 flex items-center justify-between">
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                Routine Improvements Preview
+              </h3>
+              <button
+                onClick={() => {
+                  setShowPreviewModal(false)
+                  setImprovementPreview(null)
+                }}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  {improvementPreview.summary}
+                </p>
+              </div>
+
+              {improvementPreview.changes.length > 0 && (
+                <div>
+                  <h4 className="font-semibold text-gray-900 dark:text-white mb-3">
+                    Changes to be applied:
+                  </h4>
+                  <div className="space-y-2">
+                    {improvementPreview.changes.map((change, idx) => (
+                      <div
+                        key={idx}
+                        className={`p-3 rounded-lg border ${
+                          change.type === 'exercise_added'
+                            ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                            : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+                        }`}
+                      >
+                        <div className="flex items-start gap-2">
+                          {change.type === 'exercise_added' ? (
+                            <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                          ) : (
+                            <Activity className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                          )}
+                          <div className="flex-1">
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">
+                              {change.description}
+                            </div>
+                            {change.details && typeof change.details === 'object' && 'reason' in change.details && (
+                              <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                                Reason: {change.details.reason as string}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <button
+                  onClick={applyImprovements}
+                  className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg transition-all font-medium"
+                >
+                  Apply Improvements
+                </button>
+                <button
+                  onClick={() => {
+                    setShowPreviewModal(false)
+                    setImprovementPreview(null)
+                  }}
+                  className="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

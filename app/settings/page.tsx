@@ -306,15 +306,6 @@ export default function SettingsPage() {
                       <span className="absolute top-1 left-1 w-4 h-4 bg-white rounded-full"></span>
                     </button>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-white">Leaderboard Visibility</p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Show your rank on the leaderboard</p>
-                    </div>
-                    <button className="relative w-12 h-6 bg-blue-500 rounded-full">
-                      <span className="absolute top-1 right-1 w-4 h-4 bg-white rounded-full"></span>
-                    </button>
-                  </div>
                 </div>
               </div>
 

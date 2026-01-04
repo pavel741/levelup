@@ -114,8 +114,9 @@ export async function getDatabase(): Promise<Db> {
     }
     
     return client.db(dbName)
-  } catch (error: any) {
-    console.error('❌ Error getting MongoDB database:', error.message)
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    console.error('❌ Error getting MongoDB database:', errorMessage)
     
     if (error.message?.includes('ENOTFOUND') || error.message?.includes('querySrv') || error.message?.includes('getaddrinfo')) {
       console.error('💡 DNS resolution failed. Possible causes:')
@@ -131,7 +132,7 @@ export async function getDatabase(): Promise<Db> {
       throw new Error('MongoDB DNS resolution failed. Your MongoDB Atlas cluster may be paused. Please check MongoDB Atlas dashboard and resume the cluster if needed.')
     }
     
-    if (error.message?.includes('ETIMEDOUT') || error.message?.includes('timeout') || error.message?.includes('Server selection timed out')) {
+    if (errorMessage.includes('ETIMEDOUT') || errorMessage.includes('timeout') || errorMessage.includes('Server selection timed out')) {
       console.error('💡 MongoDB connection timeout detected.')
       console.error('💡 Common causes:')
       console.error('   1. Your IP address is not whitelisted in MongoDB Atlas')
@@ -146,7 +147,7 @@ export async function getDatabase(): Promise<Db> {
       throw new Error('MongoDB connection timeout. Please check your network connection, IP whitelist settings, and ensure your MongoDB Atlas cluster is running.')
     }
     
-    if (error.message?.includes('ReplicaSetNoPrimary') || error.message?.includes('no primary')) {
+    if (errorMessage.includes('ReplicaSetNoPrimary') || errorMessage.includes('no primary')) {
       console.error('💡 MongoDB replica set has no primary server.')
       console.error('💡 This usually means:')
       console.error('   1. MongoDB Atlas cluster is paused or unavailable')

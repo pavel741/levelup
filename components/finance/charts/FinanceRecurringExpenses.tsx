@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 import type { FinanceTransaction } from '@/types/finance'
-import { format, differenceInDays, isWithinInterval, startOfMonth, endOfMonth, subMonths } from 'date-fns'
+import { format, differenceInDays } from 'date-fns'
 import { Repeat, Calendar } from 'lucide-react'
 
 interface Props {
@@ -33,11 +33,7 @@ export function FinanceRecurringExpenses({ transactions, months = 6 }: Props) {
       if (!maxDate || txDate > maxDate) maxDate = txDate
     })
     
-    // If no transactions, use current date as fallback
-    const referenceDate = maxDate || new Date()
-    const startDate = startOfMonth(subMonths(referenceDate, months))
-    const endDate = endOfMonth(referenceDate)
-
+    // Use all provided transactions (they're already filtered by timeRange from analytics page)
     // Group transactions by normalized description and category
     const transactionGroups: Record<string, FinanceTransaction[]> = {}
 
@@ -48,8 +44,7 @@ export function FinanceRecurringExpenses({ transactions, months = 6 }: Props) {
       const isExpense = type === 'expense' || amount < 0
       if (!isExpense) return
 
-      const txDate = typeof tx.date === 'string' ? new Date(tx.date) : (tx.date as Date)
-      if (!isWithinInterval(txDate, { start: startDate, end: endDate })) return
+      // Use all transactions - no date filtering needed
 
       // Normalize description (remove dates, card numbers, etc.)
       let normalizedDesc = (tx.description || '').trim()

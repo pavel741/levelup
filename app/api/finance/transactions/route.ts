@@ -16,7 +16,11 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const limitParam = searchParams.get('limit')
-    const limit = limitParam ? parseInt(limitParam) : 100 // Default to 100 for faster initial load
+    const forSummary = searchParams.get('forSummary') === 'true'
+    
+    // If forSummary=true or limit is explicitly 0, load all transactions
+    // Otherwise default to 100 for faster initial load
+    const limit = limitParam ? parseInt(limitParam) : (forSummary ? 0 : 100)
 
     // Use limit in query for better performance (avoids loading all data)
     const transactions = limit > 0 

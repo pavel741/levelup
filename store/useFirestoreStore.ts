@@ -4,7 +4,7 @@ import { format } from 'date-fns'
 import { checkAndUnlockAchievements } from '@/lib/achievements'
 import { validateMissedReason } from '@/lib/missedHabitValidation'
 import { getAllTransactionsForSummary } from '@/lib/financeApi'
-import { getWorkoutLogs } from '@/lib/workoutApi'
+import { getWorkoutLogs, deleteAllWorkoutLogs } from '@/lib/workoutApi'
 import type { FinanceTransaction } from '@/types/finance'
 import type { WorkoutLog } from '@/types/workout'
 import {
@@ -36,8 +36,8 @@ interface AppState {
   habits: Habit[]
   addHabit: (habit: Habit) => Promise<void>
   updateHabit: (id: string, updates: Partial<Habit>) => Promise<void>
-  completeHabit: (id: string) => Promise<void>
-  uncompleteHabit: (id: string) => Promise<void>
+  completeHabit: (id: string, date?: string) => Promise<void>
+  uncompleteHabit: (id: string, date?: string) => Promise<void>
   markHabitMissed: (id: string, date: string, reason: string) => Promise<void>
   updateMissedReasonValidity: (habitId: string, date: string, valid: boolean) => Promise<void>
   deleteHabit: (id: string) => Promise<void>
@@ -236,10 +236,17 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
     await updateHabitFirestore(id, updates)
     // Firestore subscription will update the state
   },
-  completeHabit: async (id) => {
-    const today = format(new Date(), 'yyyy-MM-dd')
+  completeHabit: async (id, date) => {
+    const targetDate = date || format(new Date(), 'yyyy-MM-dd')
     const habit = get().habits.find((h) => h.id === id)
     if (!habit) return
+
+    // Validate date is not in the future
+    const today = format(new Date(), 'yyyy-MM-dd')
+    if (targetDate > today) {
+      console.log(`Cannot complete habit "${habit.name}" for future date: ${targetDate}`)
+      return
+    }
 
     // Check if habit has started (respect startDate if set)
     if (habit.startDate) {
@@ -247,49 +254,79 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
         ? habit.startDate 
         : new Date(habit.startDate)
       const startDateStr = format(startDate, 'yyyy-MM-dd')
-      if (today < startDateStr) {
+      if (targetDate < startDateStr) {
         console.log(`Cannot complete habit "${habit.name}" before start date: ${startDateStr}`)
         return
       }
     }
 
+    // Check if date is already completed
+    if (habit.completedDates.includes(targetDate)) {
+      console.log(`Habit "${habit.name}" is already completed for date: ${targetDate}`)
+      return
+    }
+
     const targetCount = habit.targetCountPerDay || 1
-    const currentCount = habit.completionsPerDay?.[today] || 0
+    const currentCount = habit.completionsPerDay?.[targetDate] || 0
     
-    // Check if already reached target for today
+    // Check if already reached target for this date
     if (currentCount >= targetCount) {
       return
     }
 
-    // Increment completion count for today
+    // Increment completion count for the target date
     const newCount = currentCount + 1
     const updatedCompletionsPerDay = {
       ...(habit.completionsPerDay || {}),
-      [today]: newCount,
+      [targetDate]: newCount,
     }
 
     // If we've reached the target count, mark the date as completed
-    const wasCompleted = habit.completedDates.includes(today)
+    const wasCompleted = habit.completedDates.includes(targetDate)
     const updatedDates = newCount >= targetCount && !wasCompleted
-      ? [...habit.completedDates, today]
+      ? [...habit.completedDates, targetDate]
       : habit.completedDates
+
+    // Remove from missedDates if completing a previously missed date
+    let updatedMissedDates = habit.missedDates || []
+    if (updatedMissedDates.some((m) => m.date === targetDate)) {
+      updatedMissedDates = updatedMissedDates.filter((m) => m.date !== targetDate)
+    }
+
+    // Optimistically update local state immediately for instant UI feedback
+    const updatedHabit = {
+      ...habit,
+      completionsPerDay: updatedCompletionsPerDay,
+      completedDates: updatedDates,
+      missedDates: updatedMissedDates.length !== (habit.missedDates?.length || 0) ? updatedMissedDates : habit.missedDates,
+    }
+    set({
+      habits: get().habits.map((h) => h.id === id ? updatedHabit : h),
+    })
 
     await updateHabitFirestore(id, { 
       completionsPerDay: updatedCompletionsPerDay,
       completedDates: updatedDates,
+      ...(updatedMissedDates.length !== (habit.missedDates?.length || 0) ? { missedDates: updatedMissedDates } : {}),
     })
 
-    // Add XP only when target is reached for the first time today
+    // Add XP only when target is reached for the first time for this date
     const user = get().user
     if (user && newCount >= targetCount && !wasCompleted) {
       await get().addXP(habit.xpReward)
       
-      // Update daily stats - track habits completed
-      const todayStats = get().dailyStats.find((s) => s.date === today)
-      const currentHabitsCompleted = todayStats?.habitsCompleted || 0
-      await get().updateDailyStats({
-        habitsCompleted: currentHabitsCompleted + 1,
-      })
+      // Update daily stats - track habits completed for the target date
+      // Note: updateDailyStats updates today's stats, so for past dates we'll update today's stats
+      // This is acceptable as retroactive completions are still achievements
+      const targetDateStats = get().dailyStats.find((s) => s.date === targetDate)
+      const currentHabitsCompleted = targetDateStats?.habitsCompleted || (targetDate === today ? (get().dailyStats.find((s) => s.date === today)?.habitsCompleted || 0) : 0)
+      
+      // Only update stats if completing today, or if we have stats for the target date
+      if (targetDate === today || targetDateStats) {
+        await get().updateDailyStats({
+          habitsCompleted: currentHabitsCompleted + 1,
+        })
+      }
 
       // Update streak based on actual consecutive days
       // Recalculate streak from all habits
@@ -316,10 +353,10 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
       )
 
       for (const challenge of activeChallenges) {
-        // Check if user already completed this challenge today
+        // Check if user already completed this challenge for the target date
         const userCompletedDates = challenge.completedDates?.[user.id] || []
-        if (userCompletedDates.includes(today)) {
-          continue // Already counted for today
+        if (userCompletedDates.includes(targetDate)) {
+          continue // Already counted for this date
         }
 
         // Update progress
@@ -331,7 +368,7 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
         }
         const updatedCompletedDates = {
           ...(challenge.completedDates || {}),
-          [user.id]: [...userCompletedDates, today],
+          [user.id]: [...userCompletedDates, targetDate],
         }
 
         // Check if challenge is completed
@@ -357,29 +394,39 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
       }
     }
   },
-  uncompleteHabit: async (id) => {
-    const today = format(new Date(), 'yyyy-MM-dd')
+  uncompleteHabit: async (id, date) => {
+    const targetDate = date || format(new Date(), 'yyyy-MM-dd')
     const habit = get().habits.find((h) => h.id === id)
     if (!habit) return
 
     const targetCount = habit.targetCountPerDay || 1
-    const currentCount = habit.completionsPerDay?.[today] || 0
+    const currentCount = habit.completionsPerDay?.[targetDate] || 0
     
     // Can't uncomplete if count is already 0
     if (currentCount <= 0) return
 
-    // Decrement completion count for today
+    // Decrement completion count for the target date
     const newCount = currentCount - 1
     const updatedCompletionsPerDay = {
       ...(habit.completionsPerDay || {}),
-      [today]: newCount,
+      [targetDate]: newCount,
     }
 
     // If count drops below target, remove from completedDates
-    const wasCompleted = habit.completedDates.includes(today)
+    const wasCompleted = habit.completedDates.includes(targetDate)
     const updatedDates = newCount < targetCount && wasCompleted
-      ? habit.completedDates.filter((date) => date !== today)
+      ? habit.completedDates.filter((d) => d !== targetDate)
       : habit.completedDates
+
+    // Optimistically update local state immediately for instant UI feedback
+    const updatedHabit = {
+      ...habit,
+      completionsPerDay: updatedCompletionsPerDay,
+      completedDates: updatedDates,
+    }
+    set({
+      habits: get().habits.map((h) => h.id === id ? updatedHabit : h),
+    })
 
     await updateHabitFirestore(id, { 
       completionsPerDay: updatedCompletionsPerDay,
@@ -394,13 +441,19 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
       const xpToNextLevel = calculateXPForNextLevel(newLevel) - newXP
 
       // Update daily stats - decrement habits completed and XP earned
-      const todayStats = get().dailyStats.find((s) => s.date === today)
-      const currentHabitsCompleted = todayStats?.habitsCompleted || 0
-      const currentXpEarned = todayStats?.xpEarned || 0
-      await get().updateDailyStats({
-        habitsCompleted: Math.max(0, currentHabitsCompleted - 1),
-        xpEarned: Math.max(0, currentXpEarned - habit.xpReward),
-      })
+      // Note: For past dates, we'll update today's stats as updateDailyStats works for today
+      const today = format(new Date(), 'yyyy-MM-dd')
+      const targetDateStats = get().dailyStats.find((s) => s.date === targetDate)
+      const currentHabitsCompleted = targetDateStats?.habitsCompleted || (targetDate === today ? (get().dailyStats.find((s) => s.date === today)?.habitsCompleted || 0) : 0)
+      const currentXpEarned = targetDateStats?.xpEarned || (targetDate === today ? (get().dailyStats.find((s) => s.date === today)?.xpEarned || 0) : 0)
+      
+      // Only update stats if uncompleting today, or if we have stats for the target date
+      if (targetDate === today || targetDateStats) {
+        await get().updateDailyStats({
+          habitsCompleted: Math.max(0, currentHabitsCompleted - 1),
+          xpEarned: Math.max(0, currentXpEarned - habit.xpReward),
+        })
+      }
 
       // Recalculate streak after uncompleting
       const allHabits = get().habits.map(h => h.id === id ? { ...h, completedDates: updatedDates } : h)
@@ -700,6 +753,14 @@ export const useFirestoreStore = create<AppState>((set, get) => ({
         completionsPerDay: {},
         missedDates: [],
       })
+    }
+
+    // Delete all workout logs (workout challenges calculate progress from logs)
+    try {
+      await deleteAllWorkoutLogs(user.id)
+    } catch (error) {
+      console.error('Error deleting workout logs during reset:', error)
+      // Continue with reset even if workout log deletion fails
     }
 
     // Clear challenge progress for this user

@@ -6,6 +6,396 @@
 import type { Routine } from '@/types/workout'
 
 export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'createdBy' | 'isTemplate' | 'isPublic' | 'rating' | 'timesUsed'>[] = [
+  // Morning Stretch Routines
+  {
+    name: 'Quick Morning Stretch (5 min)',
+    description: 'A quick 5-minute morning stretch routine to wake up your body and improve flexibility. Perfect for starting your day.',
+    goal: 'custom',
+    exercises: [],
+    sessions: [
+      {
+        id: 'morning-stretch-quick',
+        name: 'Morning Stretch',
+        order: 0,
+        exercises: [
+          {
+            exerciseId: 'neck-stretch',
+            order: 0,
+            sets: [
+              { setType: 'working', targetDuration: 15, restAfter: 0 },
+              { setType: 'working', targetDuration: 15, restAfter: 10 }
+            ],
+            restTime: 10
+          },
+          {
+            exerciseId: 'shoulder-stretch',
+            order: 1,
+            sets: [
+              { setType: 'working', targetDuration: 20, restAfter: 0 },
+              { setType: 'working', targetDuration: 20, restAfter: 10 }
+            ],
+            restTime: 10
+          },
+          {
+            exerciseId: 'standing-forward-fold',
+            order: 2,
+            sets: [
+              { setType: 'working', targetDuration: 30, restAfter: 10 }
+            ],
+            restTime: 10
+          },
+          {
+            exerciseId: 'quad-stretch',
+            order: 3,
+            sets: [
+              { setType: 'working', targetDuration: 20, restAfter: 0 },
+              { setType: 'working', targetDuration: 20, restAfter: 10 }
+            ],
+            restTime: 10
+          },
+          {
+            exerciseId: 'cat-cow',
+            order: 4,
+            sets: [
+              { setType: 'working', targetReps: 10, restAfter: 10 }
+            ],
+            restTime: 10
+          }
+        ],
+        estimatedDuration: 5
+      }
+    ],
+    estimatedDuration: 5,
+    difficulty: 'easy',
+    isTemplate: true,
+    isPublic: true,
+    tags: ['morning', 'stretch', 'flexibility', 'quick', 'daily']
+  },
+  {
+    name: 'Full Body Morning Stretch (10 min)',
+    description: 'A comprehensive 10-minute morning stretch routine targeting all major muscle groups. Great for improving flexibility and mobility.',
+    goal: 'custom',
+    exercises: [],
+    sessions: [
+      {
+        id: 'morning-stretch-full',
+        name: 'Full Body Stretch',
+        order: 0,
+        exercises: [
+          {
+            exerciseId: 'neck-stretch',
+            order: 0,
+            sets: [
+              { setType: 'working', targetDuration: 20, restAfter: 0 },
+              { setType: 'working', targetDuration: 20, restAfter: 10 }
+            ],
+            restTime: 10
+          },
+          {
+            exerciseId: 'shoulder-stretch',
+            order: 1,
+            sets: [
+              { setType: 'working', targetDuration: 25, restAfter: 0 },
+              { setType: 'working', targetDuration: 25, restAfter: 10 }
+            ],
+            restTime: 10
+          },
+          {
+            exerciseId: 'chest-stretch',
+            order: 2,
+            sets: [
+              { setType: 'working', targetDuration: 25, restAfter: 0 },
+              { setType: 'working', targetDuration: 25, restAfter: 10 }
+            ],
+            restTime: 10
+          },
+          {
+            exerciseId: 'tricep-stretch',
+            order: 3,
+            sets: [
+              { setType: 'working', targetDuration: 25, restAfter: 0 },
+              { setType: 'working', targetDuration: 25, restAfter: 10 }
+            ],
+            restTime: 10
+          },
+          {
+            exerciseId: 'standing-forward-fold',
+            order: 4,
+            sets: [
+              { setType: 'working', targetDuration: 45, restAfter: 10 }
+            ],
+            restTime: 10
+          },
+          {
+            exerciseId: 'quad-stretch',
+            order: 5,
+            sets: [
+              { setType: 'working', targetDuration: 25, restAfter: 0 },
+              { setType: 'working', targetDuration: 25, restAfter: 10 }
+            ],
+            restTime: 10
+          },
+          {
+            exerciseId: 'hamstring-stretch',
+            order: 6,
+            sets: [
+              { setType: 'working', targetDuration: 30, restAfter: 0 },
+              { setType: 'working', targetDuration: 30, restAfter: 10 }
+            ],
+            restTime: 10
+          },
+          {
+            exerciseId: 'hip-flexor-stretch',
+            order: 7,
+            sets: [
+              { setType: 'working', targetDuration: 30, restAfter: 0 },
+              { setType: 'working', targetDuration: 30, restAfter: 10 }
+            ],
+            restTime: 10
+          },
+          {
+            exerciseId: 'calf-stretch',
+            order: 8,
+            sets: [
+              { setType: 'working', targetDuration: 25, restAfter: 0 },
+              { setType: 'working', targetDuration: 25, restAfter: 10 }
+            ],
+            restTime: 10
+          },
+          {
+            exerciseId: 'spinal-twist',
+            order: 9,
+            sets: [
+              { setType: 'working', targetDuration: 30, restAfter: 0 },
+              { setType: 'working', targetDuration: 30, restAfter: 10 }
+            ],
+            restTime: 10
+          },
+          {
+            exerciseId: 'childs-pose',
+            order: 10,
+            sets: [
+              { setType: 'working', targetDuration: 60, restAfter: 0 }
+            ],
+            restTime: 0
+          }
+        ],
+        estimatedDuration: 10
+      }
+    ],
+    estimatedDuration: 10,
+    difficulty: 'easy',
+    isTemplate: true,
+    isPublic: true,
+    tags: ['morning', 'stretch', 'flexibility', 'full-body', 'mobility']
+  },
+  {
+    name: 'Yoga-Inspired Morning Flow (15 min)',
+    description: 'A gentle yoga-inspired morning routine combining stretching and mobility. Perfect for flexibility, balance, and mental clarity.',
+    goal: 'custom',
+    exercises: [],
+    sessions: [
+      {
+        id: 'morning-yoga-flow',
+        name: 'Morning Yoga Flow',
+        order: 0,
+        exercises: [
+          {
+            exerciseId: 'cat-cow',
+            order: 0,
+            sets: [
+              { setType: 'working', targetReps: 12, restAfter: 10 }
+            ],
+            restTime: 10
+          },
+          {
+            exerciseId: 'childs-pose',
+            order: 1,
+            sets: [
+              { setType: 'working', targetDuration: 45, restAfter: 10 }
+            ],
+            restTime: 10
+          },
+          {
+            exerciseId: 'standing-forward-fold',
+            order: 2,
+            sets: [
+              { setType: 'working', targetDuration: 60, restAfter: 10 }
+            ],
+            restTime: 10
+          },
+          {
+            exerciseId: 'standing-side-stretch',
+            order: 3,
+            sets: [
+              { setType: 'working', targetDuration: 25, restAfter: 0 },
+              { setType: 'working', targetDuration: 25, restAfter: 10 }
+            ],
+            restTime: 10
+          },
+          {
+            exerciseId: 'quad-stretch',
+            order: 4,
+            sets: [
+              { setType: 'working', targetDuration: 30, restAfter: 0 },
+              { setType: 'working', targetDuration: 30, restAfter: 10 }
+            ],
+            restTime: 10
+          },
+          {
+            exerciseId: 'hip-flexor-stretch',
+            order: 5,
+            sets: [
+              { setType: 'working', targetDuration: 40, restAfter: 0 },
+              { setType: 'working', targetDuration: 40, restAfter: 10 }
+            ],
+            restTime: 10
+          },
+          {
+            exerciseId: 'pigeon-pose',
+            order: 6,
+            sets: [
+              { setType: 'working', targetDuration: 45, restAfter: 0 },
+              { setType: 'working', targetDuration: 45, restAfter: 10 }
+            ],
+            restTime: 10
+          },
+          {
+            exerciseId: 'figure-four-stretch',
+            order: 7,
+            sets: [
+              { setType: 'working', targetDuration: 40, restAfter: 0 },
+              { setType: 'working', targetDuration: 40, restAfter: 10 }
+            ],
+            restTime: 10
+          },
+          {
+            exerciseId: 'spinal-twist',
+            order: 8,
+            sets: [
+              { setType: 'working', targetDuration: 45, restAfter: 0 },
+              { setType: 'working', targetDuration: 45, restAfter: 10 }
+            ],
+            restTime: 10
+          },
+          {
+            exerciseId: 'butterfly-stretch',
+            order: 9,
+            sets: [
+              { setType: 'working', targetDuration: 60, restAfter: 10 }
+            ],
+            restTime: 10
+          },
+          {
+            exerciseId: 'childs-pose',
+            order: 10,
+            sets: [
+              { setType: 'working', targetDuration: 60, restAfter: 0 }
+            ],
+            restTime: 0
+          }
+        ],
+        estimatedDuration: 15
+      }
+    ],
+    estimatedDuration: 15,
+    difficulty: 'easy',
+    isTemplate: true,
+    isPublic: true,
+    tags: ['morning', 'yoga', 'stretch', 'flexibility', 'mobility', 'mindfulness']
+  },
+  {
+    name: 'Desk Worker Morning Stretch (7 min)',
+    description: 'Targeted stretches for people who sit at a desk. Focuses on neck, shoulders, back, and hips.',
+    goal: 'custom',
+    exercises: [],
+    sessions: [
+      {
+        id: 'desk-worker-stretch',
+        name: 'Desk Worker Stretch',
+        order: 0,
+        exercises: [
+          {
+            exerciseId: 'neck-stretch',
+            order: 0,
+            sets: [
+              { setType: 'working', targetDuration: 25, restAfter: 0 },
+              { setType: 'working', targetDuration: 25, restAfter: 10 }
+            ],
+            restTime: 10
+          },
+          {
+            exerciseId: 'shoulder-stretch',
+            order: 1,
+            sets: [
+              { setType: 'working', targetDuration: 30, restAfter: 0 },
+              { setType: 'working', targetDuration: 30, restAfter: 10 }
+            ],
+            restTime: 10
+          },
+          {
+            exerciseId: 'chest-stretch',
+            order: 2,
+            sets: [
+              { setType: 'working', targetDuration: 30, restAfter: 0 },
+              { setType: 'working', targetDuration: 30, restAfter: 10 }
+            ],
+            restTime: 10
+          },
+          {
+            exerciseId: 'wrist-stretch',
+            order: 3,
+            sets: [
+              { setType: 'working', targetDuration: 20, restAfter: 0 },
+              { setType: 'working', targetDuration: 20, restAfter: 10 }
+            ],
+            restTime: 10
+          },
+          {
+            exerciseId: 'spinal-twist',
+            order: 4,
+            sets: [
+              { setType: 'working', targetDuration: 40, restAfter: 0 },
+              { setType: 'working', targetDuration: 40, restAfter: 10 }
+            ],
+            restTime: 10
+          },
+          {
+            exerciseId: 'hip-flexor-stretch',
+            order: 5,
+            sets: [
+              { setType: 'working', targetDuration: 35, restAfter: 0 },
+              { setType: 'working', targetDuration: 35, restAfter: 10 }
+            ],
+            restTime: 10
+          },
+          {
+            exerciseId: 'knee-to-chest',
+            order: 6,
+            sets: [
+              { setType: 'working', targetDuration: 30, restAfter: 0 },
+              { setType: 'working', targetDuration: 30, restAfter: 10 }
+            ],
+            restTime: 10
+          },
+          {
+            exerciseId: 'standing-forward-fold',
+            order: 7,
+            sets: [
+              { setType: 'working', targetDuration: 45, restAfter: 0 }
+            ],
+            restTime: 0
+          }
+        ],
+        estimatedDuration: 7
+      }
+    ],
+    estimatedDuration: 7,
+    difficulty: 'easy',
+    isTemplate: true,
+    isPublic: true,
+    tags: ['morning', 'stretch', 'desk-worker', 'office', 'posture', 'flexibility']
+  },
   // Push/Pull/Legs (3 days per week)
   {
     name: 'Push/Pull/Legs (3-Day Split)',

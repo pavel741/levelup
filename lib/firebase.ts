@@ -36,7 +36,7 @@ const validateFirebaseConfig = (): { valid: boolean; missing: string[] } => {
   return { valid: true, missing: [] }
 }
 
-// Initialize Firebase only in browser
+// Initialize Firebase for both browser and server (API routes)
 let app: FirebaseApp | undefined
 let auth: Auth | undefined
 let db: Firestore | undefined
@@ -44,7 +44,10 @@ let analytics: Analytics | null = null
 let firebaseInitialized = false
 let firebaseInitPromise: Promise<void> | null = null
 
-if (typeof window !== 'undefined') {
+// Initialize Firebase app (works in both browser and server)
+const initFirebase = async () => {
+  if (firebaseInitialized) return
+  
   // Validate config before initializing
   const validation = validateFirebaseConfig()
   if (!validation.valid) {
@@ -60,105 +63,112 @@ Steps:
 
 The variables must be present BEFORE the build runs.`
     console.error('❌', errorMessage)
-    // Store error for ErrorDisplay component
-    try {
-      localStorage.setItem('firebase_error', JSON.stringify({
-        code: 'firebase_config_missing',
-        message: errorMessage,
-        timestamp: new Date().toISOString(),
-        source: 'firebase_init',
-        missing: validation.missing,
-        requiresRedeploy: true,
-      }))
-    } catch (e) {
-      console.error('Failed to store error:', e)
-    }
-  } else {
-    // Create initialization promise to avoid race conditions
-    firebaseInitPromise = (async () => {
-      try {
-        app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]
-        auth = getAuth(app)
-
-        // Explicitly set persistence to local storage (persists across browser sessions)
-        // This ensures users stay logged in after page refresh
-        try {
-          await setPersistence(auth, browserLocalPersistence)
-        } catch (persistenceError) {
-          console.warn('⚠️ Could not set auth persistence (may already be set):', persistenceError)
-        }
-
-        db = getFirestore(app)
-
-        
-        // Initialize Analytics only in browser and if measurementId is provided
-        if (process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID) {
-          try {
-            analytics = getAnalytics(app)
-          } catch (error) {
-            console.warn('⚠️ Firebase Analytics initialization failed:', error)
-          }
-        }
-        
-        firebaseInitialized = true
-        
-        // Suppress firebase-init.json 404 errors (harmless - Firebase SDK tries to fetch this but it's not required)
-        // Do this after initialization to avoid interfering with the init process
-        const originalFetch = window.fetch
-        let firebaseInitWarningShown = false
-        
-        window.fetch = function(...args) {
-          const url = args[0]?.toString() || ''
-          // Suppress firebase-init.json 404 errors
-          if (url.includes('firebase-init.json')) {
-            if (!firebaseInitWarningShown) {
-              console.info('ℹ️ Note: firebase-init.json 404 errors are harmless and can be ignored')
-              firebaseInitWarningShown = true
-            }
-            // Return a rejected promise to suppress the error
-            return Promise.reject(new Error('firebase-init.json not found (this is normal)'))
-          }
-          return originalFetch.apply(this, args)
-        }
-        
-        // Restore original fetch after a delay
-        setTimeout(() => {
-          window.fetch = originalFetch
-        }, 5000)
-      } catch (error: any) {
-        console.error('❌ Firebase initialization failed:', error)
-        console.error('Error code:', error.code)
-        console.error('Error message:', error.message)
-        
-        // Store error for ErrorDisplay component
-        try {
-          localStorage.setItem('firebase_error', JSON.stringify({
-            code: error.code || 'firebase_init_failed',
-            message: error.message || 'Failed to initialize Firebase',
-            timestamp: new Date().toISOString(),
-            source: 'firebase_init',
-            fullError: error,
-          }))
-        } catch (e) {
-          console.error('Failed to store error in localStorage:', e)
-        }
-        throw error
-      }
-    })()
     
-    // Start initialization immediately
-    firebaseInitPromise.catch(() => {
-      // Error already logged above
-    })
+    // Store error for ErrorDisplay component (browser only)
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('firebase_error', JSON.stringify({
+          code: 'firebase_config_missing',
+          message: errorMessage,
+          timestamp: new Date().toISOString(),
+          source: 'firebase_init',
+          missing: validation.missing,
+          requiresRedeploy: true,
+        }))
+      } catch (e) {
+        console.error('Failed to store error:', e)
+      }
+    }
+    throw new Error(errorMessage)
+  }
+  
+  try {
+    app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0]
+    
+    // Initialize auth (browser only - server routes don't need auth persistence)
+    if (typeof window !== 'undefined') {
+      auth = getAuth(app)
+      // Explicitly set persistence to local storage (persists across browser sessions)
+      try {
+        await setPersistence(auth, browserLocalPersistence)
+      } catch (persistenceError) {
+        console.warn('⚠️ Could not set auth persistence (may already be set):', persistenceError)
+      }
+    }
+    
+    // Initialize Firestore (works in both browser and server)
+    db = getFirestore(app)
+    
+    // Initialize Analytics only in browser and if measurementId is provided
+    if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID) {
+      try {
+        analytics = getAnalytics(app)
+      } catch (error) {
+        console.warn('⚠️ Firebase Analytics initialization failed:', error)
+      }
+    }
+    
+    firebaseInitialized = true
+    
+    // Suppress firebase-init.json 404 errors (browser only)
+    if (typeof window !== 'undefined') {
+      const originalFetch = window.fetch
+      let firebaseInitWarningShown = false
+      
+      window.fetch = function(...args) {
+        const url = args[0]?.toString() || ''
+        // Suppress firebase-init.json 404 errors
+        if (url.includes('firebase-init.json')) {
+          if (!firebaseInitWarningShown) {
+            console.info('ℹ️ Note: firebase-init.json 404 errors are harmless and can be ignored')
+            firebaseInitWarningShown = true
+          }
+          // Return a rejected promise to suppress the error
+          return Promise.reject(new Error('firebase-init.json not found (this is normal)'))
+        }
+        return originalFetch.apply(this, args)
+      }
+      
+      // Restore original fetch after a delay
+      setTimeout(() => {
+        window.fetch = originalFetch
+      }, 5000)
+    }
+  } catch (error: unknown) {
+    const errorCode = (error as { code?: string })?.code
+    console.error('❌ Firebase initialization failed:', error)
+    console.error('Error code:', errorCode)
+    console.error('Error message:', error.message)
+    
+    // Store error for ErrorDisplay component (browser only)
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('firebase_error', JSON.stringify({
+          code: error.code || 'firebase_init_failed',
+          message: error.message || 'Failed to initialize Firebase',
+          timestamp: new Date().toISOString(),
+          source: 'firebase_init',
+          fullError: error,
+        }))
+      } catch (e) {
+        console.error('Failed to store error in localStorage:', e)
+      }
+    }
+    throw error
   }
 }
+
+// Initialize Firebase immediately (works in both browser and server)
+firebaseInitPromise = initFirebase().catch(() => {
+  // Error already logged above
+})
 
 // Helper function to wait for Firebase initialization
 export const waitForFirebaseInit = async (): Promise<void> => {
   if (firebaseInitialized) return
   if (firebaseInitPromise) {
     await firebaseInitPromise
-  } else if (typeof window !== 'undefined') {
+  } else {
     // If promise doesn't exist, wait a bit and check again
     await new Promise(resolve => setTimeout(resolve, 100))
     if (!firebaseInitialized && !firebaseInitPromise) {

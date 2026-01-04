@@ -66,6 +66,11 @@ async function createIndexes() {
       { userId: 1, category: 1 },
       { name: 'userId_category' }
     )
+    // Index for duplicate checks (CSV import)
+    await db.collection('finance_transactions').createIndex(
+      { userId: 1, archiveId: 1 },
+      { name: 'userId_archiveId' }
+    )
     
     // Workout routines indexes
     console.log('  - Creating indexes for workout_routines...')
@@ -83,6 +88,11 @@ async function createIndexes() {
     await db.collection('workout_logs').createIndex(
       { userId: 1, routineId: 1, date: -1 },
       { name: 'userId_routineId_date' }
+    )
+    // Compound index for statistics queries
+    await db.collection('workout_logs').createIndex(
+      { userId: 1, date: -1, routineId: 1 },
+      { name: 'userId_date_routineId' }
     )
     
     // Finance categories indexes
@@ -132,6 +142,120 @@ async function createIndexes() {
         throw error
       }
     }
+    
+    // Todos Collection
+    console.log('  - Creating indexes for todos...')
+    await db.collection('todos').createIndex(
+      { userId: 1, createdAt: -1 },
+      { name: 'userId_createdAt_desc' }
+    )
+    await db.collection('todos').createIndex(
+      { userId: 1, isCompleted: 1, createdAt: -1 },
+      { name: 'userId_isCompleted_createdAt' }
+    )
+    await db.collection('todos').createIndex(
+      { userId: 1, priority: 1 },
+      { name: 'userId_priority' }
+    )
+    await db.collection('todos').createIndex(
+      { userId: 1, dueDate: 1 },
+      { name: 'userId_dueDate' }
+    )
+    console.log('  ✅ Todo indexes created.')
+    
+    // Focus sessions indexes
+    console.log('  - Creating indexes for focus_sessions...')
+    await db.collection('focus_sessions').createIndex(
+      { userId: 1, startedAt: -1 },
+      { name: 'userId_startedAt_desc' }
+    )
+    await db.collection('focus_sessions').createIndex(
+      { userId: 1, isCompleted: 1, startedAt: -1 },
+      { name: 'userId_isCompleted_startedAt' }
+    )
+    await db.collection('focus_sessions').createIndex(
+      { userId: 1, type: 1 },
+      { name: 'userId_type' }
+    )
+    // Compound index for statistics queries
+    await db.collection('focus_sessions').createIndex(
+      { userId: 1, startedAt: -1, isCompleted: 1 },
+      { name: 'userId_startedAt_isCompleted' }
+    )
+    console.log('  ✅ Focus session indexes created.')
+    
+    // Savings goals indexes
+    console.log('  - Creating indexes for savings_goals...')
+    await db.collection('savings_goals').createIndex(
+      { userId: 1, createdAt: -1 },
+      { name: 'userId_createdAt_desc' }
+    )
+    await db.collection('savings_goals').createIndex(
+      { userId: 1, category: 1 },
+      { name: 'userId_category' }
+    )
+    console.log('  ✅ Savings goals indexes created.')
+    
+    // Goals indexes
+    console.log('  - Creating indexes for goals...')
+    await db.collection('goals').createIndex(
+      { userId: 1, createdAt: -1 },
+      { name: 'userId_createdAt_desc' }
+    )
+    await db.collection('goals').createIndex(
+      { userId: 1, status: 1, createdAt: -1 },
+      { name: 'userId_status_createdAt' }
+    )
+    await db.collection('goals').createIndex(
+      { userId: 1, category: 1 },
+      { name: 'userId_category' }
+    )
+    await db.collection('goals').createIndex(
+      { userId: 1, deadline: 1 },
+      { name: 'userId_deadline' }
+    )
+    console.log('  ✅ Goals indexes created.')
+    
+    // Notifications indexes
+    console.log('  - Creating indexes for notifications...')
+    await db.collection('notifications').createIndex(
+      { userId: 1, createdAt: -1 },
+      { name: 'userId_createdAt_desc' }
+    )
+    await db.collection('notifications').createIndex(
+      { userId: 1, read: 1, createdAt: -1 },
+      { name: 'userId_read_createdAt' }
+    )
+    await db.collection('notifications').createIndex(
+      { userId: 1, scheduledFor: 1 },
+      { name: 'userId_scheduledFor' }
+    )
+    console.log('  ✅ Notifications indexes created.')
+    
+    // Journal entries indexes
+    console.log('  - Creating indexes for journal_entries...')
+    await db.collection('journal_entries').createIndex(
+      { userId: 1, date: -1 },
+      { name: 'userId_date_desc' }
+    )
+    await db.collection('journal_entries').createIndex(
+      { userId: 1, type: 1, date: -1 },
+      { name: 'userId_type_date' }
+    )
+    await db.collection('journal_entries').createIndex(
+      { userId: 1, date: 1, type: 1 },
+      { name: 'userId_date_type' }
+    )
+    // Text search index for content and title
+    await db.collection('journal_entries').createIndex(
+      { userId: 1, title: 'text', content: 'text' },
+      { name: 'userId_text_search' }
+    )
+    await db.collection('journal_entries').createIndex(
+      { userId: 1, moodRating: 1 },
+      { name: 'userId_moodRating' }
+    )
+    console.log('  ✅ Journal entries indexes created.')
     
     console.log('✅ All indexes created successfully!')
     console.log('💡 These indexes will significantly improve query performance')

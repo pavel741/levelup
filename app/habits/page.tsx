@@ -7,15 +7,20 @@ import AuthGuard from '@/components/common/AuthGuard'
 import Sidebar from '@/components/layout/Sidebar'
 import Header from '@/components/layout/Header'
 import HabitCard from '@/components/HabitCard'
-import { Plus, Target, CheckCircle2, BarChart3 } from 'lucide-react'
+import { Plus, Target, CheckCircle2, BarChart3, Calendar, Sparkles, Download, Upload, X } from 'lucide-react'
 import { Habit } from '@/types'
 import { format } from 'date-fns'
-import { showWarning } from '@/lib/utils'
+import { showWarning, showSuccess, showError } from '@/lib/utils'
+import { HABIT_TEMPLATES, HABIT_BUNDLES, createHabitFromTemplate, exportHabits, importHabits } from '@/lib/habitTemplates'
 
 export default function HabitsPage() {
   const { habits, addHabit, updateHabit, user } = useFirestoreStore()
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showTemplateModal, setShowTemplateModal] = useState(false)
+  const [showBundleModal, setShowBundleModal] = useState(false)
+  const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   
   // Debug logging
   useEffect(() => {
@@ -93,6 +98,112 @@ export default function HabitsPage() {
     setShowAddModal(false)
   }
 
+  const handleUseTemplate = (templateId: string) => {
+    const template = HABIT_TEMPLATES.find(t => t.id === templateId)
+    if (!template || !user) return
+
+    const habitData = createHabitFromTemplate(template, user.id)
+    
+    addHabit({
+      id: Date.now().toString(),
+      userId: user.id,
+      ...habitData,
+      completedDates: [],
+      createdAt: new Date(),
+      completionsPerDay: {},
+    })
+
+    showSuccess(`Added "${template.name}" habit`)
+    setShowTemplateModal(false)
+  }
+
+  const handleUseBundle = (bundleId: string) => {
+    const bundle = HABIT_BUNDLES.find(b => b.id === bundleId)
+    if (!bundle || !user) return
+
+    let addedCount = 0
+    bundle.habits.forEach(template => {
+      const habitData = createHabitFromTemplate(template, user.id)
+      addHabit({
+        id: `${Date.now()}-${addedCount}`,
+        userId: user.id,
+        ...habitData,
+        completedDates: [],
+        createdAt: new Date(),
+        completionsPerDay: {},
+      })
+      addedCount++
+    })
+
+    showSuccess(`Added ${addedCount} habits from "${bundle.name}"`)
+    setShowBundleModal(false)
+  }
+
+  const handleExportHabits = () => {
+    try {
+      const json = exportHabits(habits.filter(h => h.isActive))
+      const blob = new Blob([json], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `habits-export-${format(new Date(), 'yyyy-MM-dd')}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      showSuccess('Habits exported successfully')
+    } catch (error) {
+      showError(error, { component: 'HabitsPage', action: 'exportHabits' })
+    }
+  }
+
+  const handleImportHabits = () => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.json'
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0]
+      if (!file) return
+
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        try {
+          const jsonString = event.target?.result as string
+          const importedHabits = importHabits(jsonString)
+          
+          if (!user) return
+
+          importedHabits.forEach((habitData, index) => {
+            addHabit({
+              id: `${Date.now()}-${index}`,
+              userId: user.id,
+              name: habitData.name || 'Imported Habit',
+              description: habitData.description || '',
+              icon: habitData.icon || '🎯',
+              color: habitData.color || 'bg-blue-500',
+              frequency: habitData.frequency || 'daily',
+              targetDays: habitData.targetDays || [1, 2, 3, 4, 5, 6, 7],
+              xpReward: habitData.xpReward || 30,
+              completedDates: [],
+              createdAt: new Date(),
+              isActive: true,
+              reminderEnabled: habitData.reminderEnabled,
+              reminderTime: habitData.reminderTime,
+              targetCountPerDay: habitData.targetCountPerDay || 1,
+              completionsPerDay: {},
+            })
+          })
+
+          showSuccess(`Imported ${importedHabits.length} habit(s)`)
+        } catch (error) {
+          showError(error, { component: 'HabitsPage', action: 'importHabits' })
+        }
+      }
+      reader.readAsText(file)
+    }
+    input.click()
+  }
+
   const handleEditHabit = (habit: Habit) => {
     setEditingHabit(habit)
     const startDate = habit.startDate 
@@ -161,16 +272,35 @@ export default function HabitsPage() {
 
   const today = format(new Date(), 'yyyy-MM-dd')
   const activeHabits = habits.filter((h) => h.isActive)
-  const completedToday = activeHabits.filter((h) => {
+  const completedForDate = activeHabits.filter((h) => {
     const targetCount = h.targetCountPerDay || 1
-    const currentCount = h.completionsPerDay?.[today] || 0
-    return h.completedDates.includes(today) && currentCount >= targetCount
+    const currentCount = h.completionsPerDay?.[selectedDate] || 0
+    return h.completedDates.includes(selectedDate) && currentCount >= targetCount
   })
-  const incompleteToday = activeHabits.filter((h) => {
+  const incompleteForDate = activeHabits.filter((h) => {
     const targetCount = h.targetCountPerDay || 1
-    const currentCount = h.completionsPerDay?.[today] || 0
-    return !h.completedDates.includes(today) || currentCount < targetCount
+    const currentCount = h.completionsPerDay?.[selectedDate] || 0
+    return !h.completedDates.includes(selectedDate) || currentCount < targetCount
   })
+  
+  // Helper to format date display
+  const getDateDisplay = (dateStr: string) => {
+    const date = new Date(dateStr)
+    const todayDate = new Date()
+    todayDate.setHours(0, 0, 0, 0)
+    const selectedDateObj = new Date(dateStr)
+    selectedDateObj.setHours(0, 0, 0, 0)
+    
+    if (selectedDateObj.getTime() === todayDate.getTime()) {
+      return 'Today'
+    }
+    const yesterday = new Date(todayDate)
+    yesterday.setDate(yesterday.getDate() - 1)
+    if (selectedDateObj.getTime() === yesterday.getTime()) {
+      return 'Yesterday'
+    }
+    return format(date, 'MMM d, yyyy')
+  }
   const archivedHabits = habits.filter((h) => !h.isActive)
 
   return (
@@ -188,6 +318,19 @@ export default function HabitsPage() {
                   <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">Track your daily habits and build consistency</p>
                 </div>
                 <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+                    <Calendar className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                    <input
+                      type="date"
+                      value={selectedDate}
+                      onChange={(e) => setSelectedDate(e.target.value)}
+                      max={format(new Date(), 'yyyy-MM-dd')}
+                      className="bg-transparent border-none outline-none text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
+                    />
+                    <span className="text-xs text-gray-500 dark:text-gray-400 hidden sm:inline">
+                      {getDateDisplay(selectedDate)}
+                    </span>
+                  </div>
                   <a
                     href="/habits/statistics"
                     className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-2"
@@ -195,40 +338,49 @@ export default function HabitsPage() {
                     <BarChart3 className="w-4 h-4" />
                     Statistics
                   </a>
-                  <button
-                    onClick={() => setShowAddModal(true)}
-                    className="flex items-center justify-center gap-2 px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all font-medium shadow-lg text-sm sm:text-base"
-                  >
-                    <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
-                    <span className="hidden sm:inline">Add Habit</span>
-                    <span className="sm:hidden">Add</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowTemplateModal(true)}
+                      className="flex items-center justify-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium text-sm sm:text-base"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      <span className="hidden sm:inline">Templates</span>
+                    </button>
+                    <button
+                      onClick={() => setShowAddModal(true)}
+                      className="flex items-center justify-center gap-2 px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all font-medium shadow-lg text-sm sm:text-base"
+                    >
+                      <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+                      <span className="hidden sm:inline">Add Habit</span>
+                      <span className="sm:hidden">Add</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {incompleteToday.length > 0 && (
+              {incompleteForDate.length > 0 && (
                 <div className="mb-8">
                   <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                     <Target className="w-5 h-5" />
-                    To Complete Today
+                    To Complete {selectedDate === today ? 'Today' : `on ${getDateDisplay(selectedDate)}`}
                   </h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {incompleteToday.map((habit) => (
-                      <HabitCard key={habit.id} habit={habit} onEdit={handleEditHabit} />
+                    {incompleteForDate.map((habit) => (
+                      <HabitCard key={habit.id} habit={habit} onEdit={handleEditHabit} selectedDate={selectedDate} />
                     ))}
                   </div>
                 </div>
               )}
 
-              {completedToday.length > 0 && (
+              {completedForDate.length > 0 && (
                 <div className="mb-8">
                   <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                     <CheckCircle2 className="w-5 h-5 text-green-500" />
-                    Completed Today ({completedToday.length})
+                    Completed {selectedDate === today ? 'Today' : `on ${getDateDisplay(selectedDate)}`} ({completedForDate.length})
                   </h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 opacity-90">
-                    {completedToday.map((habit) => (
-                      <HabitCard key={habit.id} habit={habit} onEdit={handleEditHabit} />
+                    {completedForDate.map((habit) => (
+                      <HabitCard key={habit.id} habit={habit} onEdit={handleEditHabit} selectedDate={selectedDate} />
                     ))}
                   </div>
                 </div>
@@ -518,6 +670,176 @@ export default function HabitsPage() {
                 className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm sm:text-base"
               >
                 Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Template Selection Modal */}
+      {showTemplateModal && (
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Habit Templates</h2>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleExportHabits}
+                  className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors flex items-center gap-2"
+                  title="Export habits"
+                >
+                  <Download className="w-4 h-4" />
+                  Export
+                </button>
+                <button
+                  onClick={handleImportHabits}
+                  className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors flex items-center gap-2"
+                  title="Import habits"
+                >
+                  <Upload className="w-4 h-4" />
+                  Import
+                </button>
+                <button
+                  onClick={() => {
+                    setShowTemplateModal(false)
+                    setShowBundleModal(true)
+                  }}
+                  className="px-3 py-1.5 text-sm bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-lg transition-colors"
+                >
+                  View Bundles
+                </button>
+                <button
+                  onClick={() => setShowTemplateModal(false)}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            {/* Category Filter */}
+            <div className="mb-6 flex flex-wrap gap-2">
+              <button
+                onClick={() => setSelectedCategory('all')}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  selectedCategory === 'all'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                }`}
+              >
+                All
+              </button>
+              {['morning', 'evening', 'health', 'productivity', 'mindfulness', 'fitness'].map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors capitalize ${
+                    selectedCategory === cat
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
+            {/* Templates Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {HABIT_TEMPLATES.filter(t => selectedCategory === 'all' || t.category === selectedCategory).map((template) => (
+                <button
+                  key={template.id}
+                  onClick={() => handleUseTemplate(template.id)}
+                  className="text-left p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="text-3xl">{template.icon}</div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-gray-900 dark:text-white mb-1">{template.name}</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{template.description}</p>
+                      <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-500">
+                        <span className="capitalize">{template.frequency}</span>
+                        <span>•</span>
+                        <span>{template.xpReward} XP</span>
+                        {template.reminderEnabled && (
+                          <>
+                            <span>•</span>
+                            <span>⏰ {template.reminderTime}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setShowTemplateModal(false)}
+                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bundle Selection Modal */}
+      {showBundleModal && (
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Habit Bundles</h2>
+              <button
+                onClick={() => {
+                  setShowBundleModal(false)
+                  setShowTemplateModal(true)
+                }}
+                className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors"
+              >
+                View Templates
+              </button>
+              <button
+                onClick={() => setShowBundleModal(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              Add multiple related habits at once with these curated bundles.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {HABIT_BUNDLES.map((bundle) => (
+                <button
+                  key={bundle.id}
+                  onClick={() => handleUseBundle(bundle.id)}
+                  className="text-left p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="text-3xl">{bundle.icon}</div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-gray-900 dark:text-white mb-1">{bundle.name}</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{bundle.description}</p>
+                      <div className="text-xs text-gray-500 dark:text-gray-500">
+                        {bundle.habits.length} habits included
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setShowBundleModal(false)}
+                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium transition-colors"
+              >
+                Close
               </button>
             </div>
           </div>

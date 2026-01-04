@@ -22,6 +22,13 @@ export default function RoutineBuilder({ onSave, onCancel, initialRoutine }: Rou
   const [routineGoal, setRoutineGoal] = useState<Routine['goal']>(initialRoutine?.goal || 'custom')
   const [routineDifficulty, setRoutineDifficulty] = useState<Routine['difficulty']>(initialRoutine?.difficulty || 'medium')
   
+  // Schedule state
+  const [scheduleEnabled, setScheduleEnabled] = useState(initialRoutine?.schedule?.enabled || false)
+  const [reminderEnabled, setReminderEnabled] = useState(initialRoutine?.schedule?.reminderEnabled || false)
+  const [reminderTime, setReminderTime] = useState(initialRoutine?.schedule?.reminderTime || '09:00')
+  const [workoutDays, setWorkoutDays] = useState<number[]>(initialRoutine?.schedule?.workoutDays || [])
+  const [restDayReminders, setRestDayReminders] = useState(initialRoutine?.schedule?.restDayReminders || false)
+  
   // Initialize sessions from initialRoutine, or create a default session
   const initializeSessions = (): RoutineSession[] => {
     if (initialRoutine?.sessions && initialRoutine.sessions.length > 0) {
@@ -304,7 +311,14 @@ export default function RoutineBuilder({ onSave, onCancel, initialRoutine }: Rou
       isTemplate: false,
       isPublic: false,
       createdBy: 'user', // Will be set by backend
-      tags: []
+      tags: [],
+      schedule: scheduleEnabled ? {
+        enabled: true,
+        reminderEnabled,
+        reminderTime: reminderEnabled ? reminderTime : undefined,
+        workoutDays: workoutDays.length > 0 ? workoutDays : undefined,
+        restDayReminders,
+      } : undefined
     }
 
     onSave?.(routine)
@@ -341,6 +355,105 @@ export default function RoutineBuilder({ onSave, onCancel, initialRoutine }: Rou
               rows={3}
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
+          </div>
+
+          {/* Schedule Section */}
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Workout Schedule</h3>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={scheduleEnabled}
+                  onChange={(e) => setScheduleEnabled(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">Enable Schedule</span>
+              </label>
+            </div>
+
+            {scheduleEnabled && (
+              <div className="space-y-4 pl-4 border-l-2 border-blue-200 dark:border-blue-800">
+                {/* Workout Days */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Workout Days
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { value: 0, label: 'Sun' },
+                      { value: 1, label: 'Mon' },
+                      { value: 2, label: 'Tue' },
+                      { value: 3, label: 'Wed' },
+                      { value: 4, label: 'Thu' },
+                      { value: 5, label: 'Fri' },
+                      { value: 6, label: 'Sat' },
+                    ].map((day) => (
+                      <button
+                        key={day.value}
+                        type="button"
+                        onClick={() => {
+                          if (workoutDays.includes(day.value)) {
+                            setWorkoutDays(workoutDays.filter(d => d !== day.value))
+                          } else {
+                            setWorkoutDays([...workoutDays, day.value].sort())
+                          }
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                          workoutDays.includes(day.value)
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                        }`}
+                      >
+                        {day.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Reminder Settings */}
+                <div>
+                  <label className="flex items-center gap-2 cursor-pointer mb-2">
+                    <input
+                      type="checkbox"
+                      checked={reminderEnabled}
+                      onChange={(e) => setReminderEnabled(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Enable Reminders</span>
+                  </label>
+                  {reminderEnabled && (
+                    <div className="mt-2">
+                      <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+                        Reminder Time
+                      </label>
+                      <input
+                        type="time"
+                        value={reminderTime}
+                        onChange={(e) => setReminderTime(e.target.value)}
+                        className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Rest Day Reminders */}
+                <div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={restDayReminders}
+                      onChange={(e) => setRestDayReminders(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-700 dark:text-gray-300">Remind on rest days</span>
+                  </label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-6">
+                    Get a reminder to take it easy on rest days
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">

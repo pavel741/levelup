@@ -1,6 +1,6 @@
 'use client'
 
-import { Home, Target, Trophy, Settings, Award, Wallet, X, MessageCircle, Dumbbell } from 'lucide-react'
+import { Home, Target, Trophy, Settings, Award, Wallet, X, MessageCircle, Dumbbell, Timer, BarChart3, CheckSquare, Flag, BookOpen } from 'lucide-react'
 import Link from 'next/link'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
 import { usePathname } from 'next/navigation'
@@ -17,9 +17,14 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const menuItems = [
     { icon: Home, label: 'Dashboard', href: '/' },
     { icon: Target, label: 'Habits', href: '/habits' },
+    { icon: Flag, label: 'Goals', href: '/goals' },
+    { icon: CheckSquare, label: 'Todos', href: '/todos' },
     { icon: Trophy, label: 'Challenges', href: '/challenges' },
     { icon: Dumbbell, label: 'Workouts', href: '/workouts' },
     { icon: Wallet, label: 'Finance', href: '/finance' },
+    { icon: Timer, label: 'Focus', href: '/focus' },
+    { icon: BookOpen, label: 'Journal', href: '/journal' },
+    { icon: BarChart3, label: 'Statistics', href: '/statistics' },
     { icon: Award, label: 'Achievements', href: '/achievements' },
     { icon: MessageCircle, label: 'Feedback', href: '/feedback' },
     { icon: Settings, label: 'Settings', href: '/settings' },
@@ -57,9 +62,13 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       >
         {/* Mobile Close Button */}
         <div className="lg:hidden flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-          <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+          <Link
+            href="/"
+            onClick={handleLinkClick}
+            className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent hover:opacity-80 transition-opacity cursor-pointer"
+          >
             LevelUp
-          </h1>
+          </Link>
           <button
             onClick={onClose}
             className="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
@@ -71,10 +80,15 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
 
         {/* Desktop Header */}
         <div className="hidden lg:block p-6 border-b border-gray-200 dark:border-gray-700">
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            LevelUp
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Level Up Life</p>
+          <Link
+            href="/"
+            className="block cursor-pointer hover:opacity-80 transition-opacity"
+          >
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              LevelUp
+            </h1>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Level Up Life</p>
+          </Link>
         </div>
 
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">

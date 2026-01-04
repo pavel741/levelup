@@ -9,11 +9,29 @@ import {
   where,
   getDocs,
   onSnapshot,
-  Timestamp
+  Timestamp,
+  writeBatch,
+  orderBy,
+  limit,
+  startAfter,
+  type QueryDocumentSnapshot
 } from 'firebase/firestore'
 import { db } from './firebase'
 import { User, Habit, Challenge, DailyStats } from '@/types'
 import { Routine, WorkoutLog } from '@/types/workout'
+
+/**
+ * Helper function to clean data for Firestore (remove undefined values)
+ */
+function cleanFirestoreData<T extends Record<string, unknown>>(data: T): Record<string, unknown> {
+  const cleaned: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(data)) {
+    if (value !== undefined) {
+      cleaned[key] = value
+    }
+  }
+  return cleaned
+}
 
 // User operations
 export const getUserData = async (userId: string): Promise<User | null> => {
@@ -47,12 +65,14 @@ export const createUserData = async (user: User): Promise<void> => {
       ...user,
       joinedAt: Timestamp.fromDate(user.joinedAt),
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    const errorCode = (error as { code?: string })?.code
     console.error('Error creating user data:', error)
-    console.error('Error code:', error?.code)
-    console.error('Error message:', error?.message)
+    console.error('Error code:', errorCode)
+    console.error('Error message:', errorMessage)
     // Re-throw the error so callers know it failed
-    throw new Error(`Failed to create user data: ${error?.message || 'Unknown error'}`)
+    throw new Error(`Failed to create user data: ${errorMessage}`)
   }
 }
 
@@ -63,7 +83,9 @@ export const updateUserData = async (userId: string, updates: Partial<User>): Pr
   
   try {
     const userRef = doc(db, 'users', userId)
-    await updateDoc(userRef, updates as any)
+    // Firestore updateDoc requires Partial<User> but we need to convert dates
+    const firestoreUpdates: Record<string, unknown> = { ...updates }
+    await updateDoc(userRef, firestoreUpdates)
   } catch (error) {
     console.error('Error updating user data:', error)
   }
@@ -149,7 +171,7 @@ export const saveHabit = async (habit: Habit): Promise<void> => {
   
   try {
     // Remove undefined values - Firestore doesn't accept undefined
-    const habitData: any = {
+    const habitData: Record<string, unknown> = {
       ...habit,
       createdAt: Timestamp.fromDate(habit.createdAt),
     }
@@ -162,14 +184,7 @@ export const saveHabit = async (habit: Habit): Promise<void> => {
       habitData.startDate = Timestamp.fromDate(startDate)
     }
     
-    // Remove undefined fields
-    Object.keys(habitData).forEach(key => {
-      if (habitData[key] === undefined) {
-        delete habitData[key]
-      }
-    })
-    
-    await setDoc(doc(db, 'habits', habit.id), habitData)
+    await setDoc(doc(db, 'habits', habit.id), cleanFirestoreData(habitData))
   } catch (error) {
     console.error('Error saving habit:', error)
     throw error
@@ -183,7 +198,7 @@ export const updateHabit = async (habitId: string, updates: Partial<Habit>): Pro
   
   try {
     // Remove undefined values - Firestore doesn't accept undefined
-    const cleanUpdates: any = { ...updates }
+    const cleanUpdates: Record<string, unknown> = { ...updates }
     
     // Convert startDate to Timestamp if it exists
     if (cleanUpdates.startDate !== undefined) {
@@ -274,20 +289,13 @@ export const saveChallenge = async (challenge: Challenge): Promise<void> => {
   
   try {
     // Remove undefined values - Firestore doesn't accept undefined
-    const challengeData: any = {
+    const challengeData: Record<string, unknown> = {
       ...challenge,
       startDate: Timestamp.fromDate(challenge.startDate),
       endDate: Timestamp.fromDate(challenge.endDate),
     }
     
-    // Remove undefined fields
-    Object.keys(challengeData).forEach(key => {
-      if (challengeData[key] === undefined) {
-        delete challengeData[key]
-      }
-    })
-    
-    await setDoc(doc(db, 'challenges', challenge.id), challengeData)
+    await setDoc(doc(db, 'challenges', challenge.id), cleanFirestoreData(challengeData))
   } catch (error) {
     console.error('Error saving challenge:', error)
     throw error
@@ -301,7 +309,7 @@ export const updateChallenge = async (challengeId: string, updates: Partial<Chal
   
   try {
     const challengeRef = doc(db, 'challenges', challengeId)
-    const updateData: any = { ...updates }
+    const updateData: Record<string, unknown> = { ...updates }
     if (updates.startDate) {
       updateData.startDate = Timestamp.fromDate(updates.startDate)
     }
@@ -458,20 +466,13 @@ export const saveRoutine = async (routine: Routine): Promise<void> => {
   }
   
   try {
-    const routineData: any = {
+    const routineData: Record<string, unknown> = {
       ...routine,
       createdAt: Timestamp.fromDate(routine.createdAt),
       updatedAt: Timestamp.fromDate(routine.updatedAt),
     }
     
-    // Remove undefined fields
-    Object.keys(routineData).forEach(key => {
-      if (routineData[key] === undefined) {
-        delete routineData[key]
-      }
-    })
-    
-    await setDoc(doc(db, 'routines', routine.id), routineData)
+    await setDoc(doc(db, 'routines', routine.id), cleanFirestoreData(routineData))
   } catch (error) {
     console.error('Error saving routine:', error)
     throw error
@@ -484,7 +485,7 @@ export const updateRoutine = async (routineId: string, updates: Partial<Routine>
   }
   
   try {
-    const updateData: any = { ...updates }
+    const updateData: Record<string, unknown> = { ...updates }
     if (updates.createdAt) {
       updateData.createdAt = Timestamp.fromDate(updates.createdAt)
     }
@@ -492,15 +493,8 @@ export const updateRoutine = async (routineId: string, updates: Partial<Routine>
       updateData.updatedAt = Timestamp.fromDate(updates.updatedAt)
     }
     
-    // Remove undefined fields
-    Object.keys(updateData).forEach(key => {
-      if (updateData[key] === undefined) {
-        delete updateData[key]
-      }
-    })
-    
     const routineRef = doc(db, 'routines', routineId)
-    await updateDoc(routineRef, updateData)
+    await updateDoc(routineRef, cleanFirestoreData(updateData))
   } catch (error) {
     console.error('Error updating routine:', error)
     throw error
@@ -591,7 +585,7 @@ export const saveWorkoutLog = async (log: WorkoutLog): Promise<void> => {
   }
   
   try {
-    const logData: any = {
+    const logData: Record<string, unknown> = {
       ...log,
       date: Timestamp.fromDate(log.date),
       startTime: Timestamp.fromDate(log.startTime),
@@ -601,14 +595,7 @@ export const saveWorkoutLog = async (log: WorkoutLog): Promise<void> => {
       logData.endTime = Timestamp.fromDate(log.endTime)
     }
     
-    // Remove undefined fields
-    Object.keys(logData).forEach(key => {
-      if (logData[key] === undefined) {
-        delete logData[key]
-      }
-    })
-    
-    await setDoc(doc(db, 'workoutLogs', log.id), logData)
+    await setDoc(doc(db, 'workoutLogs', log.id), cleanFirestoreData(logData))
   } catch (error) {
     console.error('Error saving workout log:', error)
     throw error
@@ -621,7 +608,7 @@ export const updateWorkoutLog = async (logId: string, updates: Partial<WorkoutLo
   }
   
   try {
-    const updateData: any = { ...updates }
+    const updateData: Record<string, unknown> = { ...updates }
     if (updates.date) {
       updateData.date = Timestamp.fromDate(updates.date)
     }
@@ -632,15 +619,8 @@ export const updateWorkoutLog = async (logId: string, updates: Partial<WorkoutLo
       updateData.endTime = Timestamp.fromDate(updates.endTime)
     }
     
-    // Remove undefined fields
-    Object.keys(updateData).forEach(key => {
-      if (updateData[key] === undefined) {
-        delete updateData[key]
-      }
-    })
-    
     const logRef = doc(db, 'workoutLogs', logId)
-    await updateDoc(logRef, updateData)
+    await updateDoc(logRef, cleanFirestoreData(updateData))
   } catch (error) {
     console.error('Error updating workout log:', error)
     throw error
@@ -658,5 +638,107 @@ export const deleteWorkoutLog = async (logId: string): Promise<void> => {
     console.error('Error deleting workout log:', error)
     throw error
   }
+}
+
+export const deleteAllWorkoutLogs = async (userId: string): Promise<number> => {
+  if (!db) {
+    throw new Error('Firestore is not initialized')
+  }
+
+  const dbInstance = db
+  const logsRef = collection(dbInstance, 'workoutLogs')
+  const batchSize = 500
+  let deletedCount = 0
+  let lastDoc: QueryDocumentSnapshot | null = null
+
+  // Retry helper for Firestore operations
+  const retryOperation = async <T>(
+    operation: () => Promise<T>,
+    maxRetries = 2,
+    initialDelay = 500
+  ): Promise<T> => {
+    let lastError: unknown
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation()
+      } catch (error: unknown) {
+        lastError = error
+
+        const code = error && typeof error === 'object' && 'code' in error ? (error as { code?: string }).code : undefined
+        const message = error && typeof error === 'object' && 'message' in error && typeof (error as { message: unknown }).message === 'string' ? (error as { message: string }).message : undefined
+        const isRetryable =
+          code === 'unavailable' ||
+          code === 'deadline-exceeded' ||
+          code === 'resource-exhausted' ||
+          code === 'aborted' ||
+          code === 'cancelled' ||
+          (message?.includes('network') ?? false) ||
+          (message?.includes('timeout') ?? false)
+
+        if (!isRetryable || attempt === maxRetries) {
+          throw error
+        }
+
+        const delay = initialDelay * Math.pow(2, attempt)
+        await new Promise((resolve) => setTimeout(resolve, delay))
+      }
+    }
+
+    throw lastError
+  }
+
+  // Query all workout logs for this user
+  // Use orderBy('__name__') to paginate by document ID - this doesn't require a composite index
+  // and works with the userId filter
+  while (true) {
+    let logsQuery
+    if (lastDoc) {
+      logsQuery = query(
+        logsRef,
+        where('userId', '==', userId),
+        orderBy('__name__'), // Order by document ID for pagination
+        startAfter(lastDoc),
+        limit(batchSize)
+      )
+    } else {
+      logsQuery = query(
+        logsRef,
+        where('userId', '==', userId),
+        orderBy('__name__'), // Order by document ID for pagination
+        limit(batchSize)
+      )
+    }
+
+    const snapshot = await getDocs(logsQuery)
+    
+    if (snapshot.empty) {
+      break
+    }
+
+    // Delete in batches of 500 (Firestore batch limit)
+    for (let i = 0; i < snapshot.docs.length; i += batchSize) {
+      const chunk = snapshot.docs.slice(i, i + batchSize)
+      
+      await retryOperation(async () => {
+        const batch = writeBatch(dbInstance)
+        chunk.forEach((doc) => {
+          batch.delete(doc.ref)
+        })
+        await batch.commit()
+        deletedCount += chunk.length
+      })
+    }
+
+    // Update lastDoc for pagination
+    lastDoc = snapshot.docs[snapshot.docs.length - 1]
+
+    // If we got fewer docs than batchSize, we're done
+    if (snapshot.docs.length < batchSize) {
+      break
+    }
+  }
+
+  return deletedCount
 }
 

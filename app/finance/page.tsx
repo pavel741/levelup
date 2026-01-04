@@ -5,7 +5,7 @@ import { useFirestoreStore } from '@/store/useFirestoreStore'
 import AuthGuard from '@/components/common/AuthGuard'
 import Sidebar from '@/components/layout/Sidebar'
 import Header from '@/components/layout/Header'
-import { Wallet, TrendingUp, TrendingDown, DollarSign } from 'lucide-react'
+import { Wallet, TrendingUp, TrendingDown, DollarSign, Target, Bell, Calendar, Clock, AlertCircle } from 'lucide-react'
 // Using MongoDB for finance data (no quota limits!)
 // Client-side API wrapper (calls server-side MongoDB via API routes)
 import {
@@ -15,11 +15,18 @@ import {
   deleteTransaction,
   subscribeToCategories,
   getCategories,
+  saveCategories,
   batchAddTransactions,
   batchDeleteTransactions,
+  deleteAllTransactions,
   getFinanceSettings,
   getTransactions,
+  subscribeToRecurringTransactions,
+  addRecurringTransaction,
 } from '@/lib/financeApi'
+import { subscribeToSavingsGoals } from '@/lib/savingsGoalsApi'
+import type { SavingsGoal, FinanceRecurringTransaction } from '@/types/finance'
+import { format, differenceInDays, isPast, isToday } from 'date-fns'
 import type { FinanceTransaction, FinanceCategories, FinanceSettings } from '@/types/finance'
 import { getPeriodDates, parseTransactionDate } from '@/lib/financeDateUtils'
 import { CSVImportService } from '@/lib/csvImport'
@@ -28,6 +35,7 @@ import { getSuggestedCategory } from '@/lib/transactionCategorizer'
 import { formatCurrency, formatDate, formatDisplayDate, normalizeDate, showError, showSuccess } from '@/lib/utils'
 import { CardSkeleton, TransactionListSkeleton } from '@/components/ui/Skeleton'
 import { VirtualList } from '@/components/ui/VirtualList'
+import ExpenseForecastComponent from '@/components/finance/ExpenseForecast'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,23 +47,39 @@ export default function FinancePage() {
   const [categories, setCategories] = useState<FinanceCategories | null>(null)
   const [financeSettings, setFinanceSettings] = useState<FinanceSettings | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isLoadingAllTransactions, setIsLoadingAllTransactions] = useState(false)
+  
+  // Savings Goals state
+  const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([])
+  const [isLoadingGoals, setIsLoadingGoals] = useState(true)
+  
+  // Bill Reminders state
+  const [bills, setBills] = useState<FinanceRecurringTransaction[]>([])
+  const [isLoadingBills, setIsLoadingBills] = useState(true)
   
   // Dashboard state
   const [summaryView, setSummaryView] = useState<'monthly' | 'alltime'>('monthly')
-  const [selectedMonth, setSelectedMonth] = useState(() => {
-    const now = new Date()
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  })
+  const [selectedMonth, setSelectedMonth] = useState<string>('')
   
   // Transaction form state
   const [formType, setFormType] = useState<'income' | 'expense'>('expense')
   const [formDescription, setFormDescription] = useState('')
   const [formAmount, setFormAmount] = useState('')
   const [formCategory, setFormCategory] = useState('')
-  const [formDate, setFormDate] = useState(() => {
-    const today = new Date()
-    return today.toISOString().split('T')[0]
-  })
+  const [formDate, setFormDate] = useState<string>('')
+  const [formIsRecurring, setFormIsRecurring] = useState(false)
+  const [formRecurringInterval, setFormRecurringInterval] = useState<'monthly' | 'weekly' | 'yearly'>('monthly')
+  
+  // Initialize date-dependent state on client only (prevents hydration mismatch)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const now = new Date()
+      const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      setSelectedMonth(prev => prev || monthStr)
+      setFormDate(prev => prev || now.toISOString().split('T')[0])
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   
@@ -116,24 +140,53 @@ export default function FinancePage() {
     const loadTransactions = async () => {
       try {
         setIsLoading(true)
-        // Fast initial load with limit for immediate UI feedback
-        getTransactions(user.id, { limitCount: 100 }).then(txs => {
-          setTransactions(txs)
-          setIsLoading(false)
-        }).catch(error => {
-          console.error('Error fetching transactions on mount:', error)
-          setIsLoading(false)
-        })
+        // Load all transactions immediately for seamless date filtering
+        setIsLoadingAllTransactions(true)
+        const { getAllTransactionsForSummary: getAllTransactionsForSummaryClient } = await import('@/lib/financeApi')
         
-        // Then set up subscription for ongoing updates (load all in background)
+        // Load all transactions in parallel with initial display load
+        const [initialTxs, allTxs] = await Promise.all([
+          getTransactions(user.id, { limitCount: 100 }).catch(() => []),
+          getAllTransactionsForSummaryClient(user.id).catch(() => [])
+        ])
+        
+        setTransactions(initialTxs)
+        setAllTransactionsForSummary(allTxs)
+        setIsLoading(false)
+        setIsLoadingAllTransactions(false)
+        console.log('✅ Loaded all transactions for summary:', allTxs.length)
+        
+        // Calculate total amount for verification
+        const totalAmount = allTxs.reduce((sum, tx) => {
+          const amount = Math.abs(Number(tx.amount) || 0)
+          return sum + amount
+        }, 0)
+        console.log('💰 Total transaction amount sum:', totalAmount.toFixed(2))
+        
+        // Then set up subscription for ongoing updates (load recent transactions for display)
         unsubscribe = subscribeToTransactions(
           user.id,
           (txs) => {
-            // Only update state if transactions actually changed (handled by subscription)
             setTransactions(txs)
             setIsLoading(false)
+            // Merge new transactions into allTransactionsForSummary
+            // This ensures we have the latest transactions for date filtering
+            setAllTransactionsForSummary(prev => {
+              // Create a map of existing transactions by ID for quick lookup
+              const existingMap = new Map(prev.map(tx => [tx.id, tx]))
+              // Add/update transactions from subscription
+              txs.forEach(tx => {
+                existingMap.set(tx.id, tx)
+              })
+              // Convert back to array and sort by date descending
+              return Array.from(existingMap.values()).sort((a, b) => {
+                const dateA = parseTransactionDate(a.date).getTime()
+                const dateB = parseTransactionDate(b.date).getTime()
+                return dateB - dateA
+              })
+            })
           },
-          { limitCount: 0 } // Load all in background for complete data
+          { limitCount: 1000 } // Load recent 1000 transactions for display
         )
       } catch (error) {
         console.error('Failed to load transactions from MongoDB:', error)
@@ -189,12 +242,51 @@ export default function FinancePage() {
     loadSettings()
   }, [user?.id])
 
-  // Use already-loaded transactions for summary calculations
-  // MongoDB can load all transactions, so we'll use the loaded transactions
+  // Load Savings Goals
   useEffect(() => {
-    // MongoDB can handle loading all transactions, so use what's loaded
-    setAllTransactionsForSummary(transactions)
-  }, [transactions])
+    if (!user?.id) return
+
+    const unsubscribe = subscribeToSavingsGoals(user.id, (goals) => {
+      setSavingsGoals(goals)
+      setIsLoadingGoals(false)
+    })
+
+    return () => {
+      unsubscribe()
+    }
+  }, [user?.id])
+
+  // Load Bill Reminders
+  useEffect(() => {
+    if (!user?.id) return
+
+    const unsubscribe = subscribeToRecurringTransactions(user.id, (billsList) => {
+      setBills(billsList)
+      setIsLoadingBills(false)
+    })
+
+    return () => {
+      unsubscribe()
+    }
+  }, [user?.id])
+
+  // Load all transactions when selectedMonth changes to ensure seamless date filtering
+  useEffect(() => {
+    if (!user?.id || !selectedMonth) return
+    
+    // If we don't have all transactions loaded yet, load them
+    if (allTransactionsForSummary.length === 0 && !isLoadingAllTransactions) {
+      setIsLoadingAllTransactions(true)
+      import('@/lib/financeApi').then(async ({ getAllTransactionsForSummary: getAllTransactionsForSummaryClient }) => {
+        const allTxs: FinanceTransaction[] = await getAllTransactionsForSummaryClient(user.id)
+        setAllTransactionsForSummary(allTxs)
+        setIsLoadingAllTransactions(false)
+      }).catch((error: unknown) => {
+        console.error('Error loading all transactions for date filter:', error)
+        setIsLoadingAllTransactions(false)
+      })
+    }
+  }, [selectedMonth, user?.id, allTransactionsForSummary.length, isLoadingAllTransactions])
 
   // Initialize categories if they don't exist
   useEffect(() => {
@@ -402,6 +494,18 @@ export default function FinancePage() {
 
   // Calculate summary for selected month (using all loaded transactions from MongoDB)
   const monthlySummary = useMemo(() => {
+    // Return default values if selectedMonth is not set yet (prevents hydration errors)
+    if (!selectedMonth) {
+      const now = new Date()
+      return {
+        income: 0,
+        expenses: 0,
+        balance: 0,
+        startDate: new Date(now.getFullYear(), now.getMonth(), 1),
+        endDate: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59),
+      }
+    }
+    
     // Use period settings if available, otherwise default to calendar month
     let startDate: Date
     let endDate: Date
@@ -431,44 +535,49 @@ export default function FinancePage() {
 
     allTransactionsForSummary.forEach((tx) => {
       const txDate = parseTransactionDate(tx.date)
-      // For payday periods with cutoff times:
-      // - Start: Last working day of previous month at 2pm (14:00) - transactions at/after 2pm belong to this period
-      // - End: Last working day of current month at 1pm (13:00) - transactions before 1pm belong to this period
       let isInPeriod = false
-      if (financeSettings?.usePaydayPeriod && financeSettings?.paydayCutoffHour !== undefined) {
-        const endCutoffHour = financeSettings.paydayCutoffHour ?? 13 // 1pm for end date
-        const startCutoffHour = financeSettings.paydayStartCutoffHour ?? 14 // 2pm for start date
-        
+      if (financeSettings?.usePaydayPeriod) {
         // Check if transaction is within the period boundaries
-        if (txDate > startDate && txDate < endDate) {
-          // Between start and end dates (exclusive boundaries)
+        // For payday periods:
+        // - Start: Last working day of previous month - ALL transactions on this date belong to this period
+        // - End: Last working day of current month - ALL transactions on this date belong to NEXT period
+        //   Note: New transactions on the last working day are automatically moved to first of next month
+        //   during creation/import, but legacy transactions on the end date are excluded from this period
+        //   Since CSV imports only have dates (no time), all transactions are at midnight (00:00:00)
+        
+        // Get date-only components for comparison (normalize all to midnight for accurate date comparison)
+        const startDateOnly = new Date(startDate)
+        startDateOnly.setHours(0, 0, 0, 0)
+        const endDateOnly = new Date(endDate)
+        endDateOnly.setHours(0, 0, 0, 0)
+        const txDateOnly = new Date(txDate)
+        txDateOnly.setHours(0, 0, 0, 0)
+        
+        // Check if transaction is before start date (definitely not in period)
+        if (txDateOnly < startDateOnly) {
+          isInPeriod = false
+        }
+        // Check if transaction is after end date (definitely not in period)
+        // Note: Transactions on last working day are moved to first of next month, so they'll be excluded here
+        else if (txDateOnly > endDateOnly) {
+          isInPeriod = false
+        }
+        // Check if transaction is on start date (last working day of previous month)
+        // ALL transactions on the start date belong to this period (they were moved from previous period)
+        else if (txDateOnly.getTime() === startDateOnly.getTime()) {
+          // Include all transactions on the start date - they belong to this period
           isInPeriod = true
-        } else {
-          // Check boundary days
-          const startDateOnly = new Date(startDate)
-          startDateOnly.setHours(0, 0, 0, 0)
-          const endDateOnly = new Date(endDate)
-          endDateOnly.setHours(0, 0, 0, 0)
-          const txDateOnly = new Date(txDate)
-          txDateOnly.setHours(0, 0, 0, 0)
-          
-          if (txDateOnly.getTime() === startDateOnly.getTime()) {
-            // Same day as start date - check if at/after start cutoff (2pm)
-            const txHour = txDate.getHours()
-            const txMinutes = txDate.getMinutes()
-            const cutoffMinutes = startCutoffHour * 60
-            const txTotalMinutes = txHour * 60 + txMinutes
-            isInPeriod = txTotalMinutes >= cutoffMinutes
-          } else if (txDateOnly.getTime() === endDateOnly.getTime()) {
-            // Same day as end date - check if before end cutoff (1pm)
-            const txHour = txDate.getHours()
-            const txMinutes = txDate.getMinutes()
-            const cutoffMinutes = endCutoffHour * 60
-            const txTotalMinutes = txHour * 60 + txMinutes
-            isInPeriod = txTotalMinutes < cutoffMinutes
-          } else {
-            isInPeriod = false
-          }
+        }
+        // Check if transaction is on end date (last working day of current month)
+        // ALL transactions on the end date should go to the next period
+        // (New transactions are moved during creation, but legacy data might still be on the end date)
+        else if (txDateOnly.getTime() === endDateOnly.getTime()) {
+          // Exclude all transactions on the end date - they belong to the next period
+          isInPeriod = false
+        }
+        // Transaction is between start and end dates (not on boundary days)
+        else {
+          isInPeriod = true
         }
       } else {
         // Standard period check (inclusive boundaries)
@@ -502,22 +611,22 @@ export default function FinancePage() {
   const allTimeSummary = useMemo(() => {
     let income = 0
     let expenses = 0
-    let untypedCount = 0
-    let negativeIncomeCount = 0
-    let positiveExpenseCount = 0
 
     allTransactionsForSummary.forEach((tx) => {
       const amount = Number(tx.amount) || 0
       const type = (tx.type || '').toLowerCase()
       
+      // Skip zero or invalid amounts
+      if (amount === 0 || isNaN(amount) || !isFinite(amount)) {
+        return
+      }
+      
       if (type === 'income') {
         income += Math.abs(amount) // Always positive
-        if (amount < 0) negativeIncomeCount++
       } else if (type === 'expense') {
         expenses += Math.abs(amount) // Always positive
-        if (amount > 0) positiveExpenseCount++
       } else {
-        untypedCount++
+        // Untyped transactions: negative = expense, positive = income
         if (amount < 0) {
           expenses += Math.abs(amount)
         } else {
@@ -526,21 +635,11 @@ export default function FinancePage() {
       }
     })
 
-    // Debug info (only log if there's a potential issue)
-    if (untypedCount > 0 || negativeIncomeCount > 0 || positiveExpenseCount > 0) {
-      console.log('📊 All-time summary debug:', {
-        totalTransactions: allTransactionsForSummary.length,
-        untypedTransactions: untypedCount,
-        negativeIncomeTransactions: negativeIncomeCount,
-        positiveExpenseTransactions: positiveExpenseCount,
-        calculatedBalance: income - expenses
-      })
-    }
-
     return { income, expenses, balance: income - expenses }
   }, [allTransactionsForSummary])
 
 
+  // Helper function to adjust transaction date if it's on the last working day
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -548,23 +647,111 @@ export default function FinancePage() {
 
     setIsSubmitting(true)
     try {
+      // Check if category is new (not in available categories)
+      const categoryExists = availableCategories.includes(formCategory)
+      
+      // If category is new, save it to categories
+      if (!categoryExists && formCategory.trim()) {
+        try {
+          const currentCategories = await getCategories(user.id)
+          const updatedCategories: FinanceCategories = {
+            ...currentCategories,
+            [formType]: {
+              ...(currentCategories?.[formType] || {}),
+              [formCategory.trim()]: {},
+            },
+          }
+          await saveCategories(user.id, updatedCategories)
+          // Reload categories to update the UI
+          const updated = await getCategories(user.id)
+          setCategories(updated)
+        } catch (error) {
+          console.error('Error saving new category:', error)
+          // Continue anyway - category will still be saved with the transaction
+        }
+      }
+
       // Ensure expenses are stored as negative amounts
       const amount = Number(formAmount)
       const finalAmount = formType === 'expense' && amount > 0 ? -amount : amount
+      
+      // Keep original date - period calculation will handle payday period logic
+      const transactionDate: string | Date = formDate
       
       const transaction: Omit<FinanceTransaction, 'id'> = {
         type: formType,
         description: formDescription,
         amount: finalAmount,
-        category: formCategory,
-        date: formDate,
+        category: formCategory.trim(),
+        date: transactionDate,
       }
 
       if (editingTransactionId) {
+        // Optimistically update the transaction in local state
+        setTransactions(prev => prev.map(tx => 
+          tx.id === editingTransactionId 
+            ? { ...tx, ...transaction, id: editingTransactionId }
+            : tx
+        ))
+        setAllTransactionsForSummary(prev => prev.map(tx => 
+          tx.id === editingTransactionId 
+            ? { ...tx, ...transaction, id: editingTransactionId }
+            : tx
+        ))
+        
         await updateTransaction(user.id, editingTransactionId, transaction)
+        
+        // If marked as recurring, create a recurring transaction
+        if (formIsRecurring) {
+          try {
+            await addRecurringTransaction(user.id, {
+              name: formDescription,
+              amount: Math.abs(finalAmount),
+              category: formCategory.trim(),
+              interval: formRecurringInterval,
+              nextDate: new Date(formDate),
+            })
+            showSuccess('Transaction updated and added as recurring')
+          } catch (error) {
+            console.error('Error creating recurring transaction:', error)
+            showError(error, { component: 'FinancePage', action: 'addRecurringTransaction' })
+          }
+        }
+        
         setEditingTransactionId(null)
       } else {
-        await addTransaction(user.id, transaction)
+        // Optimistically add the transaction to local state
+        const tempId = `temp-${Date.now()}`
+        const newTransaction = { ...transaction, id: tempId } as FinanceTransaction & { id: string }
+        setTransactions(prev => [newTransaction, ...prev])
+        setAllTransactionsForSummary(prev => [newTransaction, ...prev])
+        
+        const newId = await addTransaction(user.id, transaction)
+        
+        // Replace temp ID with real ID
+        setTransactions(prev => prev.map(tx => 
+          tx.id === tempId ? { ...tx, id: newId } : tx
+        ))
+        setAllTransactionsForSummary(prev => prev.map(tx => 
+          tx.id === tempId ? { ...tx, id: newId } : tx
+        ))
+        
+        // If marked as recurring, create a recurring transaction
+        if (formIsRecurring) {
+          try {
+            await addRecurringTransaction(user.id, {
+              name: formDescription,
+              amount: Math.abs(finalAmount),
+              category: formCategory.trim(),
+              interval: formRecurringInterval,
+              nextDate: new Date(formDate),
+            })
+            showSuccess('Transaction added and set as recurring')
+          } catch (error) {
+            console.error('Error creating recurring transaction:', error)
+            showError(error, { component: 'FinancePage', action: 'addRecurringTransaction' })
+          }
+        }
       }
 
       // Reset form
@@ -572,6 +759,10 @@ export default function FinancePage() {
       setFormAmount('')
       setFormCategory('')
       setFormDate(new Date().toISOString().split('T')[0])
+      setFormIsRecurring(false)
+      setFormRecurringInterval('monthly')
+      setFormIsRecurring(false)
+      setFormRecurringInterval('monthly')
     } catch (error) {
       console.error('Error saving transaction:', error)
       showError(error, { component: 'FinancePage', action: 'saveTransaction' })
@@ -599,34 +790,61 @@ export default function FinancePage() {
   // Handle delete transaction
   const handleDelete = async (id: string) => {
     if (!user?.id || !confirm('Are you sure you want to delete this transaction?')) return
+
+    // Optimistically remove the transaction from local state
+    const deletedTx = transactions.find(tx => tx.id === id)
+    setTransactions(prev => prev.filter(tx => tx.id !== id))
+    setAllTransactionsForSummary(prev => prev.filter(tx => tx.id !== id))
+
     try {
       await deleteTransaction(user.id, id)
+      showSuccess('Transaction deleted')
     } catch (error) {
       console.error('Error deleting transaction:', error)
+      // Revert optimistic update on error
+      if (deletedTx) {
+        setTransactions(prev => [...prev, deletedTx].sort((a, b) => {
+          const dateA = parseTransactionDate(a.date).getTime()
+          const dateB = parseTransactionDate(b.date).getTime()
+          return dateB - dateA
+        }))
+        setAllTransactionsForSummary(prev => [...prev, deletedTx].sort((a, b) => {
+          const dateA = parseTransactionDate(a.date).getTime()
+          const dateB = parseTransactionDate(b.date).getTime()
+          return dateB - dateA
+        }))
+      }
       showError(error, { component: 'FinancePage', action: 'deleteTransaction' })
     }
   }
 
   // Handle delete all transactions
   const handleDeleteAll = async () => {
-    if (!user?.id || transactions.length === 0) return
+    if (!user?.id) return
     
     const confirmed = confirm(
-      `Are you sure you want to delete ALL ${transactions.length} transactions? This action cannot be undone.`
+      `Are you sure you want to delete ALL transactions? This will delete all transactions from the database, not just the ones currently visible. This action cannot be undone.`
     )
     
     if (!confirmed) return
 
     setIsSubmitting(true)
     try {
-      const transactionIds = transactions.map((tx) => tx.id!).filter((id) => id)
-      if (transactionIds.length > 0) {
-        await batchDeleteTransactions(user.id, transactionIds)
-        showSuccess(`Successfully deleted ${transactionIds.length} transactions`)
-      }
+      const deletedCount = await deleteAllTransactions(user.id)
+      
+      // Clear and reload all transactions for summary
+      setAllTransactionsForSummary([])
+      setTransactions([])
+      
+      // Reload all transactions for summary
+      const { getAllTransactionsForSummary } = await import('@/lib/financeApi')
+      const allTxs = await getAllTransactionsForSummary(user.id)
+      setAllTransactionsForSummary(allTxs)
+      
+      showSuccess(`Successfully deleted ${deletedCount} transactions`)
     } catch (error) {
       console.error('Error deleting all transactions:', error)
-      showError(error, { component: 'FinancePage', action: 'batchDeleteTransactions' })
+      showError(error, { component: 'FinancePage', action: 'deleteAllTransactions' })
     } finally {
       setIsSubmitting(false)
     }
@@ -758,33 +976,32 @@ export default function FinancePage() {
           const hasReferenceNumber = tx.referenceNumber && tx.referenceNumber.trim().length > 0
           const shouldBeBills = false // Disabled for now - focus on POS:/ATM: first
           
-          const isWrongCategory = 
-            (hasPosPattern && currentCategory !== 'Card Payment' && currentCategory !== 'ATM Withdrawal' && currentCategory !== 'Bills' && currentCategory !== 'ESTO' && currentCategory !== 'Kodulaen' && currentCategory !== 'Kommunaalid') ||
-            (hasAtmPattern && currentCategory !== 'ATM Withdrawal') ||
-            (hasPsd2Klix && currentCategory !== 'ESTO') ||
-            (hasLoanPattern && currentCategory !== 'Kodulaen') ||
-            (hasUtilityPattern && currentCategory !== 'Kommunaalid') ||
-            (hasOtherPaymentRef && currentCategory !== 'Bills' && currentCategory !== 'Card Payment' && currentCategory !== 'ATM Withdrawal' && currentCategory !== 'ESTO' && currentCategory !== 'Kodulaen' && currentCategory !== 'Kommunaalid') ||
-            (shouldBeBills && !hasPosPattern && !hasAtmPattern) // Only Bills if not POS: or ATM:
+          // Check if category contains invalid patterns (like "POS:", "ATM:", etc.) - these should always be recategorized
+          const hasInvalidCategoryPattern = hasPosInCategory || hasAtmInCategory || hasPsd2KlixInCategory
           
+          // Only recategorize if:
+          // 1. No category or "Other" category
+          // 2. Category contains invalid patterns (POS:, ATM:, PSD2, etc.) - these are clearly wrong
+          // Do NOT recategorize transactions that already have valid user-set categories
+          // This preserves user's manual category assignments
           const needsRecategorization = 
-            (!currentCategory || currentCategory === 'Other') ||
-            hasPosInCategory ||
-            hasAtmInCategory ||
-            hasPsd2KlixInCategory || // Category contains PSD2/KLIX pattern
-            isWrongCategory ||
-            shouldBeEsto ||
-            shouldBeKodulaen ||
-            shouldBeKommunaalid ||
-            shouldBeAtm ||
-            shouldBeCardPayment ||
-            shouldBeBills || // Reference number should be Bills (but only if not POS: or ATM:)
-            (hasPosPattern && !suggestedCategory) || // If has POS pattern but no category, try to categorize
-            (hasAtmPattern && !suggestedCategory) || // If has ATM pattern but no category, try to categorize
-            (hasLoanPattern && !suggestedCategory) || // If description has loan pattern but no category, try to categorize
-            (hasUtilityPattern && !suggestedCategory) || // If description has utility pattern but no category, try to categorize
-            (hasPsd2Klix && !suggestedCategory) || // If description has PSD2/KLIX but no category, try to categorize
-            (hasReferenceNumber && !hasPosPattern && !hasAtmPattern && !suggestedCategory) // If has reference number but no POS/ATM and no category, try to categorize
+            (!currentCategory || currentCategory === 'Other') || // No category or "Other"
+            hasInvalidCategoryPattern || // Category contains invalid patterns like "POS:", "ATM:", etc. - always recategorize these
+            // Only recategorize based on patterns if category is empty/Other or contains invalid patterns
+            ((!currentCategory || currentCategory === 'Other' || hasInvalidCategoryPattern) && (
+              shouldBeEsto ||
+              shouldBeKodulaen ||
+              shouldBeKommunaalid ||
+              shouldBeAtm ||
+              shouldBeCardPayment ||
+              shouldBeBills || // Reference number should be Bills (but only if not POS: or ATM:)
+              (hasPosPattern && !suggestedCategory) || // If has POS pattern but no category, try to categorize
+              (hasAtmPattern && !suggestedCategory) || // If has ATM pattern but no category, try to categorize
+              (hasLoanPattern && !suggestedCategory) || // If description has loan pattern but no category, try to categorize
+              (hasUtilityPattern && !suggestedCategory) || // If description has utility pattern but no category, try to categorize
+              (hasPsd2Klix && !suggestedCategory) || // If description has PSD2/KLIX but no category, try to categorize
+              (hasReferenceNumber && !hasPosPattern && !hasAtmPattern && !suggestedCategory) // If has reference number but no POS/ATM and no category, try to categorize
+            ))
           
           // Override suggested category based on prefix detection
           // IMPORTANT: POS: and ATM: take absolute priority
@@ -864,6 +1081,8 @@ export default function FinancePage() {
   // Handle cancel edit
   const handleCancelEdit = () => {
     setEditingTransactionId(null)
+    setFormIsRecurring(false)
+    setFormRecurringInterval('monthly')
     setFormDescription('')
     setFormAmount('')
     setFormCategory('')
@@ -1118,26 +1337,34 @@ export default function FinancePage() {
         ? ESTONIAN_BANK_PROFILES.find(b => b.id === (csvSelectedBank || csvDetectedBank))?.displayName || null
         : null
 
-      const transactionsToImport = csvParsedData.map((tx) => ({
-        type: tx.type || 'expense',
-        description: tx.description || 'Imported transaction',
-        amount: tx.amount || 0,
-        category: tx.category || 'Other',
-        date: tx.date || new Date().toISOString().split('T')[0],
-        // Include all other fields from CSV (selgitus, referenceNumber, recipientName, archiveId, etc.)
-        ...(tx.referenceNumber && { referenceNumber: tx.referenceNumber }),
-        ...(tx.recipientName && { recipientName: tx.recipientName }),
-        ...(tx.archiveId && { archiveId: tx.archiveId }),
-        ...(tx.selgitus && { selgitus: tx.selgitus }),
-        // Add bank source for imported transactions
-        ...(bankName && { sourceBank: bankName }),
-        // Include any other fields that might be present
-        ...Object.fromEntries(
-          Object.entries(tx).filter(([key]) => 
-            !['type', 'description', 'amount', 'category', 'date'].includes(key)
-          )
-        ),
-      }))
+      // Process transactions and adjust dates for payday period
+      const transactionsToImport = await Promise.all(
+        csvParsedData.map(async (tx) => {
+          const txDate = tx.date || new Date().toISOString().split('T')[0]
+          // Keep original date - period calculation will handle payday period logic
+          
+          return {
+            type: tx.type || 'expense',
+            description: tx.description || 'Imported transaction',
+            amount: tx.amount || 0,
+            category: tx.category || 'Other',
+            date: txDate,
+            // Include all other fields from CSV (selgitus, referenceNumber, recipientName, archiveId, etc.)
+            ...(tx.referenceNumber && { referenceNumber: tx.referenceNumber }),
+            ...(tx.recipientName && { recipientName: tx.recipientName }),
+            ...(tx.archiveId && { archiveId: tx.archiveId }),
+            ...(tx.selgitus && { selgitus: tx.selgitus }),
+            // Add bank source for imported transactions
+            ...(bankName && { sourceBank: bankName }),
+            // Include any other fields that might be present
+            ...Object.fromEntries(
+              Object.entries(tx).filter(([key]) => 
+                !['type', 'description', 'amount', 'category', 'date'].includes(key)
+              )
+            ),
+          }
+        })
+      )
 
       // Check how many transactions have archiveId for duplicate detection
       const transactionsWithArchiveId = transactionsToImport.filter(tx => (tx as any).archiveId)
@@ -1305,7 +1532,7 @@ export default function FinancePage() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <a
                       href="/finance/analytics"
-                      className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-lg transition-colors"
                     >
                       Analytics
                     </a>
@@ -1487,6 +1714,170 @@ export default function FinancePage() {
                       </div>
                     </div>
                   )}
+
+                  {/* Expense Forecast */}
+                  {summaryView === 'monthly' && (
+                    <div className="mt-6 space-y-6">
+                      <ExpenseForecastComponent period="month" monthsOfHistory={6} />
+                    </div>
+                  )}
+                </div>
+
+                {/* Savings Goals Section */}
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                      <Target className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                      Savings Goals
+                    </h2>
+                    <a
+                      href="/finance/savings-goals"
+                      className="text-sm text-purple-600 dark:text-purple-400 hover:underline"
+                    >
+                      View All →
+                    </a>
+                  </div>
+                  {isLoadingGoals ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <CardSkeleton />
+                      <CardSkeleton />
+                    </div>
+                  ) : savingsGoals.length === 0 ? (
+                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-8 text-center">
+                      <Target className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-600 dark:text-gray-400 mb-4">No savings goals yet</p>
+                      <a
+                        href="/finance/savings-goals"
+                        className="inline-block px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors"
+                      >
+                        Create Goal
+                      </a>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {savingsGoals.slice(0, 3).map((goal) => {
+                        const progress = goal.targetAmount > 0 ? (goal.currentAmount / goal.targetAmount) * 100 : 0
+                        return (
+                          <div
+                            key={goal.id}
+                            className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 border-l-4"
+                            style={{ borderLeftColor: goal.color || '#6366f1' }}
+                          >
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex-1">
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+                                  {goal.name}
+                                </h3>
+                                <div className="text-sm text-gray-600 dark:text-gray-400">
+                                  {formatCurrency(goal.currentAmount)} / {formatCurrency(goal.targetAmount)}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-2">
+                              <div
+                                className="h-full transition-all duration-300 rounded-full"
+                                style={{
+                                  width: `${Math.min(progress, 100)}%`,
+                                  backgroundColor: goal.color || '#6366f1',
+                                }}
+                              />
+                            </div>
+                            <div className="text-xs font-semibold text-gray-600 dark:text-gray-400">
+                              {progress.toFixed(0)}% complete
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Bill Reminders Section */}
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                      <Bell className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                      Bill Reminders
+                    </h2>
+                    <a
+                      href="/finance/bills"
+                      className="text-sm text-purple-600 dark:text-purple-400 hover:underline"
+                    >
+                      View All →
+                    </a>
+                  </div>
+                  {isLoadingBills ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <CardSkeleton />
+                      <CardSkeleton />
+                    </div>
+                  ) : bills.length === 0 ? (
+                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-8 text-center">
+                      <Bell className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-600 dark:text-gray-400 mb-4">No bill reminders yet</p>
+                      <a
+                        href="/finance/bills"
+                        className="inline-block px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors"
+                      >
+                        Add Bill
+                      </a>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {bills
+                        .filter(bill => !bill.isPaid)
+                        .sort((a, b) => {
+                          const dateA = a.dueDate ? parseTransactionDate(a.dueDate) : parseTransactionDate(a.nextDate || new Date())
+                          const dateB = b.dueDate ? parseTransactionDate(b.dueDate) : parseTransactionDate(b.nextDate || new Date())
+                          return dateA.getTime() - dateB.getTime()
+                        })
+                        .slice(0, 4)
+                        .map((bill) => {
+                          const dueDate = bill.dueDate 
+                            ? parseTransactionDate(bill.dueDate)
+                            : parseTransactionDate(bill.nextDate || new Date())
+                          const daysUntilDue = differenceInDays(dueDate, new Date())
+                          const isOverdue = isPast(dueDate) && !isToday(dueDate)
+                          const isDueSoon = daysUntilDue <= (bill.reminderDaysBefore || 3) && daysUntilDue >= 0
+
+                          return (
+                            <div
+                              key={bill.id}
+                              className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-4 border-l-4 border-purple-500"
+                            >
+                              <div className="flex items-start justify-between mb-3">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                      {bill.name || 'Untitled Bill'}
+                                    </h3>
+                                    {isOverdue && <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />}
+                                    {isDueSoon && !isOverdue && <Clock className="w-5 h-5 text-orange-600 dark:text-orange-400" />}
+                                  </div>
+                                  <div className="text-xl font-bold text-gray-900 dark:text-white mb-1">
+                                    {formatCurrency(bill.amount)}
+                                  </div>
+                                  <div className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-1">
+                                    <Calendar className="w-4 h-4" />
+                                    Due: {format(dueDate, 'MMM d, yyyy')}
+                                  </div>
+                                </div>
+                              </div>
+                              {isOverdue && (
+                                <div className="text-sm font-semibold text-red-600 dark:text-red-400">
+                                  {Math.abs(daysUntilDue)} days overdue
+                                </div>
+                              )}
+                              {isDueSoon && !isOverdue && (
+                                <div className="text-sm font-semibold text-orange-600 dark:text-orange-400">
+                                  Due in {daysUntilDue} days
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                    </div>
+                  )}
                 </div>
 
                 {/* Main View */}
@@ -1548,22 +1939,25 @@ export default function FinancePage() {
                         </div>
                         <div>
                           <label htmlFor="category" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Category
+                            Category {!availableCategories.includes(formCategory) && formCategory && (
+                              <span className="text-xs text-blue-600 dark:text-blue-400">(New category will be created)</span>
+                            )}
                           </label>
-                          <select
+                          <input
                             id="category"
+                            type="text"
+                            list="category-list"
                             value={formCategory}
                             onChange={(e) => setFormCategory(e.target.value)}
                             required
+                            placeholder="Select or type a new category"
                             className="w-full px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          >
-                            <option value="">Select category</option>
+                          />
+                          <datalist id="category-list">
                             {availableCategories.map((cat) => (
-                              <option key={cat} value={cat}>
-                                {cat}
-                              </option>
+                              <option key={cat} value={cat} />
                             ))}
-                          </select>
+                          </datalist>
                           {categorySuggestions.length > 0 && (
                             <div className="mt-2">
                               <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">Suggested categories:</div>
@@ -1580,6 +1974,30 @@ export default function FinancePage() {
                                 ))}
                               </div>
                             </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={formIsRecurring}
+                              onChange={(e) => setFormIsRecurring(e.target.checked)}
+                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            />
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                              Mark as recurring transaction
+                            </span>
+                          </label>
+                          {formIsRecurring && (
+                            <select
+                              value={formRecurringInterval}
+                              onChange={(e) => setFormRecurringInterval(e.target.value as 'monthly' | 'weekly' | 'yearly')}
+                              className="px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                              <option value="weekly">Weekly</option>
+                              <option value="monthly">Monthly</option>
+                              <option value="yearly">Yearly</option>
+                            </select>
                           )}
                         </div>
                         <div>

@@ -80,21 +80,117 @@ export interface Achievement {
   target: number
 }
 
-export interface LeaderboardEntry {
-  userId: string
-  userName: string
-  avatar?: string
-  level: number
-  xp: number
-  streak: number
-  rank: number
-}
-
 export interface DailyStats {
   date: string
   habitsCompleted: number
   xpEarned: number
   challengesCompleted: number
   distractionsBlocked: number
+}
+
+export interface Todo {
+  id: string
+  userId: string
+  title: string
+  description?: string
+  priority: 'urgent' | 'important' | 'nice-to-have'
+  category?: string
+  tags?: string[]
+  isCompleted: boolean
+  completedAt?: Date | string
+  dueDate?: Date | string
+  recurring?: {
+    type: 'daily' | 'weekly' | 'monthly'
+    interval: number // e.g., every 2 weeks
+    nextDueDate?: Date | string
+  }
+  linkedHabitId?: string // Link to a habit for integration
+  xpReward?: number // XP reward for completing this task
+  createdAt: Date | string
+  updatedAt: Date | string
+}
+
+export interface FocusSession {
+  id: string
+  userId: string
+  type: 'pomodoro' | 'short-break' | 'long-break' | 'custom'
+  duration: number // Duration in seconds
+  completedDuration: number // Actual completed duration in seconds
+  isCompleted: boolean
+  distractions?: number // Number of distractions during session
+  distractionNotes?: string[] // Notes about distractions
+  linkedHabitId?: string // Link to a habit (e.g., "Focus for 2 hours" habit)
+  xpReward?: number // XP reward for completing session
+  startedAt: Date | string
+  completedAt?: Date | string
+  createdAt: Date | string
+}
+
+export interface GoalMilestone {
+  id: string
+  title: string
+  description?: string
+  targetValue: number
+  currentValue: number
+  isCompleted: boolean
+  completedAt?: Date | string
+  order: number
+}
+
+export interface Goal {
+  id: string
+  userId: string
+  title: string
+  description?: string
+  category: 'health' | 'finance' | 'career' | 'personal' | 'fitness' | 'learning' | 'other'
+  // SMART goal criteria
+  specific: string // Specific description
+  measurable: string // How to measure progress
+  achievable: string // Why it's achievable
+  relevant: string // Why it matters
+  timeBound: Date | string // Deadline
+  
+  // Progress tracking
+  currentValue: number
+  targetValue: number
+  unit: string // e.g., 'kg', 'dollars', 'hours', 'days', 'count'
+  
+  // Milestones
+  milestones: GoalMilestone[]
+  
+  // Integration
+  linkedHabitIds?: string[] // Link to habits that contribute to this goal
+  linkedChallengeIds?: string[] // Link to challenges that contribute to this goal
+  
+  // Status
+  status: 'active' | 'paused' | 'completed' | 'cancelled'
+  progressPercentage: number // 0-100
+  
+  // Dates
+  startDate: Date | string
+  deadline: Date | string
+  completedAt?: Date | string
+  
+  // Metadata
+  createdAt: Date | string
+  updatedAt: Date | string
+  notes?: string[] // Progress notes/updates
+}
+
+export interface JournalEntry {
+  id: string
+  userId: string
+  date: string // Format: "yyyy-MM-dd"
+  type: 'daily' | 'gratitude' | 'reflection' | 'weekly' | 'monthly'
+  title?: string
+  content: string
+  mood?: 'very-happy' | 'happy' | 'neutral' | 'sad' | 'very-sad' | 'anxious' | 'calm' | 'energetic' | 'tired'
+  moodRating?: number // 1-10 scale
+  gratitudeItems?: string[] // For gratitude journal entries
+  tags?: string[]
+  linkedHabitId?: string // Integration with habits (e.g., "Journal daily" habit)
+  templateId?: string // If created from a template
+  createdAt: Date | string
+  updatedAt: Date | string
 }
 

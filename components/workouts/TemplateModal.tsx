@@ -1,6 +1,7 @@
 'use client'
 
-import { X } from 'lucide-react'
+import { useState } from 'react'
+import { X, Sparkles } from 'lucide-react'
 import { ROUTINE_TEMPLATES } from '@/lib/routineTemplates'
 import type { Routine } from '@/types/workout'
 
@@ -11,6 +12,8 @@ interface TemplateModalProps {
 }
 
 export default function TemplateModal({ isOpen, onClose, onSelectTemplate }: TemplateModalProps) {
+  const [selectedCategory, setSelectedCategory] = useState<string>('all')
+
   if (!isOpen) return null
 
   const handleSelectTemplate = (template: typeof ROUTINE_TEMPLATES[0]) => {
@@ -25,6 +28,20 @@ export default function TemplateModal({ isOpen, onClose, onSelectTemplate }: Tem
     onSelectTemplate(templateRoutine)
     onClose()
   }
+
+  // Categorize templates
+  const stretchRoutines = ROUTINE_TEMPLATES.filter(t => 
+    t.tags?.some(tag => tag.includes('stretch') || tag.includes('morning') || tag.includes('yoga'))
+  )
+  const strengthRoutines = ROUTINE_TEMPLATES.filter(t => 
+    !t.tags?.some(tag => tag.includes('stretch') || tag.includes('morning') || tag.includes('yoga'))
+  )
+
+  const displayedTemplates = selectedCategory === 'stretch' 
+    ? stretchRoutines 
+    : selectedCategory === 'strength'
+    ? strengthRoutines
+    : ROUTINE_TEMPLATES
 
   const getDifficultyBadgeClass = (difficulty: string) => {
     switch (difficulty) {
@@ -51,11 +68,47 @@ export default function TemplateModal({ isOpen, onClose, onSelectTemplate }: Tem
             <X className="w-5 h-5" />
           </button>
         </div>
-        <p className="text-gray-600 dark:text-gray-400 mb-6">
+        <p className="text-gray-600 dark:text-gray-400 mb-4">
           Choose a pre-built routine template to get started. You can customize it after loading.
         </p>
+
+        {/* Category Filter */}
+        <div className="flex gap-2 mb-6 flex-wrap">
+          <button
+            onClick={() => setSelectedCategory('all')}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              selectedCategory === 'all'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+            }`}
+          >
+            All ({ROUTINE_TEMPLATES.length})
+          </button>
+          <button
+            onClick={() => setSelectedCategory('strength')}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              selectedCategory === 'strength'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+            }`}
+          >
+            Strength ({strengthRoutines.length})
+          </button>
+          <button
+            onClick={() => setSelectedCategory('stretch')}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 ${
+              selectedCategory === 'stretch'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+            }`}
+          >
+            <Sparkles className="w-3 h-3" />
+            Morning Stretch ({stretchRoutines.length})
+          </button>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {ROUTINE_TEMPLATES.map((template, index) => (
+          {displayedTemplates.map((template, index) => (
             <div
               key={index}
               className="border border-gray-200 dark:border-gray-700 rounded-lg p-5 hover:shadow-md transition-shadow"

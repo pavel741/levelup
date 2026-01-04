@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Calendar, Clock, TrendingUp, X, Filter } from 'lucide-react'
 import { getExerciseById } from '@/lib/exerciseDatabase'
 import PostWorkoutFeedback from '@/components/PostWorkoutFeedback'
+import { VirtualList } from '@/components/ui/VirtualList'
 import type { WorkoutLog } from '@/types/workout'
 import { format } from 'date-fns'
 
@@ -84,6 +85,89 @@ export default function WorkoutHistory({ logs, onDelete }: WorkoutHistoryProps) 
           <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No workouts yet</h3>
           <p className="text-gray-600 dark:text-gray-400">Complete your first workout to see it here!</p>
         </div>
+      ) : filteredLogs.length > 50 ? (
+        // Use virtual scrolling for large lists
+        <VirtualList
+          items={filteredLogs}
+          itemHeight={180} // Approximate height of each workout card
+          containerHeight={600} // Fixed container height
+          overscan={5} // Render 5 extra items above/below for smooth scrolling
+          className="space-y-3"
+          renderItem={(log) => (
+            <div
+              key={log.id}
+              className="bg-white dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow cursor-pointer"
+              onClick={() => setSelectedLog(log)}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      {format(log.date, 'EEEE, MMMM d, yyyy')}
+                    </h3>
+                    {log.completed && (
+                      <span className="px-2 py-1 bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400 rounded text-xs font-medium">
+                        Completed
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400 mb-3">
+                    <div className="flex items-center gap-1">
+                      <Clock className="w-4 h-4" />
+                      {Math.round(log.duration / 60)} min
+                    </div>
+                    {log.totalVolume && (
+                      <div className="flex items-center gap-1">
+                        <TrendingUp className="w-4 h-4" />
+                        {log.totalVolume.toLocaleString()} kg volume
+                      </div>
+                    )}
+                    <div>{log.exercises.length} exercises</div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {log.exercises.slice(0, 5).map((ex, idx) => {
+                      const exercise = getExerciseById(ex.exerciseId)
+                      return (
+                        <span
+                          key={idx}
+                          className="px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded text-xs"
+                        >
+                          {exercise?.name || 'Unknown'}
+                        </span>
+                      )
+                    })}
+                    {log.exercises.length > 5 && (
+                      <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded text-xs">
+                        +{log.exercises.length - 5} more
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {onDelete && (
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation()
+                      if (confirm('Delete this workout?')) {
+                        // Close modals if this log is selected
+                        if (selectedLog?.id === log.id) {
+                          setSelectedLog(null)
+                        }
+                        if (feedbackLog?.id === log.id) {
+                          setShowFeedback(false)
+                          setFeedbackLog(null)
+                        }
+                        await onDelete(log.id)
+                      }
+                    }}
+                    className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        />
       ) : (
         <div className="space-y-3">
           {filteredLogs.map((log) => (

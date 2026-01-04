@@ -486,6 +486,42 @@ export const batchDeleteTransactions = async (
   }
 }
 
+export const deleteTransactionsByDateRange = async (
+  userId: string,
+  beforeDate: Date
+): Promise<number> => {
+  try {
+    const collection = await getTransactionsCollection(userId)
+    
+    // Delete all transactions before the specified date
+    const result = await collection.deleteMany({
+      userId,
+      date: { $lt: beforeDate }
+    })
+    
+    return result.deletedCount || 0
+  } catch (error) {
+    console.error('Error in deleteTransactionsByDateRange MongoDB:', error)
+    throw error
+  }
+}
+
+export const deleteAllTransactions = async (
+  userId: string
+): Promise<number> => {
+  try {
+    const collection = await getTransactionsCollection(userId)
+    
+    // Delete all transactions for this user
+    const result = await collection.deleteMany({ userId })
+    
+    return result.deletedCount || 0
+  } catch (error) {
+    console.error('Error in deleteAllTransactions MongoDB:', error)
+    throw error
+  }
+}
+
 // ---------- Categories ----------
 
 export const subscribeToCategories = (
@@ -873,10 +909,26 @@ export const addRecurringTransaction = async (
 ): Promise<string> => {
   try {
     const collection = await getRecurringTransactionsCollection(userId)
+    
+    const convertDate = (date: any): Date | undefined => {
+      if (!date) return undefined
+      if (date instanceof Date) return date
+      if (typeof date === 'string') return new Date(date)
+      return new Date(String(date))
+    }
+    
     const txData = {
       ...transaction,
       userId,
-      nextDate: transaction.nextDate instanceof Date ? transaction.nextDate : (transaction.nextDate ? new Date(transaction.nextDate) : new Date()),
+      nextDate: convertDate(transaction.nextDate) || new Date(),
+      dueDate: convertDate(transaction.dueDate),
+      lastPaidDate: convertDate(transaction.lastPaidDate),
+      isPaid: transaction.isPaid || false,
+      reminderDaysBefore: transaction.reminderDaysBefore || 3,
+      paymentHistory: transaction.paymentHistory?.map((p: any) => ({
+        ...p,
+        date: convertDate(p.date) || new Date(),
+      })) || [],
       createdAt: new Date(),
     }
     const result = await collection.insertOne(txData)
@@ -894,22 +946,32 @@ export const updateRecurringTransaction = async (
 ): Promise<void> => {
   try {
     const collection = await getRecurringTransactionsCollection(userId)
-    // Convert nextDate if present and create updateData without nextDate first
-    const { nextDate, ...updatesWithoutNextDate } = updates
-    const updateData: Partial<FinanceRecurringTransaction> & { nextDate?: Date } = { ...updatesWithoutNextDate }
-    if (nextDate) {
-      // Handle different date types: string, Date, or Timestamp
-      if (nextDate instanceof Date) {
-        updateData.nextDate = nextDate
-      } else if (typeof nextDate === 'string') {
-        updateData.nextDate = new Date(nextDate)
-      } else if (typeof nextDate === 'object' && nextDate !== null && 'toDate' in nextDate && typeof (nextDate as { toDate: () => Date }).toDate === 'function') {
-        // Firestore Timestamp
-        updateData.nextDate = (nextDate as { toDate: () => Date }).toDate()
-      } else {
-        updateData.nextDate = new Date(String(nextDate))
+    // Convert dates if present
+    const { nextDate, dueDate, lastPaidDate, ...updatesWithoutDates } = updates
+    const updateData: Partial<FinanceRecurringTransaction> & { nextDate?: Date; dueDate?: Date; lastPaidDate?: Date } = { ...updatesWithoutDates }
+    
+    const convertDate = (date: any): Date | undefined => {
+      if (!date) return undefined
+      if (date instanceof Date) return date
+      if (typeof date === 'string') return new Date(date)
+      if (typeof date === 'object' && date !== null && 'toDate' in date && typeof (date as { toDate: () => Date }).toDate === 'function') {
+        return (date as { toDate: () => Date }).toDate()
       }
+      return new Date(String(date))
     }
+    
+    if (nextDate) updateData.nextDate = convertDate(nextDate)
+    if (dueDate) updateData.dueDate = convertDate(dueDate)
+    if (lastPaidDate) updateData.lastPaidDate = convertDate(lastPaidDate)
+    
+    // Handle payment history updates
+    if (updates.paymentHistory) {
+      updateData.paymentHistory = updates.paymentHistory.map((payment: any) => ({
+        ...payment,
+        date: convertDate(payment.date) || new Date(),
+      }))
+    }
+    
     updateData.updatedAt = new Date()
 
     await collection.updateOne(

@@ -11,6 +11,7 @@ import { showWarning } from '@/lib/utils'
 interface HabitCardProps {
   habit: Habit
   onEdit?: (habit: Habit) => void
+  selectedDate?: string // Date in 'yyyy-MM-dd' format, defaults to today
 }
 
 function calculateStreak(completedDates: string[]): number {
@@ -53,7 +54,7 @@ function checkIfHabitStarted(startDate: Date | string | undefined, todayStr: str
   return todayStr >= startDateStr
 }
 
-function HabitCardComponent({ habit, onEdit }: HabitCardProps) {
+function HabitCardComponent({ habit, onEdit, selectedDate }: HabitCardProps) {
   const { completeHabit, uncompleteHabit, deleteHabit, markHabitMissed, updateMissedReasonValidity, user } = useFirestoreStore()
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showMissedModal, setShowMissedModal] = useState(false)
@@ -63,10 +64,11 @@ function HabitCardComponent({ habit, onEdit }: HabitCardProps) {
   const [showXPGain, setShowXPGain] = useState(false)
   const [xpGained, setXpGained] = useState(0)
   const today = format(new Date(), 'yyyy-MM-dd')
+  const displayDate = selectedDate || today
   const targetCount = (habit.targetCountPerDay ?? 1) as number
-  const currentCount = (habit.completionsPerDay?.[today] ?? 0) as number
-  const isCompleted = habit.completedDates.includes(today)
-  const isMissed = habit.missedDates?.some((m) => m.date === today)
+  const currentCount = (habit.completionsPerDay?.[displayDate] ?? 0) as number
+  const isCompleted = habit.completedDates.includes(displayDate)
+  const isMissed = habit.missedDates?.some((m) => m.date === displayDate)
   const [prevCompleted, setPrevCompleted] = useState(isCompleted)
   
   // Track XP changes to show notification when habit becomes completed
@@ -89,18 +91,18 @@ function HabitCardComponent({ habit, onEdit }: HabitCardProps) {
   }, [isCompleted, habit.xpReward, user, prevCompleted])
   
   // Check if habit has started
-  const hasStarted = checkIfHabitStarted(habit.startDate, today)
+  const hasStarted = checkIfHabitStarted(habit.startDate, displayDate)
 
   const handleToggle = () => {
     const targetCount = habit.targetCountPerDay || 1
-    const currentCount = habit.completionsPerDay?.[today] || 0
+    const currentCount = habit.completionsPerDay?.[displayDate] || 0
     
     // If current count exceeds target, or if at/above target and completed, uncomplete (decrement)
     if (currentCount > targetCount || (isCompleted && currentCount >= targetCount)) {
-      uncompleteHabit(habit.id)
+      uncompleteHabit(habit.id, displayDate)
     } else {
       // Otherwise, complete (increment)
-      completeHabit(habit.id)
+      completeHabit(habit.id, displayDate)
     }
   }
 
@@ -230,7 +232,7 @@ function HabitCardComponent({ habit, onEdit }: HabitCardProps) {
               )}
               <button
                 onClick={handleToggle}
-                disabled={!hasStarted || (currentCount === 0 && !isCompleted)}
+                disabled={!hasStarted}
                 className={`p-2 rounded-lg transition-colors ${
                   !hasStarted
                     ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed opacity-50'
@@ -246,16 +248,16 @@ function HabitCardComponent({ habit, onEdit }: HabitCardProps) {
                   !hasStarted && habit.startDate
                     ? `Habit starts on ${habit.startDate instanceof Date ? format(habit.startDate, 'MMM d, yyyy') : format(new Date(habit.startDate), 'MMM d, yyyy')}`
                     : currentCount > targetCount
-                    ? `Completed ${currentCount} times (target: ${targetCount}) - Click to undo one`
+                    ? `Completed ${currentCount} times (target: ${targetCount}) for ${displayDate === today ? 'today' : format(new Date(displayDate), 'MMM d')} - Click to undo one`
                     : isCompleted && currentCount >= targetCount
-                    ? `Completed (${currentCount}/${targetCount}) - Click to undo`
+                    ? `Completed (${currentCount}/${targetCount}) for ${displayDate === today ? 'today' : format(new Date(displayDate), 'MMM d')} - Click to undo`
                     : targetCount > 1
-                    ? `${currentCount}/${targetCount} - Click to add one more`
+                    ? `${currentCount}/${targetCount} for ${displayDate === today ? 'today' : format(new Date(displayDate), 'MMM d')} - Click to add one more`
                     : isCompleted 
-                    ? 'Completed - Click to undo' 
+                    ? `Completed for ${displayDate === today ? 'today' : format(new Date(displayDate), 'MMM d')} - Click to undo` 
                     : isMissed 
-                    ? 'Missed' 
-                    : 'Mark as complete'
+                    ? `Missed on ${displayDate === today ? 'today' : format(new Date(displayDate), 'MMM d')}` 
+                    : `Mark as complete for ${displayDate === today ? 'today' : format(new Date(displayDate), 'MMM d')}`
                 }
               >
                 {isCompleted && currentCount >= targetCount ? (
@@ -405,9 +407,11 @@ function HabitCardComponent({ habit, onEdit }: HabitCardProps) {
               )}
             </span>
           </div>
-          {showTargetCount && (
+              {showTargetCount && (
             <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-600 dark:text-gray-400">Today's Progress</span>
+              <span className="text-gray-600 dark:text-gray-400">
+                {displayDate === today ? "Today's Progress" : `Progress for ${format(new Date(displayDate), 'MMM d')}`}
+              </span>
               <span className="font-semibold text-blue-600 dark:text-blue-400"> {String(currentCount)}/{String(targetCount)}</span>
             </div>
           )}
@@ -579,11 +583,23 @@ function HabitCardComponent({ habit, onEdit }: HabitCardProps) {
 // Memoize HabitCard to prevent unnecessary re-renders
 export default memo(HabitCardComponent, (prevProps, nextProps) => {
   // Only re-render if habit data actually changed
+  const prevCompletedDates = prevProps.habit.completedDates || []
+  const nextCompletedDates = nextProps.habit.completedDates || []
+  const prevCompletionsPerDay = prevProps.habit.completionsPerDay || {}
+  const nextCompletionsPerDay = nextProps.habit.completionsPerDay || {}
+  
+  // Check if completion status changed for the selected date
+  const selectedDate = prevProps.selectedDate || nextProps.selectedDate || format(new Date(), 'yyyy-MM-dd')
+  const prevCompleted = prevCompletedDates.includes(selectedDate)
+  const nextCompleted = nextCompletedDates.includes(selectedDate)
+  const prevCount = prevCompletionsPerDay[selectedDate] || 0
+  const nextCount = nextCompletionsPerDay[selectedDate] || 0
+  
   return (
     prevProps.habit.id === nextProps.habit.id &&
-    prevProps.habit.completedDates.length === nextProps.habit.completedDates.length &&
-    prevProps.habit.completedDates[prevProps.habit.completedDates.length - 1] === 
-    nextProps.habit.completedDates[nextProps.habit.completedDates.length - 1] &&
-    prevProps.habit.isActive === nextProps.habit.isActive
+    prevProps.habit.isActive === nextProps.habit.isActive &&
+    prevCompleted === nextCompleted &&
+    prevCount === nextCount &&
+    prevProps.selectedDate === nextProps.selectedDate
   )
 })

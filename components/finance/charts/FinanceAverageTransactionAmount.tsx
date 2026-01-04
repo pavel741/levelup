@@ -15,7 +15,7 @@ import {
   ChartData,
 } from 'chart.js'
 import type { FinanceTransaction } from '@/types/finance'
-import { format, startOfMonth, eachMonthOfInterval, subMonths } from 'date-fns'
+import { format, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths } from 'date-fns'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend)
 
@@ -26,19 +26,31 @@ interface Props {
 
 export function FinanceAverageTransactionAmount({ transactions, months = 12 }: Props) {
   const { data, options } = useMemo(() => {
-    const now = new Date()
-    const startDate = startOfMonth(subMonths(now, months - 1))
-    const monthDates = eachMonthOfInterval({ start: startDate, end: now })
+    // Use actual transaction dates instead of fixed date range
+    // Find min and max dates from transactions
+    let minDate: Date | null = null
+    let maxDate: Date | null = null
+    
+    transactions.forEach((tx) => {
+      const txDate = typeof tx.date === 'string' ? new Date(tx.date) : (tx.date as Date)
+      if (!minDate || txDate < minDate) minDate = txDate
+      if (!maxDate || txDate > maxDate) maxDate = txDate
+    })
+    
+    // Use transaction date range, or fallback to last N months if no transactions
+    const endDate = maxDate || new Date()
+    const startDate = minDate || startOfMonth(subMonths(new Date(), months - 1))
+    const monthDates = eachMonthOfInterval({ start: startOfMonth(startDate), end: endOfMonth(endDate) })
 
     const monthlyData: Record<string, { total: number; count: number }> = {}
 
-    // Initialize all months
+    // Initialize all months from actual transaction range
     monthDates.forEach((date) => {
       const key = format(date, 'yyyy-MM')
       monthlyData[key] = { total: 0, count: 0 }
     })
 
-    // Process transactions
+    // Process all transactions (already filtered by timeRange)
     transactions.forEach((tx) => {
       const amount = Number(tx.amount) || 0
       const type = (tx.type || '').toLowerCase()

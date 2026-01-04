@@ -220,6 +220,51 @@ export const batchDeleteTransactions = async (
   cache.invalidatePattern(new RegExp(`^transactions:${userId}`))
 }
 
+export const deleteTransactionsBeforeDate = async (
+  userId: string,
+  beforeDate: Date
+): Promise<number> => {
+  const response = await fetch('/api/finance/transactions/delete-by-date', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, beforeDate: beforeDate.toISOString() }),
+  })
+  
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to delete transactions by date')
+  }
+  
+  const result = await response.json()
+  
+  // Invalidate transaction cache
+  cache.invalidatePattern(new RegExp(`^transactions:${userId}`))
+  
+  return result.deletedCount || 0
+}
+
+export const deleteAllTransactions = async (
+  userId: string
+): Promise<number> => {
+  const response = await fetch('/api/finance/transactions/delete-all', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId }),
+  })
+  
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.error || 'Failed to delete all transactions')
+  }
+  
+  const result = await response.json()
+  
+  // Invalidate transaction cache
+  cache.invalidatePattern(new RegExp(`^transactions:${userId}`))
+  
+  return result.deletedCount || 0
+}
+
 // Categories
 export const subscribeToCategories = (
   userId: string,
@@ -402,7 +447,11 @@ const _getTransactions = async (
   const limitCount = options.limitCount !== undefined && options.limitCount !== null ? options.limitCount : 0
   const params = new URLSearchParams({ userId })
   
-  if (limitCount > 0) {
+  // If limitCount is 0, use forSummary=true to load all transactions
+  // Otherwise, append limit parameter
+  if (limitCount === 0) {
+    params.append('forSummary', 'true')
+  } else if (limitCount > 0) {
     params.append('limit', limitCount.toString())
   }
   
@@ -479,18 +528,24 @@ export const saveBudgetGoals = async (
 }
 
 // Recurring Transactions
+// Get recurring transactions
+export const getRecurringTransactions = async (userId: string): Promise<any[]> => {
+  const params = new URLSearchParams({ userId })
+  const response = await fetch(`/api/finance/recurring?${params}`)
+  
+  if (!response.ok) throw new Error('Failed to fetch recurring transactions')
+  
+  const data = await response.json()
+  // Handle both wrapped (data.transactions) and unwrapped (data) formats
+  return data.data?.transactions || data.transactions || data.data || data || []
+}
+
 export const subscribeToRecurringTransactions = (
   userId: string,
   callback: (transactions: any[]) => void
 ): (() => void) => {
   const fetchRecurringTransactions = async (): Promise<any[]> => {
-    const params = new URLSearchParams({ userId })
-    const response = await fetch(`/api/finance/recurring?${params}`)
-    
-    if (!response.ok) throw new Error('Failed to fetch recurring transactions')
-    
-    const data = await response.json()
-    return data.transactions || []
+    return getRecurringTransactions(userId)
   }
 
   // Hash function for recurring transactions
