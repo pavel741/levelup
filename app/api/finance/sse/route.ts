@@ -34,10 +34,31 @@ export async function GET(request: NextRequest) {
       // Set up periodic updates (simulates real-time changes)
       // In production, this would be triggered by database change streams or events
       let isClosed = false
-      const intervalId = setInterval(async () => {
+      let intervalId: NodeJS.Timeout | null = null
+      
+      // Set a timeout to close connection before serverless function timeout
+      // Vercel Hobby: 10s, Pro: 60s - use 8s to be safe
+      const maxDuration = 8000 // 8 seconds max
+      const timeoutId = setTimeout(() => {
+        if (!isClosed) {
+          isClosed = true
+          if (intervalId) clearInterval(intervalId)
+          connections.delete(connectionId)
+          try {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ type: 'timeout', message: 'Connection closed due to serverless timeout' })}\n\n`)
+            )
+            controller.close()
+          } catch (error) {
+            // Controller might already be closed, ignore
+          }
+        }
+      }, maxDuration)
+      
+      intervalId = setInterval(async () => {
         // Check if controller is closed before trying to enqueue
-        if (isClosed) {
-          clearInterval(intervalId)
+        if (isClosed || !intervalId) {
+          if (intervalId) clearInterval(intervalId)
           return
         }
 
@@ -104,7 +125,8 @@ export async function GET(request: NextRequest) {
       // Cleanup on disconnect
       request.signal.addEventListener('abort', () => {
         isClosed = true
-        clearInterval(intervalId)
+        if (intervalId) clearInterval(intervalId)
+        clearTimeout(timeoutId)
         connections.delete(connectionId)
         try {
           controller.close()

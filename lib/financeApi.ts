@@ -13,9 +13,15 @@ export const subscribeToTransactions = (
   options: { limitCount?: number; useSSE?: boolean } = {}
 ): (() => void) => {
   const limitCount = options.limitCount !== undefined && options.limitCount !== null ? options.limitCount : 0
-  const useSSE = options.useSSE !== false // Default to true, can be disabled
+  // Disable SSE in production (Vercel serverless doesn't support long-lived connections)
+  const isProduction = typeof window !== 'undefined' && (
+    window.location.hostname.includes('vercel.app') ||
+    window.location.hostname.includes('vercel.com') ||
+    (typeof process !== 'undefined' && process.env?.NODE_ENV === 'production')
+  )
+  const useSSE = options.useSSE !== false && !isProduction // Default to false in production
 
-  // Try SSE first if supported, fallback to polling
+  // Try SSE first if supported and not in production, fallback to polling
   if (useSSE && typeof EventSource !== 'undefined') {
     try {
       let sseClient: SSEClient | null = null
@@ -271,9 +277,15 @@ export const subscribeToCategories = (
   callback: (categories: FinanceCategories) => void,
   options: { useSSE?: boolean } = {}
 ): (() => void) => {
-  const useSSE = options.useSSE !== false // Default to true
+  // Disable SSE in production (Vercel serverless doesn't support long-lived connections)
+  const isProduction = typeof window !== 'undefined' && (
+    window.location.hostname.includes('vercel.app') ||
+    window.location.hostname.includes('vercel.com') ||
+    (typeof process !== 'undefined' && process.env?.NODE_ENV === 'production')
+  )
+  const useSSE = options.useSSE !== false && !isProduction // Default to false in production
 
-  // Try SSE first if supported
+  // Try SSE first if supported and not in production
   if (useSSE && typeof EventSource !== 'undefined') {
     try {
       let sseClient: SSEClient | null = null

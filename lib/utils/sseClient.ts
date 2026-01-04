@@ -13,10 +13,6 @@ export interface SSEOptions {
 
 export class SSEClient {
   private eventSource: EventSource | null = null
-  private reconnectAttempts = 0
-  private maxReconnectAttempts = 5
-  private reconnectDelay = 1000
-  private isActive = false
 
   constructor(
     private url: string,
@@ -30,11 +26,9 @@ export class SSEClient {
       return
     }
 
-    this.isActive = true
     this.eventSource = new EventSource(this.url)
 
     this.eventSource.onopen = () => {
-      this.reconnectAttempts = 0
       this.options.onOpen?.()
     }
 
@@ -48,31 +42,22 @@ export class SSEClient {
     }
 
     this.eventSource.onerror = () => {
+      // Check for empty response or connection errors
       if (this.eventSource?.readyState === EventSource.CLOSED) {
-        this.handleReconnect()
+        // Connection closed - likely serverless timeout or network issue
+        this.disconnect()
+        this.options.onError?.(new Error('SSE connection closed - serverless environments may not support long-lived connections'))
+      } else if (this.eventSource?.readyState === EventSource.CONNECTING) {
+        // Still connecting - might be a network issue
+        // Don't immediately error, let it try to connect
       } else {
+        // Other errors - trigger fallback
         this.options.onError?.(new Error('SSE connection error'))
       }
     }
   }
 
-  private handleReconnect(): void {
-    if (!this.isActive || this.reconnectAttempts >= this.maxReconnectAttempts) {
-      this.disconnect()
-      this.options.onError?.(new Error('Max reconnection attempts reached'))
-      return
-    }
-
-    this.reconnectAttempts++
-    setTimeout(() => {
-      if (this.isActive) {
-        this.connect()
-      }
-    }, this.reconnectDelay * this.reconnectAttempts)
-  }
-
   disconnect(): void {
-    this.isActive = false
     if (this.eventSource) {
       this.eventSource.close()
       this.eventSource = null
