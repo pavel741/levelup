@@ -7,11 +7,31 @@
  */
 
 import { MongoClient, Binary } from 'mongodb'
-import {
-  getClientEncryption,
-  getUserDataEncryptionKey,
-  getExistingUserDataEncryptionKey,
-} from './csfle-key-management'
+
+// Dynamic import to avoid webpack resolution issues
+// Only load encryption functions on server-side
+let getClientEncryption: any
+let getUserDataEncryptionKey: any
+let getExistingUserDataEncryptionKey: any
+
+if (typeof window === 'undefined') {
+  // Server-side: Load real encryption module
+  const encryptionModule = require('./csfle-key-management')
+  getClientEncryption = encryptionModule.getClientEncryption
+  getUserDataEncryptionKey = encryptionModule.getUserDataEncryptionKey
+  getExistingUserDataEncryptionKey = encryptionModule.getExistingUserDataEncryptionKey
+} else {
+  // Client-side: Use stubs (should never happen, but safety)
+  getClientEncryption = () => {
+    throw new Error('Encryption modules are server-only')
+  }
+  getUserDataEncryptionKey = () => {
+    throw new Error('Encryption modules are server-only')
+  }
+  getExistingUserDataEncryptionKey = () => {
+    throw new Error('Encryption modules are server-only')
+  }
+}
 
 /**
  * Encrypt a string value for a specific user
