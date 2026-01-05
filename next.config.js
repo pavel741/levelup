@@ -48,53 +48,21 @@ const nextConfig = {
       config.externals.push('mongodb')
       config.externals.push('mongodb-client-encryption')
       
-      // Replace encryption modules with stubs
-      // Use a resolver plugin to intercept BEFORE webpack tries to resolve
+      // DIRECT APPROACH: Use resolve.alias to map the import directly to stub
+      // This works at the resolve level before webpack tries to bundle
       const stubPath = path.resolve(__dirname, 'lib/utils/encryption/csfle-client-stub')
       
-      // Create a custom resolver plugin that intercepts module resolution early
-      const EncryptionResolverPlugin = {
-        apply: (resolver) => {
-          // Hook into 'resolve' which runs before 'describedResolve'
-          resolver.hooks.resolve.tapAsync(
-            'EncryptionModuleResolver',
-            (request, resolveContext, callback) => {
-              if (request.request && typeof request.request === 'string') {
-                const req = request.request
-                // Match both absolute (@/) and relative imports
-                if (
-                  req === '@/lib/utils/encryption/csfle-key-management' ||
-                  req === './csfle-key-management' ||
-                  req === './utils/encryption/csfle-key-management' ||
-                  (req.includes('csfle-key-management') && !req.includes('csfle-client-stub'))
-                ) {
-                  // Replace with stub - use absolute path
-                  const newRequest = {
-                    ...request,
-                    request: stubPath,
-                  }
-                  return resolver.doResolve(
-                    resolver.hooks.resolve,
-                    newRequest,
-                    null,
-                    resolveContext,
-                    callback
-                  )
-                }
-              }
-              callback()
-            }
-          )
-        },
-      }
+      // Map the absolute import path directly to the stub file
+      config.resolve.alias['@/lib/utils/encryption/csfle-key-management'] = stubPath
       
-      // Add resolver plugin (runs before NormalModuleReplacementPlugin)
-      if (!config.resolve.plugins) {
-        config.resolve.plugins = []
-      }
-      config.resolve.plugins.push(EncryptionResolverPlugin)
+      // Also map relative imports from different locations
+      // For imports from lib/utils/encryption/csfle-explicit.ts
+      config.resolve.alias['./csfle-key-management'] = stubPath
       
-      // Also add NormalModuleReplacementPlugin as backup
+      // For imports from lib/mongodb-encrypted.ts  
+      config.resolve.alias['./utils/encryption/csfle-key-management'] = stubPath
+      
+      // Add NormalModuleReplacementPlugin as additional safety
       config.plugins.unshift(
         new webpack.NormalModuleReplacementPlugin(
           /csfle-key-management(?!-client-stub)/,
