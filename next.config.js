@@ -40,24 +40,7 @@ const nextConfig = {
         }
       }
       
-      // Use webpack's NormalModuleReplacementPlugin to replace encryption modules with stubs
-      // Match both absolute (@/) and relative (./) paths
-      config.plugins.push(
-        new webpack.NormalModuleReplacementPlugin(
-          /^(?:@\/lib\/utils\/encryption\/|\.\/)(keyManager|crypto|financeEncryption|routineEncryption|config)$/,
-          (resource) => {
-            // Only replace if it's from the encryption directory or loader
-            if (resource.context && (
-              resource.context.includes(path.join('lib', 'utils', 'encryption')) ||
-              resource.context.includes('loader')
-            )) {
-              resource.request = stubPath
-            }
-          }
-        )
-      )
-      
-      // Add to resolve.alias as backup
+      // Add to resolve.alias FIRST - this is checked before plugins run
       config.resolve.alias = {
         ...config.resolve.alias,
         '@/lib/utils/encryption/keyManager': stubPath,
@@ -66,9 +49,35 @@ const nextConfig = {
         '@/lib/utils/encryption/routineEncryption': stubPath,
         '@/lib/utils/encryption/config': stubPath,
       }
+      
+      // Use webpack's NormalModuleReplacementPlugin to replace encryption modules with stubs
+      // This catches any imports that aliases might miss
+      config.plugins.unshift(
+        new webpack.NormalModuleReplacementPlugin(
+          /(?:@\/lib\/utils\/encryption\/|lib\/utils\/encryption\/)(keyManager|crypto|financeEncryption|routineEncryption|config)(\.ts|\.js)?$/,
+          (resource) => {
+            resource.request = stubPath
+          }
+        )
+      )
+      
+      // Also handle relative imports from loader.ts
+      // We need to match the resolved path, not just the import string
+      config.plugins.push(
+        new webpack.NormalModuleReplacementPlugin(
+          /(keyManager|crypto|financeEncryption|routineEncryption|config)(\.ts|\.js)?$/,
+          (resource) => {
+            // Only replace if the context is the encryption directory
+            if (resource.context && resource.context.includes(path.join('lib', 'utils', 'encryption'))) {
+              resource.request = stubPath
+            }
+          }
+        )
+      )
     }
     return config
   },
 }
 
 module.exports = nextConfig
+

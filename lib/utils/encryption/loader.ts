@@ -58,21 +58,23 @@ async function loadEncryptionModules(): Promise<void> {
 
   loadingPromise = (async () => {
     try {
-      // Use static imports wrapped in dynamic import() to ensure proper bundling
-      // The 'use client' directive ensures this only runs client-side
+      // Use Function constructor to create truly dynamic imports that webpack can't analyze
+      // This prevents Next.js from trying to resolve these modules during server-side builds
+      const dynamicImport = new Function('specifier', 'return import(specifier)')
+      
+      // Build paths dynamically to prevent static analysis
+      const modules = ['keyManager', 'config', 'routineEncryption', 'financeEncryption', 'crypto']
+      const basePath = './'
+      
       const [
         keyManager,
         config,
         routineEncryption,
         financeEncryption,
         crypto,
-      ] = await Promise.all([
-        import('./keyManager'),
-        import('./config'),
-        import('./routineEncryption'),
-        import('./financeEncryption'),
-        import('./crypto'),
-      ])
+      ] = await Promise.all(
+        modules.map(module => dynamicImport(basePath + module))
+      )
 
       encryptionModules = {
         ensureUserHasEncryptionKey: keyManager.ensureUserHasEncryptionKey,
