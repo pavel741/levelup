@@ -32,12 +32,16 @@ const nextConfig = {
         use: 'ignore-loader',
       })
       
-      // Ignore mongodb-client-encryption package entirely
+      // Ignore mongodb-client-encryption package entirely on client side
       config.plugins.push(
         new webpack.IgnorePlugin({
           resourceRegExp: /^mongodb-client-encryption$/,
         })
       )
+      
+      // Note: We don't ignore the encryption utility modules (csfle-key-management, csfle-explicit)
+      // because they need to be resolvable during server-side builds.
+      // They will fail at runtime on client-side anyway due to mongodb being externalized.
     }
     
     // For server-side builds, exclude .node files from webpack bundling
