@@ -40,6 +40,9 @@ yarn-error.log*
 *password*
 *api_key*
 
+# Exception: Allow encryption key management module (it's code, not a secret)
+!lib/utils/encryption/csfle-key-management.ts
+
 # vercel
 .vercel
 
