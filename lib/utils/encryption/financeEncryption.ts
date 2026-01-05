@@ -17,7 +17,7 @@ type CryptoKey = globalThis.CryptoKey
 
 /**
  * Encrypt sensitive fields in a FinanceTransaction
- * Only encrypts: description, account
+ * Only encrypts: description, account, selgitus (Estonian description field), and other sensitive text fields
  * Keeps unencrypted: amount, date, category, type, currency, tags (for querying/analytics)
  */
 export async function encryptTransaction(
@@ -27,13 +27,27 @@ export async function encryptTransaction(
   const encrypted: FinanceTransaction = { ...transaction }
   
   // Encrypt description (may contain sensitive merchant info, payment details, etc.)
-  if (transaction.description) {
+  if (transaction.description && typeof transaction.description === 'string') {
     encrypted.description = await encryptValue(transaction.description, key)
   }
   
   // Encrypt account name/info (may contain account numbers or sensitive identifiers)
-  if (transaction.account) {
+  if (transaction.account && typeof transaction.account === 'string') {
     encrypted.account = await encryptValue(transaction.account, key)
+  }
+  
+  // Encrypt selgitus (Estonian description field) - common in Estonian bank imports
+  if ((transaction as any).selgitus && typeof (transaction as any).selgitus === 'string') {
+    (encrypted as any).selgitus = await encryptValue((transaction as any).selgitus, key)
+  }
+  
+  // Encrypt referenceNumber if it contains sensitive info (card numbers, etc.)
+  if ((transaction as any).referenceNumber && typeof (transaction as any).referenceNumber === 'string') {
+    const refNum = (transaction as any).referenceNumber
+    // Only encrypt if it looks like it might contain sensitive info (long strings)
+    if (refNum.length > 10) {
+      (encrypted as any).referenceNumber = await encryptValue(refNum, key)
+    }
   }
   
   return encrypted
@@ -49,7 +63,7 @@ export async function decryptTransaction(
   const decrypted: FinanceTransaction = { ...transaction }
   
   // Decrypt description
-  if (transaction.description) {
+  if (transaction.description && typeof transaction.description === 'string') {
     try {
       decrypted.description = await decryptValue(transaction.description, key)
     } catch (error) {
@@ -59,11 +73,33 @@ export async function decryptTransaction(
   }
   
   // Decrypt account
-  if (transaction.account) {
+  if (transaction.account && typeof transaction.account === 'string') {
     try {
       decrypted.account = await decryptValue(transaction.account, key)
     } catch (error) {
       console.warn('Failed to decrypt transaction account, assuming plaintext:', error)
+    }
+  }
+  
+  // Decrypt selgitus (Estonian description field)
+  if ((transaction as any).selgitus && typeof (transaction as any).selgitus === 'string') {
+    try {
+      (decrypted as any).selgitus = await decryptValue((transaction as any).selgitus, key)
+    } catch (error) {
+      console.warn('Failed to decrypt transaction selgitus, assuming plaintext:', error)
+    }
+  }
+  
+  // Decrypt referenceNumber if it was encrypted
+  if ((transaction as any).referenceNumber && typeof (transaction as any).referenceNumber === 'string') {
+    const refNum = (transaction as any).referenceNumber
+    // Try to decrypt if it looks encrypted (base64-like and long)
+    if (refNum.length > 20 && /^[A-Za-z0-9+/=]+$/.test(refNum)) {
+      try {
+        (decrypted as any).referenceNumber = await decryptValue(refNum, key)
+      } catch (error) {
+        // If decryption fails, keep original (might be plaintext reference number)
+      }
     }
   }
   

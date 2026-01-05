@@ -196,7 +196,7 @@ export const improveRoutine = async (routineId: string): Promise<ImproveRoutineR
 // Workout Logs
 export const getWorkoutLogs = async (userId: string): Promise<WorkoutLog[]> => {
   try {
-    const response = await fetch(`${API_BASE}/logs?userId=${userId}`)
+    const response = await authenticatedFetch(`${API_BASE}/logs`)
     if (!response.ok) {
       throw new Error('Failed to fetch workout logs')
     }

@@ -228,6 +228,20 @@ function generateEmailHTML(userName: string, stats: WeeklyStats): string {
   `
 }
 
+// GET handler for health checks and manual triggers
+export async function GET(request: NextRequest) {
+  // Verify the request is from Vercel Cron or has proper auth
+  const authHeader = request.headers.get('authorization')
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  return NextResponse.json({ 
+    message: 'Weekly email endpoint is active',
+    method: 'Use POST to trigger email sending'
+  })
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Verify the request is from Vercel Cron or has proper auth
