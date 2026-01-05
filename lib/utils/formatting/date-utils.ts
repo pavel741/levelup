@@ -170,9 +170,39 @@ export function getPeriodDates(
 
     return { startDate, endDate, cutoffHour: paydayCutoffHour, startCutoffHour: paydayStartCutoffHour }
   } else if (periodStartDay) {
-    const startDate = new Date(year, month - 1, periodStartDay)
-    const endDay = periodEndDay || periodStartDay - 1
-    const endDate = new Date(year, month, endDay, 23, 59, 59)
+    // For custom periods, the period spans from periodStartDay of previous month
+    // to (periodStartDay - 1) of current month
+    // Example: If periodStartDay is 15 and viewing January:
+    //   - Start: Dec 15 (previous month)
+    //   - End: Jan 14 (current month, day before periodStartDay)
+    
+    // Calculate previous month
+    const prevMonth = month === 1 ? 12 : month - 1
+    const prevYear = month === 1 ? year - 1 : year
+    
+    // Start date is periodStartDay of previous month
+    const startDate = new Date(prevYear, prevMonth - 1, periodStartDay)
+    
+    // End date calculation
+    let endDate: Date
+    if (periodEndDay !== null && periodEndDay !== undefined) {
+      // Use specified end day of current month
+      endDate = new Date(year, month - 1, periodEndDay, 23, 59, 59)
+    } else {
+      // Calculate end day: period ends the day before periodStartDay of current month
+      // Handle edge case where periodStartDay is 1
+      if (periodStartDay === 1) {
+        // If period starts on 1st, it ends on last day of previous month
+        // But wait, that doesn't make sense. Let me reconsider...
+        // Actually, if periodStartDay is 1, the period should be:
+        //   - Start: 1st of previous month
+        //   - End: Last day of previous month (which is day 0 of current month)
+        endDate = new Date(year, month - 1, 0, 23, 59, 59)
+      } else {
+        // Period ends on (periodStartDay - 1) of current month
+        endDate = new Date(year, month - 1, periodStartDay - 1, 23, 59, 59)
+      }
+    }
     return { startDate, endDate }
   } else {
     const startDate = startOfMonth(new Date(year, month - 1))

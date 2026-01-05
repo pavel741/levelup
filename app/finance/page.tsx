@@ -579,7 +579,15 @@ export default function FinancePage() {
         }
       } else {
         // Standard period check (inclusive boundaries)
-        isInPeriod = txDate >= startDate && txDate <= endDate
+        // For custom periods, compare dates properly (handle time components)
+        const txDateOnly = new Date(txDate)
+        txDateOnly.setHours(0, 0, 0, 0)
+        const startDateOnly = new Date(startDate)
+        startDateOnly.setHours(0, 0, 0, 0)
+        const endDateOnly = new Date(endDate)
+        endDateOnly.setHours(23, 59, 59, 999) // Include entire end date
+        
+        isInPeriod = txDateOnly >= startDateOnly && txDateOnly <= endDateOnly
       }
       
       if (isInPeriod) {
