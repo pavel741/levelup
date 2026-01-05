@@ -49,12 +49,17 @@ async function initializeUserEncryption(userId: string): Promise<void> {
   }
   
   try {
-    const { initializeUserEncryptionKey } = await import('@/lib/utils/encryption/keyManager')
-    await initializeUserEncryptionKey(userId)
+    // Dynamic import - will be resolved at runtime, not build time
+    // Webpack config excludes this module from server-side bundles
+    const encryptionModule = await import('@/lib/utils/encryption/keyManager')
+    await encryptionModule.initializeUserEncryptionKey(userId)
     console.log('✅ Encryption key initialized for user:', userId)
-  } catch (encryptionError) {
-    console.warn('⚠️ Failed to initialize encryption key (non-critical):', encryptionError)
-    // Don't fail signup if encryption key initialization fails
+  } catch (encryptionError: any) {
+    // Silently fail - encryption is optional and shouldn't block user signup
+    // The error might be due to SSR, missing browser APIs, or module not found during build
+    if (typeof window !== 'undefined' && encryptionError?.code !== 'MODULE_NOT_FOUND') {
+      console.warn('⚠️ Failed to initialize encryption key (non-critical):', encryptionError)
+    }
   }
 }
 

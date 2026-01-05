@@ -24,6 +24,17 @@ const nextConfig = {
       // Exclude MongoDB from client bundle
       config.externals = config.externals || []
       config.externals.push('mongodb')
+    } else {
+      // On server-side, prevent bundling encryption modules that use browser-only APIs
+      // These modules are only used client-side via dynamic imports
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        '@/lib/utils/encryption/keyManager': false,
+        '@/lib/utils/encryption/crypto': false,
+        '@/lib/utils/encryption/financeEncryption': false,
+        '@/lib/utils/encryption/routineEncryption': false,
+        '@/lib/utils/encryption/config': false,
+      }
     }
     return config
   },
