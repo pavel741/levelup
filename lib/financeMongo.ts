@@ -319,15 +319,22 @@ export const addTransaction = async (
     
     // Encrypt sensitive fields before saving
     try {
+      console.log('🔐 Attempting to encrypt transaction fields:', FINANCE_TRANSACTION_ENCRYPTED_FIELDS)
       txData = await encryptObjectFields(
         client,
         userId,
         txData,
         [...FINANCE_TRANSACTION_ENCRYPTED_FIELDS]
       ) as typeof txData
+      console.log('✅ Transaction fields encrypted successfully')
     } catch (error) {
-      console.error('Failed to encrypt transaction fields:', error)
-      // Continue without encryption for backward compatibility
+      console.error('❌ Failed to encrypt transaction fields:', error)
+      console.error('Error details:', error instanceof Error ? error.message : String(error))
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace')
+      // For now, log but continue - we'll fix encryption setup separately
+      // TODO: Once encryption is working, re-enable this throw
+      // throw new Error(`Encryption failed: ${error instanceof Error ? error.message : String(error)}`)
+      console.warn('⚠️ Continuing without encryption - this should be fixed!')
     }
 
     const result = await collection.insertOne(txData)
@@ -376,16 +383,23 @@ export const updateTransaction = async (
         field => field in updateData && updateData[field as keyof typeof updateData] != null
       )
       if (fieldsToEncrypt.length > 0) {
+        console.log('🔐 Attempting to encrypt update fields:', fieldsToEncrypt)
         updateData = await encryptObjectFields(
           client,
           userId,
           updateData,
           [...fieldsToEncrypt]
         ) as Partial<FinanceTransaction> & { date?: Date }
+        console.log('✅ Transaction update fields encrypted successfully')
       }
     } catch (error) {
-      console.error('Failed to encrypt transaction update fields:', error)
-      // Continue without encryption for backward compatibility
+      console.error('❌ Failed to encrypt transaction update fields:', error)
+      console.error('Error details:', error instanceof Error ? error.message : String(error))
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace')
+      // For now, log but continue - we'll fix encryption setup separately
+      // TODO: Once encryption is working, re-enable this throw
+      // throw new Error(`Encryption failed: ${error instanceof Error ? error.message : String(error)}`)
+      console.warn('⚠️ Continuing without encryption - this should be fixed!')
     }
 
     // Ensure userId matches (security check)

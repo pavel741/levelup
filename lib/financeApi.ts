@@ -152,14 +152,14 @@ export const updateTransaction = async (
   transactionId: string,
   updates: Partial<FinanceTransaction>
 ): Promise<void> => {
-  const response = await fetch(`/api/finance/transactions/${transactionId}`, {
+  const response = await fetch(`/api/finance/transactions`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userId, id: transactionId, ...updates }),
   })
   
   if (!response.ok) {
-    const error = await response.json()
+    const error = await response.json().catch(() => ({ error: 'Failed to update transaction' }))
     throw new Error(error.error || 'Failed to update transaction')
   }
   
