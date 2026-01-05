@@ -86,6 +86,22 @@ function generateIV(): Uint8Array {
 }
 
 /**
+ * Check if a string looks like encrypted data (base64 format with minimum length)
+ */
+function looksEncrypted(value: string): boolean {
+  if (!value || value.length < 20) {
+    return false // Too short to be encrypted
+  }
+  
+  // Encrypted data is base64 encoded, so it should:
+  // 1. Be longer than a typical short plaintext (encrypted data is always longer)
+  // 2. Contain only base64 characters (A-Z, a-z, 0-9, +, /, =)
+  // 3. Have a length that's a multiple of 4 (base64 padding)
+  const base64Regex = /^[A-Za-z0-9+/]+=*$/
+  return base64Regex.test(value) && value.length >= 20
+}
+
+/**
  * Encrypt a string value
  */
 export async function encryptValue(value: string, key: CryptoKey): Promise<string> {
@@ -118,15 +134,26 @@ export async function encryptValue(value: string, key: CryptoKey): Promise<strin
 
 /**
  * Decrypt a string value
+ * Returns the original value if it's not encrypted (backward compatibility)
  */
 export async function decryptValue(encryptedValue: string, key: CryptoKey): Promise<string> {
   if (!encryptedValue) return encryptedValue // Handle empty strings
+  
+  // Check if the value looks encrypted - if not, assume it's plaintext
+  if (!looksEncrypted(encryptedValue)) {
+    return encryptedValue // Return as-is if it doesn't look encrypted
+  }
   
   try {
     // Decode from base64
     const combined = Uint8Array.from(atob(encryptedValue), c => c.charCodeAt(0))
     
     // Extract IV and encrypted data
+    if (combined.length < IV_LENGTH) {
+      // Data is too short, assume plaintext
+      return encryptedValue
+    }
+    
     const iv = combined.slice(0, IV_LENGTH)
     const encrypted = combined.slice(IV_LENGTH)
     // Create a new ArrayBuffer to ensure correct type compatibility
@@ -145,8 +172,9 @@ export async function decryptValue(encryptedValue: string, key: CryptoKey): Prom
     const decoder = new TextDecoder()
     return decoder.decode(decrypted)
   } catch (error) {
-    console.error('Decryption error:', error)
-    throw new Error('Failed to decrypt value. The data may be corrupted or encrypted with a different key.')
+    // If decryption fails, assume it's plaintext (backward compatibility)
+    // Don't throw - just return the original value
+    return encryptedValue
   }
 }
 

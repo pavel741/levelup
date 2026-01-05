@@ -240,8 +240,8 @@ export const updateTransaction = async (
     try {
       const encryption = await getEncryptionModules()
       const encryptionKey = await encryption.ensureUserHasEncryptionKey(userId)
-      // Encrypt fields that should be encrypted: description, account, selgitus
-      const fieldsToEncrypt = ['description', 'account', 'selgitus'].filter(
+      // Encrypt fields that should be encrypted: description, account, recipientName, selgitus
+      const fieldsToEncrypt = ['description', 'account', 'recipientName', 'selgitus'].filter(
         field => field in updates
       ) as (keyof FinanceTransaction)[]
       

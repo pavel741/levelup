@@ -45,8 +45,9 @@ export const EXERCISE_NOTES_ENCRYPTED_FIELDS = ['notes']
  * These contain sensitive financial information
  */
 export const FINANCE_TRANSACTION_ENCRYPTED_FIELDS: (keyof FinanceTransaction)[] = [
-  'description',  // Transaction descriptions (merchant names, payment details)
-  'account',      // Account names/identifiers
+  'description',    // Transaction descriptions (merchant names, payment details)
+  'account',        // Account names/identifiers
+  // Note: recipientName is handled separately as it's a dynamic field
 ]
 
 /**

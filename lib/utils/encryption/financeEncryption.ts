@@ -36,6 +36,13 @@ export async function encryptTransaction(
     encrypted.account = await encryptValue(transaction.account, key)
   }
   
+  // Encrypt recipientName (may contain sensitive recipient information)
+  const recipientName = (transaction as any).recipientName
+  if (recipientName && typeof recipientName === 'string') {
+    const encryptedRecipientName = await encryptValue(recipientName, key)
+    ;(encrypted as any).recipientName = encryptedRecipientName
+  }
+  
   // Encrypt selgitus (Estonian description field) - common in Estonian bank imports
   const selgitus = (transaction as any).selgitus
   if (selgitus && typeof selgitus === 'string') {
@@ -65,45 +72,32 @@ export async function decryptTransaction(
 ): Promise<FinanceTransaction> {
   const decrypted: FinanceTransaction = { ...transaction }
   
-  // Decrypt description
+  // Decrypt description (decryptValue now handles plaintext gracefully)
   if (transaction.description && typeof transaction.description === 'string') {
-    try {
-      decrypted.description = await decryptValue(transaction.description, key)
-    } catch (error) {
-      // If decryption fails, assume plaintext (backward compatibility)
-      console.warn('Failed to decrypt transaction description, assuming plaintext:', error)
-    }
+    decrypted.description = await decryptValue(transaction.description, key)
   }
   
-  // Decrypt account
+  // Decrypt account (decryptValue now handles plaintext gracefully)
   if (transaction.account && typeof transaction.account === 'string') {
-    try {
-      decrypted.account = await decryptValue(transaction.account, key)
-    } catch (error) {
-      console.warn('Failed to decrypt transaction account, assuming plaintext:', error)
-    }
+    decrypted.account = await decryptValue(transaction.account, key)
   }
   
-  // Decrypt selgitus (Estonian description field)
-  if ((transaction as any).selgitus && typeof (transaction as any).selgitus === 'string') {
-    try {
-      (decrypted as any).selgitus = await decryptValue((transaction as any).selgitus, key)
-    } catch (error) {
-      console.warn('Failed to decrypt transaction selgitus, assuming plaintext:', error)
-    }
+  // Decrypt recipientName (decryptValue now handles plaintext gracefully)
+  const recipientName = (transaction as any).recipientName
+  if (recipientName && typeof recipientName === 'string') {
+    (decrypted as any).recipientName = await decryptValue(recipientName, key)
   }
   
-  // Decrypt referenceNumber if it was encrypted
-  if ((transaction as any).referenceNumber && typeof (transaction as any).referenceNumber === 'string') {
-    const refNum = (transaction as any).referenceNumber
-    // Try to decrypt if it looks encrypted (base64-like and long)
-    if (refNum.length > 20 && /^[A-Za-z0-9+/=]+$/.test(refNum)) {
-      try {
-        (decrypted as any).referenceNumber = await decryptValue(refNum, key)
-      } catch (error) {
-        // If decryption fails, keep original (might be plaintext reference number)
-      }
-    }
+  // Decrypt selgitus (decryptValue now handles plaintext gracefully)
+  const selgitus = (transaction as any).selgitus
+  if (selgitus && typeof selgitus === 'string') {
+    (decrypted as any).selgitus = await decryptValue(selgitus, key)
+  }
+  
+  // Decrypt referenceNumber if it was encrypted (decryptValue handles plaintext gracefully)
+  const referenceNumber = (transaction as any).referenceNumber
+  if (referenceNumber && typeof referenceNumber === 'string') {
+    (decrypted as any).referenceNumber = await decryptValue(referenceNumber, key)
   }
   
   return decrypted
@@ -154,35 +148,23 @@ export async function decryptRecurringTransaction(
 ): Promise<FinanceRecurringTransaction> {
   const decrypted: FinanceRecurringTransaction = { ...transaction }
   
-  // Decrypt name
+  // Decrypt name (decryptValue now handles plaintext gracefully)
   if (transaction.name) {
-    try {
-      decrypted.name = await decryptValue(transaction.name, key)
-    } catch (error) {
-      console.warn('Failed to decrypt recurring transaction name, assuming plaintext:', error)
-    }
+    decrypted.name = await decryptValue(transaction.name, key)
   }
   
-  // Decrypt description
+  // Decrypt description (decryptValue now handles plaintext gracefully)
   if (transaction.description) {
-    try {
-      decrypted.description = await decryptValue(transaction.description, key)
-    } catch (error) {
-      console.warn('Failed to decrypt recurring transaction description, assuming plaintext:', error)
-    }
+    decrypted.description = await decryptValue(transaction.description, key)
   }
   
-  // Decrypt notes in payment history
+  // Decrypt notes in payment history (decryptValue now handles plaintext gracefully)
   if (transaction.paymentHistory && Array.isArray(transaction.paymentHistory)) {
     decrypted.paymentHistory = await Promise.all(
       transaction.paymentHistory.map(async (payment) => {
         const decryptedPayment = { ...payment }
         if (payment.notes) {
-          try {
-            decryptedPayment.notes = await decryptValue(payment.notes, key)
-          } catch (error) {
-            console.warn('Failed to decrypt payment notes, assuming plaintext:', error)
-          }
+          decryptedPayment.notes = await decryptValue(payment.notes, key)
         }
         return decryptedPayment
       })
