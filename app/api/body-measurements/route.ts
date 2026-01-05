@@ -18,7 +18,7 @@ export const GET = createGetHandler<BodyMeasurement[]>(
   },
   {
     requireAuth: true,
-    allowQueryParam: true,
+    allowQueryParam: false, // Require token-based auth
     validateOwnership: true,
   }
 )

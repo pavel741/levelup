@@ -10,10 +10,7 @@
 
 import type { Routine, WorkoutLog } from '@/types/workout'
 import { authenticatedFetch } from '@/lib/utils/api/api-client'
-import { encryptObject, decryptObject } from '@/lib/utils/encryption/crypto'
-import { encryptRoutine, decryptRoutine } from '@/lib/utils/encryption/routineEncryption'
-import { ensureUserHasEncryptionKey } from '@/lib/utils/encryption/keyManager'
-import { ENCRYPTION_CONFIG, isEncryptionEnabled } from '@/lib/utils/encryption/config'
+import { getEncryptionModules, isEncryptionEnabledSync } from '@/lib/utils/encryption/loader'
 
 const API_BASE = '/api/workouts'
 
@@ -34,7 +31,7 @@ export const subscribeToRoutines = (
     if (!isActive || !userId) return
 
     try {
-      const response = await fetch(`${API_BASE}/routines?userId=${userId}`)
+      const response = await authenticatedFetch(`${API_BASE}/routines`)
       if (!response.ok) {
         console.error('Failed to fetch routines:', response.statusText)
         callback([])
@@ -45,12 +42,13 @@ export const subscribeToRoutines = (
       let routines: Routine[] = responseData.data || responseData || []
       
       // Decrypt sensitive fields if encryption is enabled
-      if (isEncryptionEnabled() && routines.length > 0) {
+      if (isEncryptionEnabledSync() && routines.length > 0) {
         try {
-          const encryptionKey = await ensureUserHasEncryptionKey(userId)
+          const encryption = await getEncryptionModules()
+          const encryptionKey = await encryption.ensureUserHasEncryptionKey(userId)
           routines = await Promise.all(
             routines.map(async (r) => {
-              return await decryptRoutine(r, encryptionKey)
+              return await encryption.decryptRoutine(r, encryptionKey)
             })
           )
         } catch (error) {
@@ -95,10 +93,11 @@ export const subscribeToRoutines = (
 export const saveRoutine = async (routine: Routine): Promise<void> => {
   // Encrypt sensitive fields before sending to server
   let routineToSave = routine
-  if (isEncryptionEnabled()) {
+  if (isEncryptionEnabledSync()) {
     try {
-      const encryptionKey = await ensureUserHasEncryptionKey(routine.userId)
-      routineToSave = await encryptRoutine(routine, encryptionKey)
+      const encryption = await getEncryptionModules()
+      const encryptionKey = await encryption.ensureUserHasEncryptionKey(routine.userId)
+      routineToSave = await encryption.encryptRoutine(routine, encryptionKey)
     } catch (error) {
       console.error('Failed to encrypt routine:', error)
       throw new Error('Failed to encrypt routine data. Please try again.')
@@ -122,20 +121,19 @@ export const saveRoutine = async (routine: Routine): Promise<void> => {
 export const updateRoutine = async (routineId: string, userId: string, updates: Partial<Routine>): Promise<void> => {
   // Encrypt sensitive fields in updates before sending
   let updatesToSend = updates
-  if (isEncryptionEnabled()) {
+  if (isEncryptionEnabledSync()) {
     try {
-      const encryptionKey = await ensureUserHasEncryptionKey(userId)
-      // Only encrypt fields that are in the updates and should be encrypted
-      const fieldsToEncrypt = ENCRYPTION_CONFIG.routines.encryptFields.filter(
-        field => field in updates
-      ) as (keyof Routine)[]
-      
-      if (fieldsToEncrypt.length > 0) {
-        updatesToSend = await encryptObject(
-          updates as Routine,
-          fieldsToEncrypt,
-          encryptionKey
-        )
+      const encryption = await getEncryptionModules()
+      const encryptionKey = await encryption.ensureUserHasEncryptionKey(userId)
+      // For updates, encrypt the entire update object as a routine
+      const tempRoutine = { ...updates } as Routine
+      const encrypted = await encryption.encryptRoutine(tempRoutine, encryptionKey)
+      // Only include fields that were in the original updates
+      updatesToSend = {}
+      for (const key in updates) {
+        if (key in encrypted) {
+          (updatesToSend as any)[key] = (encrypted as any)[key]
+        }
       }
     } catch (error) {
       console.error('Failed to encrypt routine updates:', error)
@@ -206,14 +204,15 @@ export const getWorkoutLogs = async (userId: string): Promise<WorkoutLog[]> => {
     let logs: WorkoutLog[] = responseData.data || responseData || []
     
     // Decrypt sensitive fields if encryption is enabled
-    if (isEncryptionEnabled() && logs.length > 0) {
+    if (isEncryptionEnabledSync() && logs.length > 0) {
       try {
-        const encryptionKey = await ensureUserHasEncryptionKey(userId)
+        const encryption = await getEncryptionModules()
+        const encryptionKey = await encryption.ensureUserHasEncryptionKey(userId)
         logs = await Promise.all(
           logs.map(async (log) => {
-            const decrypted = await decryptObject(
+            const decrypted = await encryption.decryptObject(
               log,
-              ENCRYPTION_CONFIG.workoutLogs.encryptFields,
+              ['notes'], // Only decrypt notes field for workout logs
               encryptionKey
             )
             return decrypted as WorkoutLog
@@ -257,7 +256,7 @@ export const subscribeToWorkoutLogs = (
     if (!isActive || !userId) return
 
     try {
-      const response = await fetch(`${API_BASE}/logs?userId=${userId}`)
+      const response = await authenticatedFetch(`${API_BASE}/logs`)
       if (!response.ok) {
         console.error('Failed to fetch workout logs:', response.statusText)
         callback([])
@@ -268,14 +267,15 @@ export const subscribeToWorkoutLogs = (
       let logs: WorkoutLog[] = responseData.data || responseData || []
       
       // Decrypt sensitive fields if encryption is enabled
-      if (isEncryptionEnabled() && logs.length > 0) {
+      if (isEncryptionEnabledSync() && logs.length > 0) {
         try {
-          const encryptionKey = await ensureUserHasEncryptionKey(userId)
+          const encryption = await getEncryptionModules()
+          const encryptionKey = await encryption.ensureUserHasEncryptionKey(userId)
           logs = await Promise.all(
             logs.map(async (l) => {
-              const decrypted = await decryptObject(
+              const decrypted = await encryption.decryptObject(
                 l,
-                ENCRYPTION_CONFIG.workoutLogs.encryptFields,
+                ['notes'], // Only decrypt notes field for workout logs
                 encryptionKey
               )
               return decrypted as WorkoutLog
@@ -326,12 +326,13 @@ export const subscribeToWorkoutLogs = (
 export const saveWorkoutLog = async (log: WorkoutLog): Promise<void> => {
   // Encrypt sensitive fields before sending to server
   let logToSave = log
-  if (isEncryptionEnabled()) {
+  if (isEncryptionEnabledSync()) {
     try {
-      const encryptionKey = await ensureUserHasEncryptionKey(log.userId)
-      logToSave = await encryptObject(
+      const encryption = await getEncryptionModules()
+      const encryptionKey = await encryption.ensureUserHasEncryptionKey(log.userId)
+      logToSave = await encryption.encryptObject(
         log,
-        ENCRYPTION_CONFIG.workoutLogs.encryptFields,
+        ['notes'], // Only encrypt notes field for workout logs
         encryptionKey
       )
     } catch (error) {
@@ -357,20 +358,19 @@ export const saveWorkoutLog = async (log: WorkoutLog): Promise<void> => {
 export const updateWorkoutLog = async (logId: string, userId: string, updates: Partial<WorkoutLog>): Promise<void> => {
   // Encrypt sensitive fields in updates before sending
   let updatesToSend = updates
-  if (isEncryptionEnabled()) {
+  if (isEncryptionEnabledSync()) {
     try {
-      const encryptionKey = await ensureUserHasEncryptionKey(userId)
-      // Only encrypt fields that are in the updates and should be encrypted
-      const fieldsToEncrypt = ENCRYPTION_CONFIG.workoutLogs.encryptFields.filter(
-        field => field in updates
-      ) as (keyof WorkoutLog)[]
-      
-      if (fieldsToEncrypt.length > 0) {
-        updatesToSend = await encryptObject(
-          updates as WorkoutLog,
-          fieldsToEncrypt,
+      const encryption = await getEncryptionModules()
+      const encryptionKey = await encryption.ensureUserHasEncryptionKey(userId)
+      // Only encrypt notes field if it's in the updates
+      if ('notes' in updates && updates.notes) {
+        const tempLog = { ...updates } as WorkoutLog
+        const encrypted = await encryption.encryptObject(
+          tempLog,
+          ['notes'],
           encryptionKey
         )
+        updatesToSend = { ...updatesToSend, notes: encrypted.notes }
       }
     } catch (error) {
       console.error('Failed to encrypt workout log updates:', error)

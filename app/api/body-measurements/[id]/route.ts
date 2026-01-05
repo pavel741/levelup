@@ -45,7 +45,7 @@ export async function DELETE(
 ) {
   try {
     const userIdResult = await getSecureUserIdFromRequest(request, {
-      allowQueryParam: true,
+      allowQueryParam: false, // Require token-based auth
       validateOwnership: true,
     })
 

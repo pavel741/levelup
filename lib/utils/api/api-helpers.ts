@@ -49,10 +49,14 @@ export async function getSecureUserIdFromRequest(
   }
   
   // Fallback to query param if allowed (for backward compatibility during migration)
+  // NOTE: This fallback should be removed once all clients are migrated to token-based auth
   if (options?.allowQueryParam) {
     const queryUserId = getUserIdFromRequest(request)
     if (queryUserId) {
-      console.warn('⚠️ Using insecure userId from query params. Migrate to token-based auth.')
+      // Only warn in development to reduce log noise in production
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('⚠️ Using insecure userId from query params. Migrate to token-based auth.')
+      }
       return { userId: queryUserId }
     }
   }

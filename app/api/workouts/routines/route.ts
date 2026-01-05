@@ -13,9 +13,9 @@ const rateLimitOptions = {
 
 async function getRoutinesHandler(request: NextRequest) {
   try {
-    // Use secure authentication with backward compatibility
+    // Use secure token-based authentication
     const userIdResult = await getSecureUserIdFromRequest(request, {
-      allowQueryParam: true, // Allow query param during migration
+      allowQueryParam: false, // Require token-based auth
       validateOwnership: true, // Ensure user can only access their own data
     })
 
@@ -41,9 +41,9 @@ async function getRoutinesHandler(request: NextRequest) {
 
 async function postRoutineHandler(request: NextRequest) {
   try {
-    // Use secure authentication
+    // Use secure token-based authentication
     const userIdResult = await getSecureUserIdFromRequest(request, {
-      allowQueryParam: true, // Allow query param during migration
+      allowQueryParam: false, // Require token-based auth
       validateOwnership: true,
     })
 

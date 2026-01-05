@@ -4,11 +4,13 @@
  */
 
 import type { BodyMeasurement } from '@/types/bodyMeasurements'
+import { authenticatedFetch } from '@/lib/utils/api/api-client'
 
 const API_BASE = '/api/body-measurements'
 
-export const getBodyMeasurements = async (userId: string): Promise<BodyMeasurement[]> => {
-  const response = await fetch(`${API_BASE}?userId=${userId}`, {
+export const getBodyMeasurements = async (_userId: string): Promise<BodyMeasurement[]> => {
+  // userId parameter kept for backward compatibility but not used (comes from auth token)
+  const response = await authenticatedFetch(API_BASE, {
     method: 'GET',
     headers: { 'Content-Type': 'application/json' },
   })
@@ -23,13 +25,14 @@ export const getBodyMeasurements = async (userId: string): Promise<BodyMeasureme
 }
 
 export const addBodyMeasurement = async (
-  userId: string,
+  _userId: string,
   measurement: Omit<BodyMeasurement, 'id' | 'userId' | 'createdAt' | 'updatedAt'>
 ): Promise<string> => {
-  const response = await fetch(API_BASE, {
+  // userId parameter kept for backward compatibility but not sent (comes from auth token)
+  const response = await authenticatedFetch(API_BASE, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, ...measurement }),
+    body: JSON.stringify(measurement),
   })
 
   if (!response.ok) {
@@ -42,14 +45,15 @@ export const addBodyMeasurement = async (
 }
 
 export const updateBodyMeasurement = async (
-  userId: string,
+  _userId: string,
   measurementId: string,
   updates: Partial<BodyMeasurement>
 ): Promise<void> => {
-  const response = await fetch(`${API_BASE}/${measurementId}`, {
+  // userId parameter kept for backward compatibility but not sent (comes from auth token)
+  const response = await authenticatedFetch(`${API_BASE}/${measurementId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, ...updates }),
+    body: JSON.stringify(updates),
   })
 
   if (!response.ok) {
@@ -58,8 +62,9 @@ export const updateBodyMeasurement = async (
   }
 }
 
-export const deleteBodyMeasurement = async (userId: string, measurementId: string): Promise<void> => {
-  const response = await fetch(`${API_BASE}/${measurementId}?userId=${userId}`, {
+export const deleteBodyMeasurement = async (_userId: string, measurementId: string): Promise<void> => {
+  // userId parameter kept for backward compatibility but not sent (comes from auth token)
+  const response = await authenticatedFetch(`${API_BASE}/${measurementId}`, {
     method: 'DELETE',
   })
 
