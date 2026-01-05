@@ -37,16 +37,19 @@ export async function encryptTransaction(
   }
   
   // Encrypt selgitus (Estonian description field) - common in Estonian bank imports
-  if ((transaction as any).selgitus && typeof (transaction as any).selgitus === 'string') {
-    (encrypted as any).selgitus = await encryptValue((transaction as any).selgitus, key)
+  const selgitus = (transaction as any).selgitus
+  if (selgitus && typeof selgitus === 'string') {
+    const encryptedSelgitus = await encryptValue(selgitus, key)
+    ;(encrypted as any).selgitus = encryptedSelgitus
   }
   
   // Encrypt referenceNumber if it contains sensitive info (card numbers, etc.)
-  if ((transaction as any).referenceNumber && typeof (transaction as any).referenceNumber === 'string') {
-    const refNum = (transaction as any).referenceNumber
+  const referenceNumber = (transaction as any).referenceNumber
+  if (referenceNumber && typeof referenceNumber === 'string') {
     // Only encrypt if it looks like it might contain sensitive info (long strings)
-    if (refNum.length > 10) {
-      (encrypted as any).referenceNumber = await encryptValue(refNum, key)
+    if (referenceNumber.length > 10) {
+      const encryptedRef = await encryptValue(referenceNumber, key)
+      ;(encrypted as any).referenceNumber = encryptedRef
     }
   }
   

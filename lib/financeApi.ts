@@ -182,15 +182,31 @@ export const addTransaction = async (
   // Always try to encrypt on client-side (encryption is enabled by default)
   if (typeof window !== 'undefined') {
     try {
+      console.log('🔐 Starting encryption for transaction:', { description: transaction.description?.substring(0, 50), selgitus: (transaction as any).selgitus?.substring(0, 50) })
       const encryption = await getEncryptionModules()
+      console.log('🔐 Encryption modules loaded')
       const encryptionKey = await encryption.ensureUserHasEncryptionKey(userId)
+      console.log('🔐 Encryption key obtained:', encryptionKey ? 'YES' : 'NO')
+      if (!encryptionKey) {
+        throw new Error('Failed to get encryption key')
+      }
+      const beforeEncrypt = { ...transactionToSave }
       transactionToSave = await encryption.encryptTransaction(transaction as FinanceTransaction, encryptionKey)
+      console.log('🔐 Encryption result:', {
+        descriptionBefore: beforeEncrypt.description?.substring(0, 50),
+        descriptionAfter: transactionToSave.description?.substring(0, 50),
+        selgitusBefore: (beforeEncrypt as any).selgitus?.substring(0, 50),
+        selgitusAfter: (transactionToSave as any).selgitus?.substring(0, 50),
+      })
       console.log('✅ Transaction encrypted before saving')
     } catch (error) {
       console.error('❌ Failed to encrypt transaction:', error)
+      console.error('❌ Error details:', error instanceof Error ? error.stack : error)
       // Don't throw - allow transaction to save unencrypted for backward compatibility
       // But log the error so we know encryption failed
     }
+  } else {
+    console.log('⚠️ Not encrypting - running on server-side')
   }
   
   const response = await fetch('/api/finance/transactions', {

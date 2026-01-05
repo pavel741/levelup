@@ -49,10 +49,8 @@ async function initializeUserEncryption(userId: string): Promise<void> {
   }
   
   try {
-    // Dynamic import using a function to prevent Next.js static analysis
-    // Webpack config provides a stub for server-side builds
-    const getEncryptionPath = (name: string) => `@/lib/utils/encryption/${name}`
-    const encryptionModule = await import(getEncryptionPath('keyManager'))
+    // Direct import - webpack alias only affects server-side builds
+    const encryptionModule = await import('@/lib/utils/encryption/keyManager')
     await encryptionModule.initializeUserEncryptionKey(userId)
     console.log('✅ Encryption key initialized for user:', userId)
   } catch (encryptionError: any) {

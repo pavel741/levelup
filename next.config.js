@@ -29,11 +29,11 @@ const nextConfig = {
       // These modules are only used client-side via dynamic imports
       // Use a no-op module instead of false to avoid webpack errors
       const path = require('path')
+      const fs = require('fs')
       const stubPath = path.resolve(__dirname, 'lib', 'utils', 'encryption', 'server-stub.js')
       
       // Only add aliases if the stub file exists
-      try {
-        require.resolve(stubPath)
+      if (fs.existsSync(stubPath)) {
         config.resolve.alias = {
           ...config.resolve.alias,
           '@/lib/utils/encryption/keyManager': stubPath,
@@ -42,7 +42,7 @@ const nextConfig = {
           '@/lib/utils/encryption/routineEncryption': stubPath,
           '@/lib/utils/encryption/config': stubPath,
         }
-      } catch (e) {
+      } else {
         // If stub doesn't exist, use false (will cause build errors but that's expected)
         config.resolve.alias = {
           ...config.resolve.alias,
