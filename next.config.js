@@ -41,30 +41,23 @@ const nextConfig = {
       }
       
       // Use webpack's NormalModuleReplacementPlugin to replace encryption modules with stubs
-      // This must run BEFORE webpack tries to resolve the modules
-      config.plugins.unshift(
+      // Match both absolute (@/) and relative (./) paths
+      config.plugins.push(
         new webpack.NormalModuleReplacementPlugin(
-          /^@\/lib\/utils\/encryption\/(keyManager|crypto|financeEncryption|routineEncryption|config)$/,
+          /^(?:@\/lib\/utils\/encryption\/|\.\/)(keyManager|crypto|financeEncryption|routineEncryption|config)$/,
           (resource) => {
-            resource.request = stubPath
-          }
-        )
-      )
-      
-      // Also handle relative paths from within the encryption directory
-      config.plugins.unshift(
-        new webpack.NormalModuleReplacementPlugin(
-          /^\.\/(keyManager|crypto|financeEncryption|routineEncryption|config)$/,
-          (resource) => {
-            // Only replace if the context is the encryption directory
-            if (resource.context && resource.context.includes(path.join('lib', 'utils', 'encryption'))) {
+            // Only replace if it's from the encryption directory or loader
+            if (resource.context && (
+              resource.context.includes(path.join('lib', 'utils', 'encryption')) ||
+              resource.context.includes('loader')
+            )) {
               resource.request = stubPath
             }
           }
         )
       )
       
-      // Add to resolve.alias - this is checked FIRST by webpack
+      // Add to resolve.alias as backup
       config.resolve.alias = {
         ...config.resolve.alias,
         '@/lib/utils/encryption/keyManager': stubPath,
@@ -77,7 +70,5 @@ const nextConfig = {
     return config
   },
 }
-
-module.exports = nextConfig
 
 module.exports = nextConfig
