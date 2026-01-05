@@ -37,13 +37,17 @@ const nextConfig = {
       config.externals.push('mongodb')
       config.externals.push('mongodb-client-encryption')
       
-      // Replace encryption modules with stubs on client side
-      // This allows webpack to resolve the imports during dependency analysis
-      // Match both './csfle-key-management' and './utils/encryption/csfle-key-management' patterns
+      // Replace encryption modules with stubs using NormalModuleReplacementPlugin
+      // This is the most reliable approach for Vercel's build environment
+      // The plugin intercepts module resolution and replaces the request
       const stubPath = path.resolve(__dirname, 'lib/utils/encryption/csfle-client-stub')
+      
+      // Use a more specific regex that matches the module name at the end of the request
+      // This ensures we catch all variations of the import path
       config.plugins.push(
         new webpack.NormalModuleReplacementPlugin(
-          /^(\.\/)?(utils\/encryption\/)?csfle-key-management$/,
+          // Match any path ending with csfle-key-management (but not the stub itself)
+          /([^/\\]+[/\\])?csfle-key-management$/,
           stubPath
         )
       )
