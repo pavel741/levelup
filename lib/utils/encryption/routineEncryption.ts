@@ -4,7 +4,11 @@
  * These functions handle the complex nested structure of routines,
  * encrypting only sensitive fields like notes while keeping metadata
  * (IDs, names, etc.) unencrypted for querying purposes.
+ * 
+ * NOTE: This module is client-side only.
  */
+
+'use client'
 
 import type { Routine } from '@/types/workout'
 import { encryptValue, decryptValue } from './crypto'

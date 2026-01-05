@@ -6,6 +6,8 @@
  * before it reaches the server, ensuring privacy even from database owners.
  */
 
+'use client'
+
 import type { Routine, WorkoutLog } from '@/types/workout'
 import { authenticatedFetch } from '@/lib/utils/api/api-client'
 import { encryptObject, decryptObject } from '@/lib/utils/encryption/crypto'

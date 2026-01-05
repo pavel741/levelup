@@ -3,7 +3,11 @@
  * 
  * These functions handle encryption of sensitive financial data while keeping
  * metadata (amounts, dates, categories) unencrypted for querying and analytics.
+ * 
+ * NOTE: This module is client-side only.
  */
+
+'use client'
 
 import type { FinanceTransaction, FinanceRecurringTransaction } from '@/types/finance'
 import { encryptValue, decryptValue } from './crypto'

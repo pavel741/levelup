@@ -10,7 +10,11 @@
  * - Keys are never sent to the server
  * - Only encrypted data is stored in MongoDB
  * - Decryption happens client-side when data is retrieved
+ * 
+ * NOTE: This module is client-side only and uses browser APIs.
  */
+
+'use client'
 
 // CryptoKey is a global type from Web Crypto API, we'll use it directly
 // Other modules can import it from the global scope or use typeof on functions that return it

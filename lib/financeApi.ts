@@ -4,6 +4,8 @@
 // This module handles client-side encryption/decryption of sensitive financial data
 // before it reaches the server, ensuring privacy even from database owners.
 
+'use client'
+
 import type { FinanceTransaction, FinanceCategories, FinanceSettings, FinanceRecurringTransaction } from '@/types/finance'
 import { createSmartPoll } from '@/lib/utils/smart-polling'
 import { cache, createCacheKey } from '@/lib/utils/cache'

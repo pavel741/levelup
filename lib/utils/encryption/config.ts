@@ -4,7 +4,11 @@
  * Defines which fields should be encrypted for each data type.
  * Only sensitive user data should be encrypted - metadata like IDs, dates, etc.
  * can remain unencrypted for querying and indexing purposes.
+ * 
+ * NOTE: This module is client-side only.
  */
+
+'use client'
 
 import type { Routine, WorkoutLog } from '@/types/workout'
 import type { FinanceTransaction, FinanceRecurringTransaction } from '@/types/finance'

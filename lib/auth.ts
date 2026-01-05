@@ -40,8 +40,14 @@ export const getErrorMessage = (error: any): string => {
 /**
  * Initialize encryption key for a user (non-blocking)
  * This is called after user creation to set up client-side encryption
+ * Only runs in the browser (client-side)
  */
 async function initializeUserEncryption(userId: string): Promise<void> {
+  // Only initialize encryption in the browser (client-side)
+  if (typeof window === 'undefined') {
+    return // Skip on server-side
+  }
+  
   try {
     const { initializeUserEncryptionKey } = await import('@/lib/utils/encryption/keyManager')
     await initializeUserEncryptionKey(userId)
