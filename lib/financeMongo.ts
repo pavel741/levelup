@@ -1,4 +1,4 @@
-import { ObjectId } from 'mongodb'
+import { ObjectId, Binary } from 'mongodb'
 import { getDatabase } from './mongodb'
 import clientPromise from './mongodb'
 import {
@@ -50,6 +50,7 @@ type TransactionSubscribeCallback = (
 ) => void
 
 // Convert MongoDB ObjectId to string and handle dates
+// Note: Binary objects (encrypted data) are preserved for decryption
 const convertMongoData = <T = unknown>(data: unknown): T | null | undefined => {
   if (data === null || data === undefined) return data as T | null | undefined
 
@@ -61,6 +62,12 @@ const convertMongoData = <T = unknown>(data: unknown): T | null | undefined => {
   // Handle Date
   if (data instanceof Date) {
     return data.toISOString().split('T')[0] as T
+  }
+
+  // Handle Binary (encrypted data) - preserve as Binary for decryption
+  // We'll decrypt it later in decryptObjectFields
+  if (data instanceof Binary) {
+    return data as T
   }
 
   if (Array.isArray(data)) {
@@ -75,6 +82,32 @@ const convertMongoData = <T = unknown>(data: unknown): T | null | undefined => {
       } else {
         converted[key] = convertMongoData(value)
       }
+    }
+    return converted as T
+  }
+
+  return data as T
+}
+
+// Ensure all Binary objects are converted to strings before JSON serialization
+// This is a safety net in case decryption fails or Binary objects slip through
+const ensureJsonSerializable = <T = unknown>(data: unknown): T => {
+  if (data === null || data === undefined) return data as T
+
+  // Convert Binary objects to base64 strings (shouldn't happen after decryption, but safety net)
+  if (data instanceof Binary) {
+    // Binary object found - shouldn't happen after decryption, but convert to base64 as fallback
+    return data.toString('base64') as T
+  }
+
+  if (Array.isArray(data)) {
+    return data.map((item) => ensureJsonSerializable(item)) as T
+  }
+
+  if (typeof data === 'object' && data.constructor === Object) {
+    const converted: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(data)) {
+      converted[key] = ensureJsonSerializable(value)
     }
     return converted as T
   }
@@ -146,18 +179,23 @@ export const subscribeToTransactions = (
             id: converted.id || doc._id.toString(),
           } as WithId<FinanceTransaction>
           
-          // Decrypt sensitive fields
-          try {
-            return await decryptObjectFields(
-              client,
-              userId,
-              transaction,
-              [...FINANCE_TRANSACTION_ENCRYPTED_FIELDS]
-            ) as WithId<FinanceTransaction>
-          } catch (error) {
-            console.warn('Failed to decrypt transaction fields (backward compatibility):', error)
-            return transaction
-          }
+            // Decrypt sensitive fields
+            try {
+              const decrypted = await decryptObjectFields(
+                client,
+                userId,
+                transaction,
+                [...FINANCE_TRANSACTION_ENCRYPTED_FIELDS]
+              ) as WithId<FinanceTransaction>
+              
+              // Ensure all Binary objects are converted to strings (safety net)
+              // This prevents Binary objects from being sent through JSON
+              return ensureJsonSerializable(decrypted) as WithId<FinanceTransaction>
+            } catch (error) {
+              console.warn(`Failed to decrypt transaction ${transaction.id} fields:`, error instanceof Error ? error.message : error)
+              // Even if decryption fails, ensure Binary objects are converted
+              return ensureJsonSerializable(transaction) as WithId<FinanceTransaction>
+            }
         })
       )
 
@@ -171,7 +209,7 @@ export const subscribeToTransactions = (
         })
       }
     } catch (error) {
-      console.error('❌ Error loading transactions from MongoDB:', error)
+      console.error('Error loading transactions from MongoDB:', error)
       callback([], { hasMore: false, lastDoc: null })
     }
   }
@@ -227,15 +265,19 @@ export const getAllTransactionsForSummary = async (
             
             // Decrypt sensitive fields
             try {
-              return await decryptObjectFields(
+              const decrypted = await decryptObjectFields(
                 client,
                 userId,
                 transaction,
                 [...FINANCE_TRANSACTION_ENCRYPTED_FIELDS]
               ) as WithId<FinanceTransaction>
+              
+              // Ensure all Binary objects are converted to strings (safety net)
+              return ensureJsonSerializable(decrypted) as WithId<FinanceTransaction>
             } catch (error) {
-              console.warn('Failed to decrypt transaction fields (backward compatibility):', error)
-              return transaction
+              console.warn('Failed to decrypt transaction fields:', error instanceof Error ? error.message : error)
+              // Even if decryption fails, ensure Binary objects are converted
+              return ensureJsonSerializable(transaction) as WithId<FinanceTransaction>
             }
           })
         )
@@ -319,30 +361,14 @@ export const addTransaction = async (
     
     // Encrypt sensitive fields before saving
     try {
-      console.log('🔐 Attempting to encrypt transaction fields:', FINANCE_TRANSACTION_ENCRYPTED_FIELDS)
-      console.log('📊 Transaction data before encryption:', {
-        description: (txData as any).description?.substring(0, 20),
-        recipientName: (txData as any).recipientName?.substring(0, 20),
-        selgitus: (txData as any).selgitus?.substring(0, 20),
-      })
-      
       txData = await encryptObjectFields(
         client,
         userId,
         txData as any,
         [...FINANCE_TRANSACTION_ENCRYPTED_FIELDS]
       ) as typeof txData
-      
-      console.log('✅ Transaction fields encrypted successfully')
-      console.log('📊 Transaction data after encryption:', {
-        description: (txData as any).description?.substring(0, 20),
-        recipientName: (txData as any).recipientName?.substring(0, 20),
-        selgitus: (txData as any).selgitus?.substring(0, 20),
-      })
     } catch (error) {
-      console.error('❌ Failed to encrypt transaction fields:', error)
-      console.error('Error details:', error instanceof Error ? error.message : String(error))
-      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace')
+      console.error('Failed to encrypt transaction fields:', error instanceof Error ? error.message : String(error))
       // Don't save unencrypted sensitive data - throw error
       throw new Error(`Encryption failed: ${error instanceof Error ? error.message : String(error)}`)
     }
@@ -393,19 +419,15 @@ export const updateTransaction = async (
         field => field in updateData && updateData[field as keyof typeof updateData] != null
       )
       if (fieldsToEncrypt.length > 0) {
-        console.log('🔐 Attempting to encrypt update fields:', fieldsToEncrypt)
         updateData = await encryptObjectFields(
           client,
           userId,
           updateData,
           [...fieldsToEncrypt]
         ) as Partial<FinanceTransaction> & { date?: Date }
-        console.log('✅ Transaction update fields encrypted successfully')
       }
     } catch (error) {
-      console.error('❌ Failed to encrypt transaction update fields:', error)
-      console.error('Error details:', error instanceof Error ? error.message : String(error))
-      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace')
+      console.error('Failed to encrypt transaction update fields:', error instanceof Error ? error.message : String(error))
       // Don't save unencrypted sensitive data - throw error
       throw new Error(`Encryption failed: ${error instanceof Error ? error.message : String(error)}`)
     }
@@ -1012,7 +1034,7 @@ export const subscribeToRecurringTransactions = (
               [...RECURRING_TRANSACTION_ENCRYPTED_FIELDS]
             ) as FinanceRecurringTransaction
           } catch (error) {
-            console.warn('Failed to decrypt recurring transaction fields (backward compatibility):', error)
+            console.warn('Failed to decrypt recurring transaction fields:', error instanceof Error ? error.message : error)
             return transaction
           }
         })
@@ -1059,15 +1081,19 @@ export const getRecurringTransactions = async (
         
         // Decrypt sensitive fields
         try {
-          return await decryptObjectFields(
+          const decrypted = await decryptObjectFields(
             client,
             userId,
             transaction,
             [...RECURRING_TRANSACTION_ENCRYPTED_FIELDS]
           ) as FinanceRecurringTransaction
+          
+          // Ensure all Binary objects are converted to strings (safety net)
+          return ensureJsonSerializable(decrypted) as FinanceRecurringTransaction
         } catch (error) {
           console.warn('Failed to decrypt recurring transaction fields (backward compatibility):', error)
-          return transaction
+          // Even if decryption fails, ensure Binary objects are converted
+          return ensureJsonSerializable(transaction) as FinanceRecurringTransaction
         }
       })
     )

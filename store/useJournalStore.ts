@@ -155,8 +155,11 @@ export const useJournalStore = create<JournalState>((set, get) => ({
   addEntry: async (userId: string, entry: Omit<JournalEntry, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => {
     try {
       await addJournalEntryApi(userId, entry)
-      // Reload entries to get the new one
-      await get().loadEntries(userId, get().filters)
+      // Immediately fetch and update entries to show the new one
+      // This bypasses cache and ensures the new entry appears right away
+      const currentFilters = get().filters
+      const entries = await fetchJournalEntries(userId, currentFilters)
+      set({ entries, isLoadingEntries: false })
     } catch (error) {
       console.error('Error adding journal entry:', error)
       showError('Failed to add journal entry')
@@ -167,8 +170,10 @@ export const useJournalStore = create<JournalState>((set, get) => ({
   updateEntry: async (userId: string, entryId: string, updates: Partial<JournalEntry>) => {
     try {
       await updateJournalEntryApi(userId, entryId, updates)
-      // Reload entries to get updated data
-      await get().loadEntries(userId, get().filters)
+      // Immediately fetch and update entries to show the updated one
+      const currentFilters = get().filters
+      const entries = await fetchJournalEntries(userId, currentFilters)
+      set({ entries, isLoadingEntries: false })
       // Update current entry if it's the one being edited
       if (get().currentEntry?.id === entryId) {
         set({ currentEntry: { ...get().currentEntry, ...updates } as JournalEntry })
@@ -183,8 +188,10 @@ export const useJournalStore = create<JournalState>((set, get) => ({
   deleteEntry: async (userId: string, entryId: string) => {
     try {
       await deleteJournalEntryApi(userId, entryId)
-      // Reload entries to reflect deletion
-      await get().loadEntries(userId, get().filters)
+      // Immediately fetch and update entries to reflect deletion
+      const currentFilters = get().filters
+      const entries = await fetchJournalEntries(userId, currentFilters)
+      set({ entries, isLoadingEntries: false })
       // Clear current entry if it's the one being deleted
       if (get().currentEntry?.id === entryId) {
         set({ currentEntry: null })

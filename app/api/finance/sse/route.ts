@@ -7,6 +7,7 @@
 import { NextRequest } from 'next/server'
 import { getUserIdFromRequest, validateUserIdForApi } from '@/lib/utils'
 import { getDatabase } from '@/lib/mongodb'
+import { getAllTransactionsForSummary } from '@/lib/financeMongo'
 
 export const dynamic = 'force-dynamic'
 
@@ -68,19 +69,10 @@ export async function GET(request: NextRequest) {
 
           switch (dataType) {
             case 'transactions':
-              const transactionsCollection = db.collection('finance_transactions')
-              // Load recent transactions for SSE (limit to last 1000 for performance)
-              // All transactions are loaded separately for summary calculations
-              const transactions = await transactionsCollection
-                .find({ userId: userId! })
-                .sort({ date: -1 })
-                .limit(1000) // Limit to recent 1000 transactions for SSE performance
-                .toArray()
-              data = transactions.map((doc) => ({
-                id: doc._id.toString(),
-                ...doc,
-                _id: undefined,
-              }))
+              // Use getAllTransactionsForSummary which handles decryption properly
+              // Limit to last 1000 transactions for SSE performance
+              const transactions = await getAllTransactionsForSummary(userId!, 1000)
+              data = transactions
               break
 
             case 'categories':
@@ -142,16 +134,9 @@ export async function GET(request: NextRequest) {
 
         switch (dataType) {
           case 'transactions':
-            const transactionsCollection = db.collection('finance_transactions')
-            const transactions = await transactionsCollection
-              .find({ userId: userId! })
-              .sort({ date: -1 })
-              .toArray()
-            data = transactions.map((doc) => ({
-              id: doc._id.toString(),
-              ...doc,
-              _id: undefined,
-            }))
+            // Use getAllTransactionsForSummary which handles decryption properly
+            const transactions = await getAllTransactionsForSummary(userId!)
+            data = transactions
             break
 
           case 'categories':

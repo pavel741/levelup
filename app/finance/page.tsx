@@ -127,7 +127,6 @@ export default function FinancePage() {
   const [csvColumnMapping, setCsvColumnMapping] = useState<any>(null)
   const [csvParsedData, setCsvParsedData] = useState<any[]>([])
   const [csvHeaders, setCsvHeaders] = useState<string[]>([])
-  const [csvDetectedBank, setCsvDetectedBank] = useState<string | null>(null)
   const [csvSelectedBank, setCsvSelectedBank] = useState<string | null>(null)
   
   // Load transactions with optimized initial load (limit to 100 for fast initial render)
@@ -1263,10 +1262,8 @@ export default function FinancePage() {
       
       // Reset bank selection for new file
       setCsvSelectedBank(null)
-      setCsvDetectedBank(null)
       
       const csvService = new CSVImportService()
-      // Auto-detect bank for new file
       const result = csvService.parseCSV(text)
       
       console.log(`📊 Parsed ${result.transactions.length} transactions from CSV`)
@@ -1274,14 +1271,8 @@ export default function FinancePage() {
       setCsvParsedData(result.transactions)
       setCsvColumnMapping(result.columnMapping)
       setCsvHeaders(result.columnMapping._allHeaders || [])
-      setCsvDetectedBank(result.detectedBank?.id || null)
-      // Auto-select detected bank
-      if (result.detectedBank) {
-        setCsvSelectedBank(result.detectedBank.id)
-      }
       setShowCsvMapping(true)
-      const bankInfo = result.detectedBank ? ` (${result.detectedBank.displayName})` : ''
-      setCsvImportStatus(`Found ${result.transactions.length} transactions${bankInfo}`)
+      setCsvImportStatus(`Found ${result.transactions.length} transactions`)
     } catch (error: unknown) {
       const errorMessage = error && typeof error === 'object' && 'message' in error && typeof error.message === 'string' ? error.message : 'Unknown error'
       if (errorMessage.includes('parsing')) {
@@ -1306,7 +1297,6 @@ export default function FinancePage() {
         setCsvParsedData(result.transactions)
         setCsvColumnMapping(result.columnMapping)
         setCsvHeaders(result.columnMapping._allHeaders || [])
-        setCsvDetectedBank(result.detectedBank?.id || null)
         setCsvImportStatus(`Re-parsed ${result.transactions.length} transactions using ${ESTONIAN_BANK_PROFILES.find(b => b.id === bankId)?.displayName || 'selected bank'} profile`)
       } catch (error: unknown) {
         const errorMessage = error && typeof error === 'object' && 'message' in error && typeof error.message === 'string' ? error.message : 'Unknown error'
@@ -1331,8 +1321,8 @@ export default function FinancePage() {
 
     try {
       // Get bank name for source tracking
-      const bankName = csvSelectedBank || csvDetectedBank
-        ? ESTONIAN_BANK_PROFILES.find(b => b.id === (csvSelectedBank || csvDetectedBank))?.displayName || null
+      const bankName = csvSelectedBank
+        ? ESTONIAN_BANK_PROFILES.find(b => b.id === csvSelectedBank)?.displayName || null
         : null
 
       // Process transactions and adjust dates for payday period
@@ -1478,7 +1468,6 @@ export default function FinancePage() {
         setCsvColumnMapping(null)
         setCsvHeaders([])
         setCsvParsedData([])
-        setCsvDetectedBank(null)
         setCsvSelectedBank(null)
         setCsvImportStatus('')
         setCsvImportProgress(0)
@@ -1547,11 +1536,11 @@ export default function FinancePage() {
                 {isLoading && transactions.length === 0 ? (
                   <div className="space-y-6">
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <CardSkeleton />
-                      <CardSkeleton />
-                      <CardSkeleton />
+                      <CardSkeleton key="summary-skeleton-1" />
+                      <CardSkeleton key="summary-skeleton-2" />
+                      <CardSkeleton key="summary-skeleton-3" />
                     </div>
-                    <CardSkeleton />
+                    <CardSkeleton key="summary-skeleton-4" />
                     <TransactionListSkeleton count={10} />
                   </div>
                 ) : (
@@ -1737,8 +1726,8 @@ export default function FinancePage() {
                   </div>
                   {isLoadingGoals ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      <CardSkeleton />
-                      <CardSkeleton />
+                      <CardSkeleton key="goal-skeleton-1" />
+                      <CardSkeleton key="goal-skeleton-2" />
                     </div>
                   ) : savingsGoals.length === 0 ? (
                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-8 text-center">
@@ -1806,8 +1795,8 @@ export default function FinancePage() {
                   </div>
                   {isLoadingBills ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <CardSkeleton />
-                      <CardSkeleton />
+                      <CardSkeleton key="bill-skeleton-1" />
+                      <CardSkeleton key="bill-skeleton-2" />
                     </div>
                   ) : bills.length === 0 ? (
                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-8 text-center">
@@ -2135,19 +2124,13 @@ export default function FinancePage() {
                                 onChange={(e) => handleBankSelectionChange(e.target.value)}
                                 className="w-full px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                               >
-                                <option value="">Auto-detect (Recommended)</option>
+                                <option value="">Select your bank (optional)</option>
                                 {ESTONIAN_BANK_PROFILES.map((bank) => (
                                   <option key={bank.id} value={bank.id}>
                                     {bank.displayName}
-                                    {csvDetectedBank === bank.id ? ' (Auto-detected)' : ''}
                                   </option>
                                 ))}
                               </select>
-                              {csvDetectedBank && (
-                                <p className="text-xs text-green-600 dark:text-green-400 mt-2">
-                                  ✓ Auto-detected: {ESTONIAN_BANK_PROFILES.find(b => b.id === csvDetectedBank)?.displayName}
-                                </p>
-                              )}
                               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                 Selecting your bank will automatically map columns. You can still adjust mappings below if needed.
                               </p>
@@ -2206,7 +2189,6 @@ export default function FinancePage() {
                                   setCsvColumnMapping(null)
                                   setCsvHeaders([])
                                   setCsvParsedData([])
-                                  setCsvDetectedBank(null)
                                   setCsvSelectedBank(null)
                                   setCsvImportStatus('')
                                 }}
@@ -2468,7 +2450,7 @@ export default function FinancePage() {
                           <>
                             {/* Pagination only for small lists (<=50 items) */}
                             {filteredTransactions.length <= 50 && filteredTransactions.length > transactionsPerPage && (
-                              <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center justify-between">
+                              <div key="pagination-info" className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg flex items-center justify-between">
                                 <span className="text-sm text-blue-800 dark:text-blue-200">
                                   Showing {((currentPage - 1) * transactionsPerPage) + 1}-{Math.min(currentPage * transactionsPerPage, filteredTransactions.length)} of {filteredTransactions.length} transactions
                                 </span>
@@ -2495,7 +2477,7 @@ export default function FinancePage() {
                             )}
                             {/* Show virtual scrolling indicator for large lists */}
                             {filteredTransactions.length > 50 && (
-                              <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                              <div key="virtual-scroll-info" className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
                                 <span className="text-sm text-green-800 dark:text-green-200">
                                   📊 Virtual scrolling enabled: Showing {filteredTransactions.length} transactions (only visible items rendered)
                                 </span>
@@ -2504,6 +2486,7 @@ export default function FinancePage() {
                             {filteredTransactions.length > 50 ? (
                               // Use virtual scrolling for large lists
                               <VirtualList
+                                key="virtual-list"
                                 items={filteredTransactions}
                                 itemHeight={100} // Reduced height for mobile-optimized cards
                                 containerHeight={600} // Fixed container height
@@ -2610,7 +2593,8 @@ export default function FinancePage() {
                               />
                             ) : (
                               // Use regular rendering for small lists
-                              paginatedTransactions.map((tx) => {
+                              <div key="regular-transaction-list">
+                              {paginatedTransactions.map((tx) => {
                                 const txType = (tx.type || '').toLowerCase()
                                 const amount = Number(tx.amount) || 0
                                 
@@ -2658,20 +2642,20 @@ export default function FinancePage() {
                                             {formatDisplayDate(tx.date)}
                                           </span>
                                           {tx.category && (
-                                            <>
+                                            <span key="category" className="flex items-center gap-1.5 sm:gap-2">
                                               <span className="text-gray-400 dark:text-gray-500">•</span>
                                               <span className="text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 sm:px-2 py-0.5 rounded-md">
                                                 {tx.category}
                                               </span>
-                                            </>
+                                            </span>
                                           )}
                                           {(tx as any).sourceBank && (
-                                            <>
+                                            <span key="sourceBank" className="flex items-center gap-1.5 sm:gap-2">
                                               <span className="text-gray-400 dark:text-gray-500 hidden sm:inline">•</span>
                                               <span className="text-xs text-gray-500 dark:text-gray-400 hidden sm:inline">
                                                 {(tx as any).sourceBank}
                                               </span>
-                                            </>
+                                            </span>
                                           )}
                                         </div>
                                       </div>
@@ -2710,7 +2694,8 @@ export default function FinancePage() {
                                     </div>
                                   </div>
                                 )
-                              })
+                              })}
+                              </div>
                             )}
                           </>
                         )}

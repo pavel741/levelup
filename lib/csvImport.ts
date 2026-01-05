@@ -1,6 +1,6 @@
 // CSV Import Utility - TypeScript version
 
-import { detectBankProfile, createColumnMappingFromProfile, ESTONIAN_BANK_PROFILES, type BankProfile } from './bankProfiles'
+import { createColumnMappingFromProfile, ESTONIAN_BANK_PROFILES, type BankProfile } from './bankProfiles'
 
 type ColumnMapping = {
   type: number | null
@@ -552,10 +552,11 @@ export class CSVImportService {
 
     // Try to detect bank if not specified
     if (!bankProfile) {
-      bankProfile = detectBankProfile(headers)
-      if (bankProfile) {
-        this._detectedBank = bankProfile
-      }
+      // Bank detection removed - user must manually select bank if needed
+      // bankProfile = detectBankProfile(headers)
+      // if (bankProfile) {
+      //   this._detectedBank = bankProfile
+      // }
     } else {
       this._detectedBank = bankProfile
     }
