@@ -48,18 +48,30 @@ const nextConfig = {
       config.externals.push('mongodb')
       config.externals.push('mongodb-client-encryption')
       
-      // MINIMAL APPROACH: Just ensure webpack can resolve the files
-      // Add lib directory to resolve.modules so webpack can find them
-      if (!config.resolve.modules) {
-        config.resolve.modules = ['node_modules']
-      }
-      const libPath = path.resolve(__dirname, 'lib')
-      if (!config.resolve.modules.includes(libPath)) {
-        config.resolve.modules.push(libPath)
+      // ULTIMATE SOLUTION: Ensure stub file exists with exact name webpack expects
+      // Copy stub to match the import name exactly
+      const fs = require('fs')
+      const stubPath = path.resolve(__dirname, 'lib/utils/encryption/csfle-client-stub.ts')
+      const targetPath = path.resolve(__dirname, 'lib/utils/encryption/csfle-key-management.ts')
+      const backupPath = path.resolve(__dirname, 'lib/utils/encryption/csfle-key-management.backup.ts')
+      
+      // On client builds, temporarily replace the file
+      // This ensures webpack can always resolve it
+      if (fs.existsSync(stubPath) && fs.existsSync(targetPath)) {
+        // Backup original if not already backed up
+        if (!fs.existsSync(backupPath)) {
+          fs.copyFileSync(targetPath, backupPath)
+        }
+        // Replace with stub for client build
+        fs.copyFileSync(stubPath, targetPath)
       }
       
-      // That's it - let webpack resolve naturally
-      // Since these are in API routes (server-only), webpack won't bundle them for client
+      // Also configure alias as backup
+      if (!config.resolve.alias) {
+        config.resolve.alias = {}
+      }
+      config.resolve.alias['./csfle-key-management'] = stubPath
+      config.resolve.alias['./utils/encryption/csfle-key-management'] = stubPath
       
       // Ignore native .node files
       config.module.rules.push({
@@ -79,9 +91,24 @@ const nextConfig = {
       // They will fail at runtime on client-side anyway due to mongodb being externalized.
     }
     
-    // For server-side builds, exclude .node files from webpack bundling
-    // They will be loaded at runtime by Node.js
+    // For server-side builds, restore original file if it was replaced
     if (isServer) {
+      const fs = require('fs')
+      const targetPath = path.resolve(__dirname, 'lib/utils/encryption/csfle-key-management.ts')
+      const backupPath = path.resolve(__dirname, 'lib/utils/encryption/csfle-key-management.backup.ts')
+      
+      // Restore original file for server builds
+      if (fs.existsSync(backupPath) && fs.existsSync(targetPath)) {
+        // Check if current file is the stub (by checking if it has the stub's error message)
+        const currentContent = fs.readFileSync(targetPath, 'utf8')
+        if (currentContent.includes('Encryption modules are server-only')) {
+          // It's the stub, restore the original
+          fs.copyFileSync(backupPath, targetPath)
+        }
+      }
+      
+      // Exclude .node files from webpack bundling
+      // They will be loaded at runtime by Node.js
       config.module.rules.push({
         test: /\.node$/,
         loader: 'ignore-loader',

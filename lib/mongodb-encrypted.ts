@@ -6,27 +6,12 @@
  */
 
 import { MongoClient, Db } from 'mongodb'
-
-// Dynamic import to avoid webpack resolution issues
-let getKmsProviders: any
-let getUserDataEncryptionKey: any
-let getExistingUserDataEncryptionKey: any
-let KEY_VAULT_NAMESPACE: string
-
-if (typeof window === 'undefined') {
-  // Server-side: Load real encryption module
-  const encryptionModule = require('./utils/encryption/csfle-key-management')
-  getKmsProviders = encryptionModule.getKmsProviders
-  getUserDataEncryptionKey = encryptionModule.getUserDataEncryptionKey
-  getExistingUserDataEncryptionKey = encryptionModule.getExistingUserDataEncryptionKey
-  KEY_VAULT_NAMESPACE = encryptionModule.KEY_VAULT_NAMESPACE
-} else {
-  // Client-side: Use stubs (should never happen)
-  getKmsProviders = () => { throw new Error('Server-only') }
-  getUserDataEncryptionKey = () => { throw new Error('Server-only') }
-  getExistingUserDataEncryptionKey = () => { throw new Error('Server-only') }
-  KEY_VAULT_NAMESPACE = ''
-}
+import {
+  getKmsProviders,
+  getUserDataEncryptionKey,
+  getExistingUserDataEncryptionKey,
+  KEY_VAULT_NAMESPACE,
+} from './utils/encryption/csfle-key-management'
 import {
   getFinanceTransactionsSchema,
   getWorkoutRoutinesSchema,

@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "next dev",
     "dev:network": "next dev -H 0.0.0.0",
+    "prebuild": "node scripts/prepare-build.js",
     "build": "next build",
+    "postbuild": "node scripts/restore-build.js",
     "start": "next start",
     "start:network": "next start -H 0.0.0.0",
     "lint": "next lint",
