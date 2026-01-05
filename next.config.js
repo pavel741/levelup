@@ -21,60 +21,47 @@ const nextConfig = {
         'mongodb-client-encryption': false,
       }
       
-      // Exclude MongoDB from client bundle
+      // Exclude MongoDB and encryption modules from client bundle
       config.externals = config.externals || []
       config.externals.push('mongodb')
-    } else {
-      // On server-side, prevent bundling encryption modules that use browser-only APIs
-      // These modules are only used client-side via dynamic imports
-      const path = require('path')
-      const fs = require('fs')
-      const stubPath = path.resolve(__dirname, 'lib', 'utils', 'encryption', 'server-stub.js')
+      config.externals.push('mongodb-client-encryption')
       
-      // Ensure stub file exists
-      if (!fs.existsSync(stubPath)) {
-        // Create stub file if it doesn't exist
-        const stubDir = path.dirname(stubPath)
-        if (!fs.existsSync(stubDir)) {
-          fs.mkdirSync(stubDir, { recursive: true })
-        }
-      }
+      // Ignore native .node files
+      config.module.rules.push({
+        test: /\.node$/,
+        use: 'ignore-loader',
+      })
       
-      // Add to resolve.alias FIRST - this is checked before plugins run
-      config.resolve.alias = {
-        ...config.resolve.alias,
-        '@/lib/utils/encryption/keyManager': stubPath,
-        '@/lib/utils/encryption/crypto': stubPath,
-        '@/lib/utils/encryption/financeEncryption': stubPath,
-        '@/lib/utils/encryption/routineEncryption': stubPath,
-        '@/lib/utils/encryption/config': stubPath,
-      }
-      
-      // Use webpack's NormalModuleReplacementPlugin to replace encryption modules with stubs
-      // This catches any imports that aliases might miss
-      config.plugins.unshift(
-        new webpack.NormalModuleReplacementPlugin(
-          /(?:@\/lib\/utils\/encryption\/|lib\/utils\/encryption\/)(keyManager|crypto|financeEncryption|routineEncryption|config)(\.ts|\.js)?$/,
-          (resource) => {
-            resource.request = stubPath
-          }
-        )
-      )
-      
-      // Also handle relative imports from loader.ts
-      // We need to match the resolved path, not just the import string
+      // Ignore mongodb-client-encryption package entirely
       config.plugins.push(
-        new webpack.NormalModuleReplacementPlugin(
-          /(keyManager|crypto|financeEncryption|routineEncryption|config)(\.ts|\.js)?$/,
-          (resource) => {
-            // Only replace if the context is the encryption directory
-            if (resource.context && resource.context.includes(path.join('lib', 'utils', 'encryption'))) {
-              resource.request = stubPath
-            }
-          }
-        )
+        new webpack.IgnorePlugin({
+          resourceRegExp: /^mongodb-client-encryption$/,
+        })
       )
     }
+    
+    // For server-side builds, exclude .node files from webpack bundling
+    // They will be loaded at runtime by Node.js
+    if (isServer) {
+      config.module.rules.push({
+        test: /\.node$/,
+        loader: 'ignore-loader',
+      })
+      
+      // Also mark mongodb-client-encryption as external for server builds
+      // This prevents webpack from trying to bundle the native module
+      const originalExternals = config.externals || []
+      config.externals = [
+        ...(Array.isArray(originalExternals) ? originalExternals : [originalExternals]),
+        ({ request }, callback) => {
+          if (request && request.includes('mongodb-client-encryption')) {
+            return callback(null, `commonjs ${request}`)
+          }
+          callback()
+        },
+      ]
+    }
+    
     return config
   },
 }

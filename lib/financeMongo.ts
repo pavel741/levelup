@@ -1,5 +1,6 @@
 import { ObjectId } from 'mongodb'
 import { getDatabase } from './mongodb'
+import clientPromise from './mongodb'
 import {
   FinanceTransaction,
   FinanceCategories,
@@ -9,6 +10,24 @@ import {
   FinanceRecurringTransaction,
 } from '@/types/finance'
 import { queryCache, createQueryCacheKey } from './utils/queryCache'
+import {
+  encryptObjectFields,
+  decryptObjectFields,
+} from './utils/encryption/csfle-explicit'
+
+// Fields to encrypt/decrypt for finance transactions
+const FINANCE_TRANSACTION_ENCRYPTED_FIELDS = [
+  'description',
+  'account',
+  'recipientName',
+  'selgitus',
+] as const
+
+// Fields to encrypt/decrypt for recurring transactions
+const RECURRING_TRANSACTION_ENCRYPTED_FIELDS = [
+  'name',
+  'description',
+] as const
 
 // ---------- Helpers ----------
 
@@ -116,13 +135,31 @@ export const subscribeToTransactions = (
       }
 
       const docs = await query.toArray()
-      const transactions = docs.map((doc) => {
-        const converted = convertMongoData(doc) as FinanceTransaction
-        return {
-          ...converted,
-          id: converted.id || doc._id.toString(),
-        } as WithId<FinanceTransaction>
-      })
+      
+      // Decrypt sensitive fields
+      const client = await clientPromise
+      const transactions = await Promise.all(
+        docs.map(async (doc) => {
+          const converted = convertMongoData(doc) as FinanceTransaction
+          const transaction = {
+            ...converted,
+            id: converted.id || doc._id.toString(),
+          } as WithId<FinanceTransaction>
+          
+          // Decrypt sensitive fields
+          try {
+            return await decryptObjectFields(
+              client,
+              userId,
+              transaction,
+              [...FINANCE_TRANSACTION_ENCRYPTED_FIELDS]
+            ) as WithId<FinanceTransaction>
+          } catch (error) {
+            console.warn('Failed to decrypt transaction fields (backward compatibility):', error)
+            return transaction
+          }
+        })
+      )
 
       // Only call callback if data actually changed
       const newHash = hashData(transactions)
@@ -177,14 +214,31 @@ export const getAllTransactionsForSummary = async (
         }
         
         const docs = await query.toArray()
+        const client = await clientPromise
         
-        return docs.map((doc) => {
-          const converted = convertMongoData(doc) as FinanceTransaction
-          return {
-            ...converted,
-            id: converted.id || doc._id.toString(),
-          } as WithId<FinanceTransaction>
-        })
+        // Decrypt sensitive fields
+        return await Promise.all(
+          docs.map(async (doc) => {
+            const converted = convertMongoData(doc) as FinanceTransaction
+            const transaction = {
+              ...converted,
+              id: converted.id || doc._id.toString(),
+            } as WithId<FinanceTransaction>
+            
+            // Decrypt sensitive fields
+            try {
+              return await decryptObjectFields(
+                client,
+                userId,
+                transaction,
+                [...FINANCE_TRANSACTION_ENCRYPTED_FIELDS]
+              ) as WithId<FinanceTransaction>
+            } catch (error) {
+              console.warn('Failed to decrypt transaction fields (backward compatibility):', error)
+              return transaction
+            }
+          })
+        )
       } catch (error) {
         console.error('Error loading all transactions from MongoDB:', error)
         return []
@@ -210,13 +264,31 @@ export const loadMoreTransactions = async (
     }
 
     const docs = await query.toArray()
-    const transactions = docs.map((doc) => {
-      const converted = convertMongoData(doc) as FinanceTransaction
-      return {
-        ...converted,
-        id: converted.id || doc._id.toString(),
-      } as WithId<FinanceTransaction>
-    })
+    
+    // Decrypt sensitive fields
+    const client = await clientPromise
+    const transactions = await Promise.all(
+      docs.map(async (doc) => {
+        const converted = convertMongoData(doc) as FinanceTransaction
+        const transaction = {
+          ...converted,
+          id: converted.id || doc._id.toString(),
+        } as WithId<FinanceTransaction>
+        
+        // Decrypt sensitive fields
+        try {
+          return await decryptObjectFields(
+            client,
+            userId,
+            transaction,
+            [...FINANCE_TRANSACTION_ENCRYPTED_FIELDS]
+          ) as WithId<FinanceTransaction>
+        } catch (error) {
+          console.warn('Failed to decrypt transaction fields (backward compatibility):', error)
+          return transaction
+        }
+      })
+    )
 
     return {
       transactions,
@@ -235,16 +307,28 @@ export const addTransaction = async (
 ): Promise<string> => {
   try {
     const collection = await getTransactionsCollection(userId)
+    const client = await clientPromise
     
     // Convert date string to Date object and add userId
-    const txData = {
+    let txData = {
       ...transaction,
       userId, // Add userId to document for filtering
       date: transaction.date instanceof Date ? transaction.date : new Date(transaction.date),
       createdAt: new Date(),
     }
     
-    // Debug logging removed
+    // Encrypt sensitive fields before saving
+    try {
+      txData = await encryptObjectFields(
+        client,
+        userId,
+        txData,
+        [...FINANCE_TRANSACTION_ENCRYPTED_FIELDS]
+      ) as typeof txData
+    } catch (error) {
+      console.error('Failed to encrypt transaction fields:', error)
+      // Continue without encryption for backward compatibility
+    }
 
     const result = await collection.insertOne(txData)
     
@@ -265,10 +349,11 @@ export const updateTransaction = async (
 ): Promise<void> => {
   try {
     const collection = await getTransactionsCollection(userId)
+    const client = await clientPromise
     
     // Convert date if present and create updateData without date first
     const { date, ...updatesWithoutDate } = updates
-    const updateData: Partial<FinanceTransaction> & { date?: Date } = { ...updatesWithoutDate }
+    let updateData: Partial<FinanceTransaction> & { date?: Date } = { ...updatesWithoutDate }
     if (date) {
       // Handle different date types: string, Date, or Timestamp
       if (date instanceof Date) {
@@ -283,6 +368,25 @@ export const updateTransaction = async (
       }
     }
     updateData.updatedAt = new Date()
+    
+    // Encrypt sensitive fields in updates before saving
+    try {
+      // Only encrypt fields that are being updated and are in the encrypted fields list
+      const fieldsToEncrypt = FINANCE_TRANSACTION_ENCRYPTED_FIELDS.filter(
+        field => field in updateData && updateData[field as keyof typeof updateData] != null
+      )
+      if (fieldsToEncrypt.length > 0) {
+        updateData = await encryptObjectFields(
+          client,
+          userId,
+          updateData,
+          [...fieldsToEncrypt]
+        ) as Partial<FinanceTransaction> & { date?: Date }
+      }
+    } catch (error) {
+      console.error('Failed to encrypt transaction update fields:', error)
+      // Continue without encryption for backward compatibility
+    }
 
     // Ensure userId matches (security check)
     await collection.updateOne(
@@ -428,17 +532,31 @@ export const batchAddTransactions = async (
       const chunk = transactionsToImport.slice(i, i + batchSize)
 
       try {
+        const client = await clientPromise
+        
         // Convert dates and prepare documents with userId
-        const docs = chunk.map((tx) => ({
+        let docs = chunk.map((tx) => ({
           ...tx,
           userId, // Add userId to each document
           date: tx.date instanceof Date ? tx.date : new Date(tx.date),
           createdAt: new Date(),
         }))
         
-        // Debug: Log selgitus in first few transactions
-        const docsWithSelgitus = docs.filter(d => 'selgitus' in d)
-        if (docsWithSelgitus.length > 0 && i === 0) {
+        // Encrypt sensitive fields before saving
+        try {
+          docs = await Promise.all(
+            docs.map(async (doc) => {
+              return await encryptObjectFields(
+                client,
+                userId,
+                doc,
+                [...FINANCE_TRANSACTION_ENCRYPTED_FIELDS]
+              ) as typeof doc
+            })
+          )
+        } catch (error) {
+          console.error('Failed to encrypt batch transaction fields:', error)
+          // Continue without encryption for backward compatibility
         }
 
         await collection.insertMany(docs, { ordered: false }) // Continue on errors
@@ -851,15 +969,32 @@ export const subscribeToRecurringTransactions = (
 
     try {
       const collection = await getRecurringTransactionsCollection(userId)
+      const client = await clientPromise
       const docs = await collection.find({ userId }).sort({ name: 1 }).toArray()
       
-      const transactions = docs.map((doc) => {
-        const converted = convertMongoData(doc) as FinanceRecurringTransaction
-        return {
-          ...converted,
-          id: converted.id || doc._id.toString(),
-        } as FinanceRecurringTransaction
-      })
+      // Decrypt sensitive fields
+      const transactions = await Promise.all(
+        docs.map(async (doc) => {
+          const converted = convertMongoData(doc) as FinanceRecurringTransaction
+          const transaction = {
+            ...converted,
+            id: converted.id || doc._id.toString(),
+          } as FinanceRecurringTransaction
+          
+          // Decrypt sensitive fields
+          try {
+            return await decryptObjectFields(
+              client,
+              userId,
+              transaction,
+              [...RECURRING_TRANSACTION_ENCRYPTED_FIELDS]
+            ) as FinanceRecurringTransaction
+          } catch (error) {
+            console.warn('Failed to decrypt recurring transaction fields (backward compatibility):', error)
+            return transaction
+          }
+        })
+      )
 
       callback(transactions)
     } catch (error) {
@@ -888,15 +1023,32 @@ export const getRecurringTransactions = async (
 ): Promise<FinanceRecurringTransaction[]> => {
   try {
     const collection = await getRecurringTransactionsCollection(userId)
+    const client = await clientPromise
     const docs = await collection.find({ userId }).sort({ name: 1 }).toArray()
     
-    return docs.map((doc) => {
-      const converted = convertMongoData(doc) as FinanceRecurringTransaction
-      return {
-        ...converted,
-        id: converted.id || doc._id.toString(),
-      } as FinanceRecurringTransaction
-    })
+    // Decrypt sensitive fields
+    return await Promise.all(
+      docs.map(async (doc) => {
+        const converted = convertMongoData(doc) as FinanceRecurringTransaction
+        const transaction = {
+          ...converted,
+          id: converted.id || doc._id.toString(),
+        } as FinanceRecurringTransaction
+        
+        // Decrypt sensitive fields
+        try {
+          return await decryptObjectFields(
+            client,
+            userId,
+            transaction,
+            [...RECURRING_TRANSACTION_ENCRYPTED_FIELDS]
+          ) as FinanceRecurringTransaction
+        } catch (error) {
+          console.warn('Failed to decrypt recurring transaction fields (backward compatibility):', error)
+          return transaction
+        }
+      })
+    )
   } catch (error) {
     console.error('Error getting recurring transactions from MongoDB:', error)
     return []
@@ -909,6 +1061,7 @@ export const addRecurringTransaction = async (
 ): Promise<string> => {
   try {
     const collection = await getRecurringTransactionsCollection(userId)
+    const client = await clientPromise
     
     const convertDate = (date: any): Date | undefined => {
       if (!date) return undefined
@@ -917,7 +1070,7 @@ export const addRecurringTransaction = async (
       return new Date(String(date))
     }
     
-    const txData = {
+    let txData = {
       ...transaction,
       userId,
       nextDate: convertDate(transaction.nextDate) || new Date(),
@@ -931,6 +1084,20 @@ export const addRecurringTransaction = async (
       })) || [],
       createdAt: new Date(),
     }
+    
+    // Encrypt sensitive fields before saving
+    try {
+      txData = await encryptObjectFields(
+        client,
+        userId,
+        txData,
+        [...RECURRING_TRANSACTION_ENCRYPTED_FIELDS]
+      ) as typeof txData
+    } catch (error) {
+      console.error('Failed to encrypt recurring transaction fields:', error)
+      // Continue without encryption for backward compatibility
+    }
+    
     const result = await collection.insertOne(txData)
     return result.insertedId.toString()
   } catch (error) {

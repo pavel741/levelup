@@ -1,6 +1,22 @@
 import { ObjectId } from 'mongodb'
 import { getDatabase } from './mongodb'
+import clientPromise from './mongodb'
 import type { Routine, WorkoutLog } from '@/types/workout'
+import {
+  encryptObjectFields,
+  decryptObjectFields,
+} from './utils/encryption/csfle-explicit'
+
+// Fields to encrypt/decrypt for workout routines
+const ROUTINE_ENCRYPTED_FIELDS = [
+  'name',
+  'description',
+] as const
+
+// Fields to encrypt/decrypt for workout logs
+const WORKOUT_LOG_ENCRYPTED_FIELDS = [
+  'notes',
+] as const
 
 type MongoValue = string | number | boolean | Date | ObjectId | null | undefined | MongoValue[] | { [key: string]: MongoValue }
 
@@ -69,16 +85,34 @@ export const getRoutinesByUserId = async (userId: string): Promise<Routine[]> =>
       console.log('[getRoutinesByUserId] Sample routines userIds:', allRoutines.map(r => r.userId))
     }
 
-    return routines.map((doc) => {
-      const data = convertMongoData<Record<string, unknown>>(doc) as Record<string, unknown>
-      const createdAt = data.createdAt instanceof Date ? data.createdAt : new Date(data.createdAt as string | number | Date)
-      const updatedAt = data.updatedAt instanceof Date ? data.updatedAt : new Date(data.updatedAt as string | number | Date)
-      return {
-        ...(data as Record<string, unknown>),
-        createdAt,
-        updatedAt,
-      } as Routine
-    })
+    const client = await clientPromise
+    
+    // Decrypt sensitive fields
+    return await Promise.all(
+      routines.map(async (doc) => {
+        const data = convertMongoData<Record<string, unknown>>(doc) as Record<string, unknown>
+        const createdAt = data.createdAt instanceof Date ? data.createdAt : new Date(data.createdAt as string | number | Date)
+        const updatedAt = data.updatedAt instanceof Date ? data.updatedAt : new Date(data.updatedAt as string | number | Date)
+        const routine = {
+          ...(data as Record<string, unknown>),
+          createdAt,
+          updatedAt,
+        } as Routine
+        
+        // Decrypt sensitive fields
+        try {
+          return await decryptObjectFields(
+            client,
+            userId,
+            routine,
+            [...ROUTINE_ENCRYPTED_FIELDS]
+          ) as Routine
+        } catch (error) {
+          console.warn('Failed to decrypt routine fields (backward compatibility):', error)
+          return routine
+        }
+      })
+    )
   } catch (error) {
     console.error('Error fetching routines from MongoDB:', error)
     return []
@@ -92,12 +126,26 @@ export const saveRoutine = async (routine: Routine): Promise<void> => {
     }
 
     const collection = await getRoutinesCollection()
+    const client = await clientPromise
     
-    const routineData: Omit<Routine, 'id'> & { _id?: ObjectId } = {
+    let routineData: Omit<Routine, 'id'> & { _id?: ObjectId } = {
       ...routine,
       userId: routine.userId, // Ensure userId is set
       createdAt: routine.createdAt instanceof Date ? routine.createdAt : new Date(routine.createdAt),
       updatedAt: routine.updatedAt instanceof Date ? routine.updatedAt : new Date(routine.updatedAt),
+    }
+    
+    // Encrypt sensitive fields before saving
+    try {
+      routineData = await encryptObjectFields(
+        client,
+        routine.userId,
+        routineData,
+        [...ROUTINE_ENCRYPTED_FIELDS]
+      ) as Omit<Routine, 'id'> & { _id?: ObjectId }
+    } catch (error) {
+      console.error('Failed to encrypt routine fields:', error)
+      // Continue without encryption for backward compatibility
     }
     
     // Remove id field for MongoDB storage
@@ -126,11 +174,31 @@ export const saveRoutine = async (routine: Routine): Promise<void> => {
 export const updateRoutine = async (routineId: string, userId: string, updates: Partial<Omit<Routine, 'id' | 'userId'>>): Promise<void> => {
   try {
     const collection = await getRoutinesCollection()
+    const client = await clientPromise
     
-    const updateData: Partial<Routine> = { ...updates, updatedAt: new Date() }
+    let updateData: Partial<Routine> = { ...updates, updatedAt: new Date() }
     
     if (updates.createdAt) {
       updateData.createdAt = updates.createdAt instanceof Date ? updates.createdAt : new Date(updates.createdAt)
+    }
+    
+    // Encrypt sensitive fields in updates before saving
+    try {
+      // Only encrypt fields that are being updated and are in the encrypted fields list
+      const fieldsToEncrypt = ROUTINE_ENCRYPTED_FIELDS.filter(
+        field => field in updateData && updateData[field as keyof typeof updateData] != null
+      )
+      if (fieldsToEncrypt.length > 0) {
+        updateData = await encryptObjectFields(
+          client,
+          userId,
+          updateData,
+          [...fieldsToEncrypt]
+        ) as Partial<Routine>
+      }
+    } catch (error) {
+      console.error('Failed to encrypt routine update fields:', error)
+      // Continue without encryption for backward compatibility
     }
     if (updates.updatedAt) {
       updateData.updatedAt = updates.updatedAt instanceof Date ? updates.updatedAt : new Date(updates.updatedAt)
@@ -175,18 +243,36 @@ export const getWorkoutLogsByUserId = async (userId: string): Promise<WorkoutLog
       .sort({ date: -1 })
       .toArray()
 
-    return logs.map((doc) => {
-      const data = convertMongoData<Record<string, unknown>>(doc) as Record<string, unknown>
-      const date = data.date instanceof Date ? data.date : new Date(data.date as string | number | Date)
-      const startTime = data.startTime instanceof Date ? data.startTime : new Date(data.startTime as string | number | Date)
-      const endTime = data.endTime ? (data.endTime instanceof Date ? data.endTime : new Date(data.endTime as string | number | Date)) : undefined
-      return {
-        ...(data as Record<string, unknown>),
-        date,
-        startTime,
-        endTime,
-      } as WorkoutLog
-    })
+    const client = await clientPromise
+    
+    // Decrypt sensitive fields
+    return await Promise.all(
+      logs.map(async (doc) => {
+        const data = convertMongoData<Record<string, unknown>>(doc) as Record<string, unknown>
+        const date = data.date instanceof Date ? data.date : new Date(data.date as string | number | Date)
+        const startTime = data.startTime instanceof Date ? data.startTime : new Date(data.startTime as string | number | Date)
+        const endTime = data.endTime ? (data.endTime instanceof Date ? data.endTime : new Date(data.endTime as string | number | Date)) : undefined
+        const log = {
+          ...(data as Record<string, unknown>),
+          date,
+          startTime,
+          endTime,
+        } as WorkoutLog
+        
+        // Decrypt sensitive fields
+        try {
+          return await decryptObjectFields(
+            client,
+            userId,
+            log,
+            [...WORKOUT_LOG_ENCRYPTED_FIELDS]
+          ) as WorkoutLog
+        } catch (error) {
+          console.warn('Failed to decrypt workout log fields (backward compatibility):', error)
+          return log
+        }
+      })
+    )
   } catch (error) {
     console.error('Error fetching workout logs from MongoDB:', error)
     return []
@@ -196,20 +282,34 @@ export const getWorkoutLogsByUserId = async (userId: string): Promise<WorkoutLog
 export const saveWorkoutLog = async (log: WorkoutLog): Promise<void> => {
   try {
     const collection = await getWorkoutLogsCollection()
+    const client = await clientPromise
     
-    const logData: Omit<WorkoutLog, 'id'> & { _id?: ObjectId } = {
+    let logData: Omit<WorkoutLog, 'id'> & { _id?: ObjectId } = {
       ...log,
       userId: log.userId,
       date: log.date instanceof Date ? log.date : new Date(log.date),
       startTime: log.startTime instanceof Date ? log.startTime : new Date(log.startTime),
     }
     
-    // Remove id field for MongoDB storage
-    delete (logData as Partial<WorkoutLog>).id
-
     if (log.endTime) {
       logData.endTime = log.endTime instanceof Date ? log.endTime : new Date(log.endTime)
     }
+    
+    // Encrypt sensitive fields before saving
+    try {
+      logData = await encryptObjectFields(
+        client,
+        log.userId,
+        logData,
+        [...WORKOUT_LOG_ENCRYPTED_FIELDS]
+      ) as Omit<WorkoutLog, 'id'> & { _id?: ObjectId }
+    } catch (error) {
+      console.error('Failed to encrypt workout log fields:', error)
+      // Continue without encryption for backward compatibility
+    }
+    
+    // Remove id field for MongoDB storage
+    delete (logData as Partial<WorkoutLog>).id
 
     // Remove undefined fields
     const logDataRecord = logData as Record<string, unknown>
@@ -233,8 +333,28 @@ export const saveWorkoutLog = async (log: WorkoutLog): Promise<void> => {
 export const updateWorkoutLog = async (logId: string, userId: string, updates: Partial<Omit<WorkoutLog, 'id' | 'userId'>>): Promise<void> => {
   try {
     const collection = await getWorkoutLogsCollection()
+    const client = await clientPromise
     
-    const updateData: Partial<WorkoutLog> = { ...updates }
+    let updateData: Partial<WorkoutLog> = { ...updates }
+    
+    // Encrypt sensitive fields in updates before saving
+    try {
+      // Only encrypt fields that are being updated and are in the encrypted fields list
+      const fieldsToEncrypt = WORKOUT_LOG_ENCRYPTED_FIELDS.filter(
+        field => field in updateData && updateData[field as keyof typeof updateData] != null
+      )
+      if (fieldsToEncrypt.length > 0) {
+        updateData = await encryptObjectFields(
+          client,
+          userId,
+          updateData,
+          fieldsToEncrypt as string[]
+        ) as Partial<WorkoutLog>
+      }
+    } catch (error) {
+      console.error('Failed to encrypt workout log update fields:', error)
+      // Continue without encryption for backward compatibility
+    }
     
     if (updates.date) {
       updateData.date = updates.date instanceof Date ? updates.date : new Date(updates.date)

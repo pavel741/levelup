@@ -37,34 +37,6 @@ export const getErrorMessage = (error: any): string => {
   }
 }
 
-/**
- * Initialize encryption key for a user (non-blocking)
- * This is called after user creation to set up client-side encryption
- * Only runs in the browser (client-side)
- */
-async function initializeUserEncryption(userId: string): Promise<void> {
-  // Only initialize encryption in the browser (client-side)
-  if (typeof window === 'undefined') {
-    return // Skip on server-side
-  }
-  
-  try {
-    // Use Function constructor with string concatenation to prevent webpack static analysis
-    // This prevents Next.js from trying to resolve this module during server-side builds
-    const base = '@/lib/utils/encryption/'
-    const module = 'keyManager'
-    const dynamicImport = new Function('specifier', 'return import(specifier)')
-    const encryptionModule = await dynamicImport(base + module)
-    await encryptionModule.initializeUserEncryptionKey(userId)
-    console.log('✅ Encryption key initialized for user:', userId)
-  } catch (encryptionError: any) {
-    // Silently fail - encryption is optional and shouldn't block user signup
-    // The error might be due to SSR, missing browser APIs, or module not found during build
-    if (typeof window !== 'undefined' && encryptionError?.code !== 'MODULE_NOT_FOUND') {
-      console.warn('⚠️ Failed to initialize encryption key (non-critical):', encryptionError)
-    }
-  }
-}
 
 export const signUp = async (email: string, password: string, name: string): Promise<User | null> => {
   if (!auth) {
@@ -89,7 +61,6 @@ export const signUp = async (email: string, password: string, name: string): Pro
     }
 
     await createUserData(user)
-    await initializeUserEncryption(user.id)
     return user
   } catch (error: any) {
     console.error('Error signing up:', error)
@@ -118,7 +89,6 @@ export const signUp = async (email: string, password: string, name: string): Pro
               joinedAt: new Date(),
             }
             await createUserData(user)
-            await initializeUserEncryption(user.id)
             return user
           }
           
@@ -191,7 +161,6 @@ export const signIn = async (email: string, password: string): Promise<User | nu
           joinedAt: new Date(),
         }
         await createUserData(user)
-        await initializeUserEncryption(user.id)
       }
       
       return user
@@ -315,7 +284,6 @@ export const handleGoogleRedirect = async (): Promise<User | null> => {
       
       try {
         await createUserData(user)
-        await initializeUserEncryption(user.id)
       } catch (createError: any) {
         console.error('❌ Failed to create user data in Firestore:', createError)
         console.error('Create error code:', createError.code)
