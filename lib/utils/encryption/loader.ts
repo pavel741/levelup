@@ -58,8 +58,10 @@ async function loadEncryptionModules(): Promise<void> {
 
   loadingPromise = (async () => {
     try {
-      // Use direct string imports - Next.js will resolve these at build time
-      // The webpack alias only affects server-side builds
+      // Use Function constructor to create dynamic imports that webpack can't statically analyze
+      // This prevents Next.js from trying to resolve these modules during server-side builds
+      const dynamicImport = new Function('specifier', 'return import(specifier)')
+      
       const [
         keyManager,
         config,
@@ -67,11 +69,11 @@ async function loadEncryptionModules(): Promise<void> {
         financeEncryption,
         crypto,
       ] = await Promise.all([
-        import('@/lib/utils/encryption/keyManager'),
-        import('@/lib/utils/encryption/config'),
-        import('@/lib/utils/encryption/routineEncryption'),
-        import('@/lib/utils/encryption/financeEncryption'),
-        import('@/lib/utils/encryption/crypto'),
+        dynamicImport('@/lib/utils/encryption/keyManager'),
+        dynamicImport('@/lib/utils/encryption/config'),
+        dynamicImport('@/lib/utils/encryption/routineEncryption'),
+        dynamicImport('@/lib/utils/encryption/financeEncryption'),
+        dynamicImport('@/lib/utils/encryption/crypto'),
       ])
 
       encryptionModules = {
