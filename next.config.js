@@ -37,26 +37,71 @@ const nextConfig = {
       config.externals.push('mongodb')
       config.externals.push('mongodb-client-encryption')
       
-      // Replace encryption modules with stubs
-      // The key is to match the exact import path before webpack tries to resolve it
-      const stubPath = path.resolve(__dirname, 'lib/utils/encryption/csfle-client-stub.ts')
+      // Use a custom resolver plugin to intercept module resolution early
+      // This runs before webpack tries to resolve the module
+      const stubAbsolutePath = path.resolve(__dirname, 'lib/utils/encryption/csfle-client-stub')
       
-      // Use NormalModuleReplacementPlugin with exact string matching
-      // This must match BEFORE webpack tries to resolve the module
+      // Create a custom resolver plugin
+      const EncryptionResolverPlugin = {
+        apply: (resolver) => {
+          // Hook into the 'described-resolve' hook which runs early in resolution
+          resolver.hooks.describedResolve.tapAsync(
+            'EncryptionModuleResolver',
+            (request, resolveContext, callback) => {
+              // Check if this is a request for csfle-key-management
+              if (request.request && typeof request.request === 'string') {
+                const req = request.request
+                // Match the exact import patterns we use
+                if (
+                  req === './csfle-key-management' ||
+                  req === './utils/encryption/csfle-key-management' ||
+                  (req.includes('csfle-key-management') && !req.includes('csfle-client-stub'))
+                ) {
+                  // Calculate relative path from the requesting file's directory to the stub
+                  const requestingDir = request.context ? request.context.issuer : __dirname
+                  let stubRelativePath = path.relative(requestingDir || __dirname, stubAbsolutePath)
+                  
+                  // Normalize path separators for webpack (use forward slashes)
+                  stubRelativePath = stubRelativePath.split(path.sep).join('/')
+                  
+                  // Ensure it starts with ./ if it's not already absolute or node_modules
+                  if (!stubRelativePath.startsWith('.') && !stubRelativePath.startsWith('/')) {
+                    stubRelativePath = './' + stubRelativePath
+                  }
+                  
+                  // Replace the request with the stub path
+                  const newRequest = {
+                    ...request,
+                    request: stubRelativePath,
+                  }
+                  // Continue resolution with the new request
+                  return resolver.doResolve(
+                    resolver.hooks.describedResolve,
+                    newRequest,
+                    null,
+                    resolveContext,
+                    callback
+                  )
+                }
+              }
+              // Continue with normal resolution
+              callback()
+            }
+          )
+        },
+      }
+      
+      // Add the resolver plugin
+      if (!config.resolve.plugins) {
+        config.resolve.plugins = []
+      }
+      config.resolve.plugins.push(EncryptionResolverPlugin)
+      
+      // Also add NormalModuleReplacementPlugin as a fallback
       config.plugins.push(
         new webpack.NormalModuleReplacementPlugin(
-          // Match the exact relative import: './csfle-key-management'
-          /^\.\/csfle-key-management$/,
-          stubPath
-        )
-      )
-      
-      // Also handle the other import pattern from lib/mongodb-encrypted.ts
-      config.plugins.push(
-        new webpack.NormalModuleReplacementPlugin(
-          // Match: './utils/encryption/csfle-key-management'
-          /^\.\/utils\/encryption\/csfle-key-management$/,
-          stubPath
+          /csfle-key-management(?!-client-stub)/,
+          stubAbsolutePath
         )
       )
       
