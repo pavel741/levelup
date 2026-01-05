@@ -48,24 +48,18 @@ const nextConfig = {
       config.externals.push('mongodb')
       config.externals.push('mongodb-client-encryption')
       
-      // Replace wrapper imports with stub on client side
-      const stubPath = path.resolve(__dirname, 'lib/utils/encryption/csfle-client-stub')
+      // MINIMAL APPROACH: Just ensure webpack can resolve the files
+      // Add lib directory to resolve.modules so webpack can find them
+      if (!config.resolve.modules) {
+        config.resolve.modules = ['node_modules']
+      }
+      const libPath = path.resolve(__dirname, 'lib')
+      if (!config.resolve.modules.includes(libPath)) {
+        config.resolve.modules.push(libPath)
+      }
       
-      // Replace the wrapper file's import of csfle-key-management with the stub
-      config.plugins.unshift(
-        new webpack.NormalModuleReplacementPlugin(
-          /csfle-key-management-wrapper/,
-          stubPath
-        )
-      )
-      
-      // Also handle direct imports as fallback
-      config.plugins.unshift(
-        new webpack.NormalModuleReplacementPlugin(
-          /csfle-key-management(?!-client-stub|-wrapper)/,
-          stubPath
-        )
-      )
+      // That's it - let webpack resolve naturally
+      // Since these are in API routes (server-only), webpack won't bundle them for client
       
       // Ignore native .node files
       config.module.rules.push({

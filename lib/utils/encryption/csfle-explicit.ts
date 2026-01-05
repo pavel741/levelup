@@ -7,12 +7,11 @@
  */
 
 import { MongoClient, Binary } from 'mongodb'
-// Use wrapper that handles server/client automatically
 import {
   getClientEncryption,
   getUserDataEncryptionKey,
   getExistingUserDataEncryptionKey,
-} from './csfle-key-management-wrapper'
+} from './csfle-key-management'
 
 /**
  * Encrypt a string value for a specific user
