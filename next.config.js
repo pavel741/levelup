@@ -7,6 +7,8 @@ const nextConfig = {
   images: {
     domains: ['firebasestorage.googleapis.com'],
   },
+  // Note: serverComponentsExternalPackages is available in Next.js 13.4+
+  // For Next.js 14, we handle this via webpack externals instead
   // Experimental features for better performance
   experimental: {
     // optimizeCss: true, // Disabled - requires critters package
@@ -37,71 +39,23 @@ const nextConfig = {
       config.externals.push('mongodb')
       config.externals.push('mongodb-client-encryption')
       
-      // Use a custom resolver plugin to intercept module resolution early
-      // This runs before webpack tries to resolve the module
-      const stubAbsolutePath = path.resolve(__dirname, 'lib/utils/encryption/csfle-client-stub')
+      // Replace encryption modules with stubs using absolute path imports
+      // Now that we're using @/lib/utils/encryption/csfle-key-management, webpack can resolve it
+      const stubPath = path.resolve(__dirname, 'lib/utils/encryption/csfle-client-stub')
       
-      // Create a custom resolver plugin
-      const EncryptionResolverPlugin = {
-        apply: (resolver) => {
-          // Hook into the 'described-resolve' hook which runs early in resolution
-          resolver.hooks.describedResolve.tapAsync(
-            'EncryptionModuleResolver',
-            (request, resolveContext, callback) => {
-              // Check if this is a request for csfle-key-management
-              if (request.request && typeof request.request === 'string') {
-                const req = request.request
-                // Match the exact import patterns we use
-                if (
-                  req === './csfle-key-management' ||
-                  req === './utils/encryption/csfle-key-management' ||
-                  (req.includes('csfle-key-management') && !req.includes('csfle-client-stub'))
-                ) {
-                  // Calculate relative path from the requesting file's directory to the stub
-                  const requestingDir = request.context ? request.context.issuer : __dirname
-                  let stubRelativePath = path.relative(requestingDir || __dirname, stubAbsolutePath)
-                  
-                  // Normalize path separators for webpack (use forward slashes)
-                  stubRelativePath = stubRelativePath.split(path.sep).join('/')
-                  
-                  // Ensure it starts with ./ if it's not already absolute or node_modules
-                  if (!stubRelativePath.startsWith('.') && !stubRelativePath.startsWith('/')) {
-                    stubRelativePath = './' + stubRelativePath
-                  }
-                  
-                  // Replace the request with the stub path
-                  const newRequest = {
-                    ...request,
-                    request: stubRelativePath,
-                  }
-                  // Continue resolution with the new request
-                  return resolver.doResolve(
-                    resolver.hooks.describedResolve,
-                    newRequest,
-                    null,
-                    resolveContext,
-                    callback
-                  )
-                }
-              }
-              // Continue with normal resolution
-              callback()
-            }
-          )
-        },
-      }
+      // Match absolute path imports via @ alias
+      config.plugins.unshift(
+        new webpack.NormalModuleReplacementPlugin(
+          /@\/lib\/utils\/encryption\/csfle-key-management$/,
+          stubPath.replace(/\\/g, '/') // Normalize path separators
+        )
+      )
       
-      // Add the resolver plugin
-      if (!config.resolve.plugins) {
-        config.resolve.plugins = []
-      }
-      config.resolve.plugins.push(EncryptionResolverPlugin)
-      
-      // Also add NormalModuleReplacementPlugin as a fallback
-      config.plugins.push(
+      // Also handle relative imports as fallback
+      config.plugins.unshift(
         new webpack.NormalModuleReplacementPlugin(
           /csfle-key-management(?!-client-stub)/,
-          stubAbsolutePath
+          stubPath
         )
       )
       

@@ -7,11 +7,12 @@
  */
 
 import { MongoClient, Binary } from 'mongodb'
+// Use absolute import path - webpack resolves this more reliably
 import {
   getClientEncryption,
   getUserDataEncryptionKey,
   getExistingUserDataEncryptionKey,
-} from './csfle-key-management'
+} from '@/lib/utils/encryption/csfle-key-management'
 
 /**
  * Encrypt a string value for a specific user
