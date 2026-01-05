@@ -1,4 +1,6 @@
 /** @type {import('next').NextConfig} */
+const path = require('path')
+
 const nextConfig = {
   reactStrictMode: true,
   compress: true, // Enable gzip compression
@@ -10,6 +12,15 @@ const nextConfig = {
     // optimizeCss: true, // Disabled - requires critters package
   },
   webpack: (config, { isServer, webpack }) => {
+    // Ensure TypeScript files can be resolved
+    config.resolve.extensions = [
+      '.js',
+      '.jsx',
+      '.ts',
+      '.tsx',
+      ...(config.resolve.extensions || []),
+    ]
+    
     // Exclude MongoDB and Node.js modules from client-side bundle
     if (!isServer) {
       config.resolve.fallback = {
@@ -25,6 +36,17 @@ const nextConfig = {
       config.externals = config.externals || []
       config.externals.push('mongodb')
       config.externals.push('mongodb-client-encryption')
+      
+      // Replace encryption modules with stubs on client side
+      // This allows webpack to resolve the imports during dependency analysis
+      // Match both './csfle-key-management' and './utils/encryption/csfle-key-management' patterns
+      const stubPath = path.resolve(__dirname, 'lib/utils/encryption/csfle-client-stub')
+      config.plugins.push(
+        new webpack.NormalModuleReplacementPlugin(
+          /^(\.\/)?(utils\/encryption\/)?csfle-key-management$/,
+          stubPath
+        )
+      )
       
       // Ignore native .node files
       config.module.rules.push({
