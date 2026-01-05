@@ -41,16 +41,18 @@ const nextConfig = {
       }
       
       // Use webpack's NormalModuleReplacementPlugin to replace encryption modules with stubs
+      // Match both @/lib/utils/encryption/* and relative paths ./keyManager, etc.
       config.plugins.push(
         new webpack.NormalModuleReplacementPlugin(
-          /^@\/lib\/utils\/encryption\/(keyManager|crypto|financeEncryption|routineEncryption|config)$/,
+          /^(\.\/|@\/lib\/utils\/encryption\/)(keyManager|crypto|financeEncryption|routineEncryption|config)$/,
           (resource) => {
             resource.request = stubPath
           }
         )
       )
       
-      // Also add to resolve.alias as backup
+      // Also add to resolve.alias as backup for both absolute and relative paths
+      const encryptionDir = path.resolve(__dirname, 'lib', 'utils', 'encryption')
       config.resolve.alias = {
         ...config.resolve.alias,
         '@/lib/utils/encryption/keyManager': stubPath,
@@ -58,6 +60,12 @@ const nextConfig = {
         '@/lib/utils/encryption/financeEncryption': stubPath,
         '@/lib/utils/encryption/routineEncryption': stubPath,
         '@/lib/utils/encryption/config': stubPath,
+        // Also alias relative paths from within the encryption directory
+        [path.join(encryptionDir, 'keyManager')]: stubPath,
+        [path.join(encryptionDir, 'crypto')]: stubPath,
+        [path.join(encryptionDir, 'financeEncryption')]: stubPath,
+        [path.join(encryptionDir, 'routineEncryption')]: stubPath,
+        [path.join(encryptionDir, 'config')]: stubPath,
       }
     }
     return config
