@@ -58,6 +58,9 @@ async function loadEncryptionModules(): Promise<void> {
 
   loadingPromise = (async () => {
     try {
+      // Use dynamic imports with template literals to prevent Next.js static analysis
+      // These will only be resolved at runtime in the browser
+      const encryptionPath = (name: string) => `@/lib/utils/encryption/${name}`
       const [
         keyManager,
         config,
@@ -65,11 +68,11 @@ async function loadEncryptionModules(): Promise<void> {
         financeEncryption,
         crypto,
       ] = await Promise.all([
-        import('@/lib/utils/encryption/keyManager'),
-        import('@/lib/utils/encryption/config'),
-        import('@/lib/utils/encryption/routineEncryption'),
-        import('@/lib/utils/encryption/financeEncryption'),
-        import('@/lib/utils/encryption/crypto'),
+        import(encryptionPath('keyManager')),
+        import(encryptionPath('config')),
+        import(encryptionPath('routineEncryption')),
+        import(encryptionPath('financeEncryption')),
+        import(encryptionPath('crypto')),
       ])
 
       encryptionModules = {
