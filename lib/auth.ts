@@ -49,9 +49,12 @@ async function initializeUserEncryption(userId: string): Promise<void> {
   }
   
   try {
-    // Use relative path import - webpack will resolve this correctly
-    // The @ alias doesn't work in runtime dynamic imports
-    const encryptionModule = await import('@/lib/utils/encryption/keyManager')
+    // Use Function constructor with string concatenation to prevent webpack static analysis
+    // This prevents Next.js from trying to resolve this module during server-side builds
+    const base = '@/lib/utils/encryption/'
+    const module = 'keyManager'
+    const dynamicImport = new Function('specifier', 'return import(specifier)')
+    const encryptionModule = await dynamicImport(base + module)
     await encryptionModule.initializeUserEncryptionKey(userId)
     console.log('✅ Encryption key initialized for user:', userId)
   } catch (encryptionError: any) {
