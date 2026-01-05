@@ -11,7 +11,7 @@ import {
   getUserDataEncryptionKey,
   getExistingUserDataEncryptionKey,
   KEY_VAULT_NAMESPACE,
-} from '@/lib/utils/encryption/csfle-key-management'
+} from './utils/encryption/csfle-key-management-wrapper'
 import {
   getFinanceTransactionsSchema,
   getWorkoutRoutinesSchema,

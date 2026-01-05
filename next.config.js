@@ -48,24 +48,21 @@ const nextConfig = {
       config.externals.push('mongodb')
       config.externals.push('mongodb-client-encryption')
       
-      // DIRECT APPROACH: Use resolve.alias to map the import directly to stub
-      // This works at the resolve level before webpack tries to bundle
+      // Replace wrapper imports with stub on client side
       const stubPath = path.resolve(__dirname, 'lib/utils/encryption/csfle-client-stub')
       
-      // Map the absolute import path directly to the stub file
-      config.resolve.alias['@/lib/utils/encryption/csfle-key-management'] = stubPath
-      
-      // Also map relative imports from different locations
-      // For imports from lib/utils/encryption/csfle-explicit.ts
-      config.resolve.alias['./csfle-key-management'] = stubPath
-      
-      // For imports from lib/mongodb-encrypted.ts  
-      config.resolve.alias['./utils/encryption/csfle-key-management'] = stubPath
-      
-      // Add NormalModuleReplacementPlugin as additional safety
+      // Replace the wrapper file's import of csfle-key-management with the stub
       config.plugins.unshift(
         new webpack.NormalModuleReplacementPlugin(
-          /csfle-key-management(?!-client-stub)/,
+          /csfle-key-management-wrapper/,
+          stubPath
+        )
+      )
+      
+      // Also handle direct imports as fallback
+      config.plugins.unshift(
+        new webpack.NormalModuleReplacementPlugin(
+          /csfle-key-management(?!-client-stub|-wrapper)/,
           stubPath
         )
       )
