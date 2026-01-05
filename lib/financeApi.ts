@@ -179,14 +179,17 @@ export const addTransaction = async (
 ): Promise<string> => {
   // Encrypt sensitive fields before sending to server
   let transactionToSave = transaction
-  if (isEncryptionEnabledSync()) {
+  // Always try to encrypt on client-side (encryption is enabled by default)
+  if (typeof window !== 'undefined') {
     try {
       const encryption = await getEncryptionModules()
       const encryptionKey = await encryption.ensureUserHasEncryptionKey(userId)
       transactionToSave = await encryption.encryptTransaction(transaction as FinanceTransaction, encryptionKey)
+      console.log('✅ Transaction encrypted before saving')
     } catch (error) {
-      console.error('Failed to encrypt transaction:', error)
-      throw new Error('Failed to encrypt transaction data. Please try again.')
+      console.error('❌ Failed to encrypt transaction:', error)
+      // Don't throw - allow transaction to save unencrypted for backward compatibility
+      // But log the error so we know encryption failed
     }
   }
   
@@ -216,12 +219,13 @@ export const updateTransaction = async (
 ): Promise<void> => {
   // Encrypt sensitive fields in updates before sending
   let updatesToSend = updates
-  if (isEncryptionEnabledSync()) {
+  // Always try to encrypt on client-side (encryption is enabled by default)
+  if (typeof window !== 'undefined') {
     try {
       const encryption = await getEncryptionModules()
       const encryptionKey = await encryption.ensureUserHasEncryptionKey(userId)
-      // Only encrypt fields that are in the updates and should be encrypted
-      const fieldsToEncrypt = ['description', 'account'].filter(
+      // Encrypt fields that should be encrypted: description, account, selgitus
+      const fieldsToEncrypt = ['description', 'account', 'selgitus'].filter(
         field => field in updates
       ) as (keyof FinanceTransaction)[]
       
@@ -242,8 +246,8 @@ export const updateTransaction = async (
         }
       }
     } catch (error) {
-      console.error('Failed to encrypt transaction updates:', error)
-      throw new Error('Failed to encrypt transaction updates. Please try again.')
+      console.error('❌ Failed to encrypt transaction updates:', error)
+      // Don't throw - allow updates to save unencrypted for backward compatibility
     }
   }
   
@@ -288,7 +292,8 @@ export const batchAddTransactions = async (
 ): Promise<{ success: number; errors: number; skipped: number }> => {
   // Encrypt sensitive fields before sending to server
   let transactionsToSave = transactions
-  if (isEncryptionEnabledSync()) {
+  // Always try to encrypt on client-side (encryption is enabled by default)
+  if (typeof window !== 'undefined') {
     try {
       const encryption = await getEncryptionModules()
       const encryptionKey = await encryption.ensureUserHasEncryptionKey(userId)
@@ -296,9 +301,11 @@ export const batchAddTransactions = async (
         transactions as FinanceTransaction[],
         encryptionKey
       )
+      console.log(`✅ Encrypted ${transactionsToSave.length} transactions before batch save`)
     } catch (error) {
-      console.error('Failed to encrypt transactions:', error)
-      throw new Error('Failed to encrypt transaction data. Please try again.')
+      console.error('❌ Failed to encrypt transactions:', error)
+      // Don't throw - allow transactions to save unencrypted for backward compatibility
+      // But log the error so we know encryption failed
     }
   }
   

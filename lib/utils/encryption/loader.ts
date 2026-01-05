@@ -125,13 +125,16 @@ export async function getEncryptionModules() {
 
 /**
  * Check if encryption is enabled (synchronous check)
+ * Returns true on client-side by default (encryption is enabled in config)
+ * Returns false on server-side (encryption modules are browser-only)
  */
 export function isEncryptionEnabledSync(): boolean {
   // Always return false on server-side
   if (typeof window === 'undefined') {
     return false
   }
-  // On client-side, return the loaded value or false if not loaded yet
-  return encryptionModules?.isEncryptionEnabled() ?? false
+  // On client-side, encryption is enabled by default
+  // If modules are loaded, use their check; otherwise assume enabled
+  return encryptionModules?.isEncryptionEnabled() ?? true
 }
 
