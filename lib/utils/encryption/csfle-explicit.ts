@@ -7,11 +7,31 @@
  */
 
 import { MongoClient, Binary } from 'mongodb'
-import {
-  getClientEncryption,
-  getUserDataEncryptionKey,
-  getExistingUserDataEncryptionKey,
-} from './csfle-key-management'
+
+// Dynamic import to avoid webpack resolution issues
+// Only load encryption functions on server-side
+let getClientEncryption: any
+let getUserDataEncryptionKey: any
+let getExistingUserDataEncryptionKey: any
+
+if (typeof window === 'undefined') {
+  // Server-side: Load real encryption module using require (not analyzed by webpack)
+  const encryptionModule = require('./csfle-key-management')
+  getClientEncryption = encryptionModule.getClientEncryption
+  getUserDataEncryptionKey = encryptionModule.getUserDataEncryptionKey
+  getExistingUserDataEncryptionKey = encryptionModule.getExistingUserDataEncryptionKey
+} else {
+  // Client-side: Use stubs (should never happen, but safety)
+  getClientEncryption = () => {
+    throw new Error('Encryption modules are server-only')
+  }
+  getUserDataEncryptionKey = () => {
+    throw new Error('Encryption modules are server-only')
+  }
+  getExistingUserDataEncryptionKey = () => {
+    throw new Error('Encryption modules are server-only')
+  }
+}
 
 /**
  * Encrypt a string value for a specific user
@@ -23,22 +43,36 @@ export async function encryptValue(
 ): Promise<string | undefined | null> {
   if (!value) return value
   
-  // Get or create user's encryption key
-  let dataKeyId = await getExistingUserDataEncryptionKey(client, userId)
-  if (!dataKeyId) {
-    dataKeyId = await getUserDataEncryptionKey(client, userId)
+  try {
+    // Get or create user's encryption key
+    let dataKeyId = await getExistingUserDataEncryptionKey(client, userId)
+    if (!dataKeyId) {
+      console.log(`🔑 Creating encryption key for user: ${userId}`)
+      dataKeyId = await getUserDataEncryptionKey(client, userId)
+    } else {
+      console.log(`🔑 Using existing encryption key for user: ${userId}`)
+    }
+    
+    const encryption = getClientEncryption(client)
+    
+    // Encrypt the value
+    console.log(`🔐 Encrypting value for user ${userId}, length: ${value.length}`)
+    const encrypted = await encryption.encrypt(value, {
+      keyId: dataKeyId,
+      algorithm: 'AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic',
+    })
+    
+    // Convert Binary to base64 string for storage
+    const result = encrypted.toString('base64')
+    console.log(`✅ Encrypted value successfully, result length: ${result.length}`)
+    return result
+  } catch (error) {
+    console.error('❌ Encryption error in encryptValue:', error)
+    console.error('Error type:', error instanceof Error ? error.constructor.name : typeof error)
+    console.error('Error message:', error instanceof Error ? error.message : String(error))
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack')
+    throw error // Re-throw so caller knows encryption failed
   }
-  
-  const encryption = getClientEncryption(client)
-  
-  // Encrypt the value
-  const encrypted = await encryption.encrypt(value, {
-    keyId: dataKeyId,
-    algorithm: 'AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic',
-  })
-  
-  // Convert Binary to base64 string for storage
-  return encrypted.toString('base64')
 }
 
 /**

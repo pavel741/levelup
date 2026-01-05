@@ -320,21 +320,31 @@ export const addTransaction = async (
     // Encrypt sensitive fields before saving
     try {
       console.log('🔐 Attempting to encrypt transaction fields:', FINANCE_TRANSACTION_ENCRYPTED_FIELDS)
+      console.log('📊 Transaction data before encryption:', {
+        description: (txData as any).description?.substring(0, 20),
+        recipientName: (txData as any).recipientName?.substring(0, 20),
+        selgitus: (txData as any).selgitus?.substring(0, 20),
+      })
+      
       txData = await encryptObjectFields(
         client,
         userId,
-        txData,
+        txData as any,
         [...FINANCE_TRANSACTION_ENCRYPTED_FIELDS]
       ) as typeof txData
+      
       console.log('✅ Transaction fields encrypted successfully')
+      console.log('📊 Transaction data after encryption:', {
+        description: (txData as any).description?.substring(0, 20),
+        recipientName: (txData as any).recipientName?.substring(0, 20),
+        selgitus: (txData as any).selgitus?.substring(0, 20),
+      })
     } catch (error) {
       console.error('❌ Failed to encrypt transaction fields:', error)
       console.error('Error details:', error instanceof Error ? error.message : String(error))
       console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace')
-      // For now, log but continue - we'll fix encryption setup separately
-      // TODO: Once encryption is working, re-enable this throw
-      // throw new Error(`Encryption failed: ${error instanceof Error ? error.message : String(error)}`)
-      console.warn('⚠️ Continuing without encryption - this should be fixed!')
+      // Don't save unencrypted sensitive data - throw error
+      throw new Error(`Encryption failed: ${error instanceof Error ? error.message : String(error)}`)
     }
 
     const result = await collection.insertOne(txData)
@@ -396,10 +406,8 @@ export const updateTransaction = async (
       console.error('❌ Failed to encrypt transaction update fields:', error)
       console.error('Error details:', error instanceof Error ? error.message : String(error))
       console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace')
-      // For now, log but continue - we'll fix encryption setup separately
-      // TODO: Once encryption is working, re-enable this throw
-      // throw new Error(`Encryption failed: ${error instanceof Error ? error.message : String(error)}`)
-      console.warn('⚠️ Continuing without encryption - this should be fixed!')
+      // Don't save unencrypted sensitive data - throw error
+      throw new Error(`Encryption failed: ${error instanceof Error ? error.message : String(error)}`)
     }
 
     // Ensure userId matches (security check)

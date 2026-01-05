@@ -18,12 +18,22 @@ console.log('🔧 [PREBUILD] Preparing build: Replacing csfle-key-management wit
 console.log('📁 Encryption dir:', encryptionDir)
 console.log('📄 Original file exists:', fs.existsSync(originalFile))
 console.log('📄 Stub file exists:', fs.existsSync(stubFile))
+console.log('📂 Files in directory:', fs.readdirSync(encryptionDir))
 
 // Always check and backup - Vercel cache might restore files
 if (!fs.existsSync(originalFile)) {
   console.error('❌ Error: Original file not found:', originalFile)
   console.error('📂 Files in directory:', fs.readdirSync(encryptionDir))
-  process.exit(1)
+  
+  // Check if backup exists and restore it
+  if (fs.existsSync(backupFile)) {
+    console.log('🔄 Restoring from backup file...')
+    fs.copyFileSync(backupFile, originalFile)
+    console.log('✅ Restored from backup')
+  } else {
+    console.error('❌ No backup file found either. Cannot proceed.')
+    process.exit(1)
+  }
 }
 
 if (!fs.existsSync(stubFile)) {

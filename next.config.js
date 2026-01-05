@@ -48,26 +48,8 @@ const nextConfig = {
       config.externals.push('mongodb')
       config.externals.push('mongodb-client-encryption')
       
-      // File replacement is handled by prebuild script
-      // Just ensure webpack can resolve the file via alias as backup
-      const stubPath = path.resolve(__dirname, 'lib/utils/encryption/csfle-client-stub.ts')
-      
-      if (!config.resolve.alias) {
-        config.resolve.alias = {}
-      }
-      
-      // Map imports to stub file (prebuild script should have replaced the file already)
-      config.resolve.alias['./csfle-key-management'] = stubPath
-      config.resolve.alias['./utils/encryption/csfle-key-management'] = stubPath
-      
-      // Also add lib to modules for resolution
-      if (!config.resolve.modules) {
-        config.resolve.modules = ['node_modules']
-      }
-      const libPath = path.resolve(__dirname, 'lib')
-      if (!config.resolve.modules.includes(libPath)) {
-        config.resolve.modules.push(libPath)
-      }
+      // Dynamic imports handle encryption modules - no webpack config needed
+      // The require() calls in the code won't be analyzed by webpack
       
       // Ignore native .node files
       config.module.rules.push({
@@ -89,7 +71,6 @@ const nextConfig = {
     
     // For server-side builds, exclude .node files from webpack bundling
     // They will be loaded at runtime by Node.js
-    // Note: File restoration is handled by postbuild script
     if (isServer) {
       config.module.rules.push({
         test: /\.node$/,
