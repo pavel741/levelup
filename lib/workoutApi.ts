@@ -1,10 +1,17 @@
 /**
  * Client-side API wrapper for workout operations
  * All MongoDB operations go through API routes
+ * 
+ * This module handles client-side encryption/decryption of sensitive data
+ * before it reaches the server, ensuring privacy even from database owners.
  */
 
 import type { Routine, WorkoutLog } from '@/types/workout'
 import { authenticatedFetch } from '@/lib/utils/api/api-client'
+import { encryptObject, decryptObject } from '@/lib/utils/encryption/crypto'
+import { encryptRoutine, decryptRoutine } from '@/lib/utils/encryption/routineEncryption'
+import { ensureUserHasEncryptionKey } from '@/lib/utils/encryption/keyManager'
+import { ENCRYPTION_CONFIG, isEncryptionEnabled } from '@/lib/utils/encryption/config'
 
 const API_BASE = '/api/workouts'
 
@@ -33,7 +40,21 @@ export const subscribeToRoutines = (
       }
 
       const responseData = await response.json()
-      const routines: Routine[] = responseData.data || responseData || []
+      let routines: Routine[] = responseData.data || responseData || []
+      
+      // Decrypt sensitive fields if encryption is enabled
+      if (isEncryptionEnabled() && routines.length > 0) {
+        try {
+          const encryptionKey = await ensureUserHasEncryptionKey(userId)
+          routines = await Promise.all(
+            routines.map(async (r) => {
+              return await decryptRoutine(r, encryptionKey)
+            })
+          )
+        } catch (error) {
+          console.warn('Failed to decrypt routines, data may be unencrypted (backward compatibility):', error)
+        }
+      }
       
       // Convert date strings to Date objects
       const convertedRoutines = routines.map((r) => ({
@@ -70,12 +91,24 @@ export const subscribeToRoutines = (
 }
 
 export const saveRoutine = async (routine: Routine): Promise<void> => {
+  // Encrypt sensitive fields before sending to server
+  let routineToSave = routine
+  if (isEncryptionEnabled()) {
+    try {
+      const encryptionKey = await ensureUserHasEncryptionKey(routine.userId)
+      routineToSave = await encryptRoutine(routine, encryptionKey)
+    } catch (error) {
+      console.error('Failed to encrypt routine:', error)
+      throw new Error('Failed to encrypt routine data. Please try again.')
+    }
+  }
+
   const response = await authenticatedFetch(`${API_BASE}/routines`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(routine),
+    body: JSON.stringify(routineToSave),
   })
 
   if (!response.ok) {
@@ -85,12 +118,35 @@ export const saveRoutine = async (routine: Routine): Promise<void> => {
 }
 
 export const updateRoutine = async (routineId: string, userId: string, updates: Partial<Routine>): Promise<void> => {
+  // Encrypt sensitive fields in updates before sending
+  let updatesToSend = updates
+  if (isEncryptionEnabled()) {
+    try {
+      const encryptionKey = await ensureUserHasEncryptionKey(userId)
+      // Only encrypt fields that are in the updates and should be encrypted
+      const fieldsToEncrypt = ENCRYPTION_CONFIG.routines.encryptFields.filter(
+        field => field in updates
+      ) as (keyof Routine)[]
+      
+      if (fieldsToEncrypt.length > 0) {
+        updatesToSend = await encryptObject(
+          updates as Routine,
+          fieldsToEncrypt,
+          encryptionKey
+        )
+      }
+    } catch (error) {
+      console.error('Failed to encrypt routine updates:', error)
+      throw new Error('Failed to encrypt routine updates. Please try again.')
+    }
+  }
+
   const response = await authenticatedFetch(`${API_BASE}/routines/${routineId}`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ userId, updates }),
+    body: JSON.stringify({ userId, updates: updatesToSend }),
   })
 
   if (!response.ok) {
@@ -145,7 +201,27 @@ export const getWorkoutLogs = async (userId: string): Promise<WorkoutLog[]> => {
       throw new Error('Failed to fetch workout logs')
     }
     const responseData = await response.json()
-    const logs: WorkoutLog[] = responseData.data || responseData || []
+    let logs: WorkoutLog[] = responseData.data || responseData || []
+    
+    // Decrypt sensitive fields if encryption is enabled
+    if (isEncryptionEnabled() && logs.length > 0) {
+      try {
+        const encryptionKey = await ensureUserHasEncryptionKey(userId)
+        logs = await Promise.all(
+          logs.map(async (log) => {
+            const decrypted = await decryptObject(
+              log,
+              ENCRYPTION_CONFIG.workoutLogs.encryptFields,
+              encryptionKey
+            )
+            return decrypted as WorkoutLog
+          })
+        )
+      } catch (error) {
+        console.warn('Failed to decrypt workout logs, data may be unencrypted (backward compatibility):', error)
+      }
+    }
+    
     return logs.map((log) => ({
       ...log,
       date: log.date instanceof Date ? log.date : new Date(log.date),
@@ -187,7 +263,26 @@ export const subscribeToWorkoutLogs = (
       }
 
       const responseData = await response.json()
-      const logs: WorkoutLog[] = responseData.data || responseData || []
+      let logs: WorkoutLog[] = responseData.data || responseData || []
+      
+      // Decrypt sensitive fields if encryption is enabled
+      if (isEncryptionEnabled() && logs.length > 0) {
+        try {
+          const encryptionKey = await ensureUserHasEncryptionKey(userId)
+          logs = await Promise.all(
+            logs.map(async (l) => {
+              const decrypted = await decryptObject(
+                l,
+                ENCRYPTION_CONFIG.workoutLogs.encryptFields,
+                encryptionKey
+              )
+              return decrypted as WorkoutLog
+            })
+          )
+        } catch (error) {
+          console.warn('Failed to decrypt workout logs, data may be unencrypted (backward compatibility):', error)
+        }
+      }
       
       // Convert date strings to Date objects
       const convertedLogs = logs.map((l) => ({
@@ -227,12 +322,28 @@ export const subscribeToWorkoutLogs = (
 }
 
 export const saveWorkoutLog = async (log: WorkoutLog): Promise<void> => {
+  // Encrypt sensitive fields before sending to server
+  let logToSave = log
+  if (isEncryptionEnabled()) {
+    try {
+      const encryptionKey = await ensureUserHasEncryptionKey(log.userId)
+      logToSave = await encryptObject(
+        log,
+        ENCRYPTION_CONFIG.workoutLogs.encryptFields,
+        encryptionKey
+      )
+    } catch (error) {
+      console.error('Failed to encrypt workout log:', error)
+      throw new Error('Failed to encrypt workout log data. Please try again.')
+    }
+  }
+
   const response = await authenticatedFetch(`${API_BASE}/logs`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(log),
+    body: JSON.stringify(logToSave),
   })
 
   if (!response.ok) {
@@ -242,12 +353,35 @@ export const saveWorkoutLog = async (log: WorkoutLog): Promise<void> => {
 }
 
 export const updateWorkoutLog = async (logId: string, userId: string, updates: Partial<WorkoutLog>): Promise<void> => {
+  // Encrypt sensitive fields in updates before sending
+  let updatesToSend = updates
+  if (isEncryptionEnabled()) {
+    try {
+      const encryptionKey = await ensureUserHasEncryptionKey(userId)
+      // Only encrypt fields that are in the updates and should be encrypted
+      const fieldsToEncrypt = ENCRYPTION_CONFIG.workoutLogs.encryptFields.filter(
+        field => field in updates
+      ) as (keyof WorkoutLog)[]
+      
+      if (fieldsToEncrypt.length > 0) {
+        updatesToSend = await encryptObject(
+          updates as WorkoutLog,
+          fieldsToEncrypt,
+          encryptionKey
+        )
+      }
+    } catch (error) {
+      console.error('Failed to encrypt workout log updates:', error)
+      throw new Error('Failed to encrypt workout log updates. Please try again.')
+    }
+  }
+
   const response = await authenticatedFetch(`${API_BASE}/logs/${logId}`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ userId, updates }),
+    body: JSON.stringify({ userId, updates: updatesToSend }),
   })
 
   if (!response.ok) {

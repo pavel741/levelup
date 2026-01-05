@@ -1,10 +1,16 @@
 // Client-side API wrapper for MongoDB finance operations
 // This replaces direct MongoDB imports in client components
+// 
+// This module handles client-side encryption/decryption of sensitive financial data
+// before it reaches the server, ensuring privacy even from database owners.
 
-import type { FinanceTransaction, FinanceCategories, FinanceSettings } from '@/types/finance'
+import type { FinanceTransaction, FinanceCategories, FinanceSettings, FinanceRecurringTransaction } from '@/types/finance'
 import { createSmartPoll } from '@/lib/utils/smart-polling'
 import { cache, createCacheKey } from '@/lib/utils/cache'
 import { createFinanceSSE, SSEClient } from '@/lib/utils/sseClient'
+import { encryptTransaction, encryptRecurringTransaction, encryptTransactions, decryptTransactions, decryptRecurringTransactions } from '@/lib/utils/encryption/financeEncryption'
+import { ensureUserHasEncryptionKey } from '@/lib/utils/encryption/keyManager'
+import { isEncryptionEnabled } from '@/lib/utils/encryption/config'
 
 // Transactions
 export const subscribeToTransactions = (
@@ -45,15 +51,48 @@ export const subscribeToTransactions = (
               transactions = transactions.slice(0, limitCount)
             }
 
-            // Only call callback if data changed
-            const newHash = hashData(transactions)
-            if (isFirstMessage || newHash !== lastDataHash) {
-              isFirstMessage = false
-              lastDataHash = newHash
-              callback(transactions, {
-                hasMore: false,
-                lastDoc: null,
-              })
+            // Decrypt sensitive fields if encryption is enabled (async IIFE)
+            if (isEncryptionEnabled() && transactions.length > 0) {
+              (async () => {
+                try {
+                  const encryptionKey = await ensureUserHasEncryptionKey(userId)
+                  const decryptedTransactions = await decryptTransactions(transactions, encryptionKey)
+                  
+                  // Only call callback if data changed
+                  const newHash = hashData(decryptedTransactions)
+                  if (isFirstMessage || newHash !== lastDataHash) {
+                    isFirstMessage = false
+                    lastDataHash = newHash
+                    callback(decryptedTransactions, {
+                      hasMore: false,
+                      lastDoc: null,
+                    })
+                  }
+                } catch (error) {
+                  console.warn('Failed to decrypt transactions, data may be unencrypted (backward compatibility):', error)
+                  // Fallback to unencrypted data
+                  const newHash = hashData(transactions)
+                  if (isFirstMessage || newHash !== lastDataHash) {
+                    isFirstMessage = false
+                    lastDataHash = newHash
+                    callback(transactions, {
+                      hasMore: false,
+                      lastDoc: null,
+                    })
+                  }
+                }
+              })()
+            } else {
+              // No encryption needed, proceed normally
+              const newHash = hashData(transactions)
+              if (isFirstMessage || newHash !== lastDataHash) {
+                isFirstMessage = false
+                lastDataHash = newHash
+                callback(transactions, {
+                  hasMore: false,
+                  lastDoc: null,
+                })
+              }
             }
           }
         },
@@ -98,7 +137,19 @@ export const subscribeToTransactions = (
     if (!response.ok) throw new Error('Failed to fetch transactions')
     
     const responseData = await response.json()
-    return responseData.data?.transactions || responseData.transactions || []
+    let transactions = responseData.data?.transactions || responseData.transactions || []
+    
+    // Decrypt sensitive fields if encryption is enabled
+    if (isEncryptionEnabled() && transactions.length > 0) {
+      try {
+        const encryptionKey = await ensureUserHasEncryptionKey(userId)
+        transactions = await decryptTransactions(transactions, encryptionKey)
+      } catch (error) {
+        console.warn('Failed to decrypt transactions, data may be unencrypted (backward compatibility):', error)
+      }
+    }
+    
+    return transactions
   }
 
   return createSmartPoll(
@@ -124,10 +175,22 @@ export const addTransaction = async (
   userId: string,
   transaction: Omit<FinanceTransaction, 'id'>
 ): Promise<string> => {
+  // Encrypt sensitive fields before sending to server
+  let transactionToSave = transaction
+  if (isEncryptionEnabled()) {
+    try {
+      const encryptionKey = await ensureUserHasEncryptionKey(userId)
+      transactionToSave = await encryptTransaction(transaction as FinanceTransaction, encryptionKey)
+    } catch (error) {
+      console.error('Failed to encrypt transaction:', error)
+      throw new Error('Failed to encrypt transaction data. Please try again.')
+    }
+  }
+  
   const response = await fetch('/api/finance/transactions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, ...transaction }),
+    body: JSON.stringify({ userId, ...transactionToSave }),
   })
   
   if (!response.ok) {
@@ -148,10 +211,42 @@ export const updateTransaction = async (
   transactionId: string,
   updates: Partial<FinanceTransaction>
 ): Promise<void> => {
+  // Encrypt sensitive fields in updates before sending
+  let updatesToSend = updates
+  if (isEncryptionEnabled()) {
+    try {
+      const encryptionKey = await ensureUserHasEncryptionKey(userId)
+      // Only encrypt fields that are in the updates and should be encrypted
+      const fieldsToEncrypt = ['description', 'account'].filter(
+        field => field in updates
+      ) as (keyof FinanceTransaction)[]
+      
+      if (fieldsToEncrypt.length > 0) {
+        const tempTransaction = { ...updates } as FinanceTransaction
+        const encrypted = await encryptTransaction(tempTransaction, encryptionKey)
+        updatesToSend = {}
+        for (const field of fieldsToEncrypt) {
+          if (encrypted[field] !== undefined) {
+            updatesToSend[field] = encrypted[field]
+          }
+        }
+        // Add non-encrypted fields
+        for (const [key, value] of Object.entries(updates)) {
+          if (!fieldsToEncrypt.includes(key as keyof FinanceTransaction)) {
+            updatesToSend[key as keyof FinanceTransaction] = value
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to encrypt transaction updates:', error)
+      throw new Error('Failed to encrypt transaction updates. Please try again.')
+    }
+  }
+  
   const response = await fetch('/api/finance/transactions', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, id: transactionId, ...updates }),
+    body: JSON.stringify({ userId, id: transactionId, ...updatesToSend }),
   })
   
   if (!response.ok) {
@@ -187,10 +282,25 @@ export const batchAddTransactions = async (
   progressCallback?: (current: number, total: number) => void,
   options?: { skipDuplicates?: boolean }
 ): Promise<{ success: number; errors: number; skipped: number }> => {
+  // Encrypt sensitive fields before sending to server
+  let transactionsToSave = transactions
+  if (isEncryptionEnabled()) {
+    try {
+      const encryptionKey = await ensureUserHasEncryptionKey(userId)
+      transactionsToSave = await encryptTransactions(
+        transactions as FinanceTransaction[],
+        encryptionKey
+      )
+    } catch (error) {
+      console.error('Failed to encrypt transactions:', error)
+      throw new Error('Failed to encrypt transaction data. Please try again.')
+    }
+  }
+  
   const response = await fetch('/api/finance/transactions/batch', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, transactions, options }),
+    body: JSON.stringify({ userId, transactions: transactionsToSave, options }),
   })
   
   if (!response.ok) {
@@ -475,8 +585,19 @@ const _getTransactions = async (
   }
   
   const responseData = await response.json()
-  // Handle both wrapped (data.data.transactions) and unwrapped (data.transactions) formats
-  return responseData.data?.transactions || responseData.transactions || []
+  let transactions = responseData.data?.transactions || responseData.transactions || []
+  
+  // Decrypt sensitive fields if encryption is enabled
+  if (isEncryptionEnabled() && transactions.length > 0) {
+    try {
+      const encryptionKey = await ensureUserHasEncryptionKey(userId)
+      transactions = await decryptTransactions(transactions, encryptionKey)
+    } catch (error) {
+      console.warn('Failed to decrypt transactions, data may be unencrypted (backward compatibility):', error)
+    }
+  }
+  
+  return transactions
 }
 
 // Cached version with stale-while-revalidate
@@ -505,8 +626,19 @@ export const getAllTransactionsForSummary = async (
   }
   
   const responseData = await response.json()
-  // Handle both wrapped (data.data.transactions) and unwrapped (data.transactions) formats
-  return responseData.data?.transactions || responseData.transactions || []
+  let transactions = responseData.data?.transactions || responseData.transactions || []
+  
+  // Decrypt sensitive fields if encryption is enabled
+  if (isEncryptionEnabled() && transactions.length > 0) {
+    try {
+      const encryptionKey = await ensureUserHasEncryptionKey(userId)
+      transactions = await decryptTransactions(transactions, encryptionKey)
+    } catch (error) {
+      console.warn('Failed to decrypt transactions, data may be unencrypted (backward compatibility):', error)
+    }
+  }
+  
+  return transactions
 }
 
 // Budget Goals
@@ -541,22 +673,33 @@ export const saveBudgetGoals = async (
 
 // Recurring Transactions
 // Get recurring transactions
-export const getRecurringTransactions = async (userId: string): Promise<any[]> => {
+export const getRecurringTransactions = async (userId: string): Promise<FinanceRecurringTransaction[]> => {
   const params = new URLSearchParams({ userId })
   const response = await fetch(`/api/finance/recurring?${params}`)
   
   if (!response.ok) throw new Error('Failed to fetch recurring transactions')
   
   const data = await response.json()
-  // Handle both wrapped (data.transactions) and unwrapped (data) formats
-  return data.data?.transactions || data.transactions || data.data || data || []
+  let transactions = data.data?.transactions || data.transactions || data.data || data || []
+  
+  // Decrypt sensitive fields if encryption is enabled
+  if (isEncryptionEnabled() && transactions.length > 0) {
+    try {
+      const encryptionKey = await ensureUserHasEncryptionKey(userId)
+      transactions = await decryptRecurringTransactions(transactions, encryptionKey)
+    } catch (error) {
+      console.warn('Failed to decrypt recurring transactions, data may be unencrypted (backward compatibility):', error)
+    }
+  }
+  
+  return transactions
 }
 
 export const subscribeToRecurringTransactions = (
   userId: string,
-  callback: (transactions: any[]) => void
+  callback: (transactions: FinanceRecurringTransaction[]) => void
 ): (() => void) => {
-  const fetchRecurringTransactions = async (): Promise<any[]> => {
+  const fetchRecurringTransactions = async (): Promise<FinanceRecurringTransaction[]> => {
     return getRecurringTransactions(userId)
   }
 
@@ -583,12 +726,30 @@ export const subscribeToRecurringTransactions = (
 
 export const addRecurringTransaction = async (
   userId: string,
-  transaction: any
+  transaction: Omit<FinanceRecurringTransaction, 'id'>
 ): Promise<string> => {
+  // Encrypt sensitive fields before sending to server
+  let transactionToSave = transaction
+  if (isEncryptionEnabled()) {
+    try {
+      const encryptionKey = await ensureUserHasEncryptionKey(userId)
+      // Create a temporary transaction with a placeholder id for encryption
+      // Only encrypt fields that exist in the transaction
+      const tempTransaction = { ...transaction, id: 'temp' } as FinanceRecurringTransaction
+      const encrypted = await encryptRecurringTransaction(tempTransaction, encryptionKey)
+      // Remove the temp id before sending
+      const { id: _, ...encryptedWithoutId } = encrypted
+      transactionToSave = encryptedWithoutId as Omit<FinanceRecurringTransaction, 'id'>
+    } catch (error) {
+      console.error('Failed to encrypt recurring transaction:', error)
+      throw new Error('Failed to encrypt recurring transaction data. Please try again.')
+    }
+  }
+  
   const response = await fetch('/api/finance/recurring', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, ...transaction }),
+    body: JSON.stringify({ userId, ...transactionToSave }),
   })
   
   if (!response.ok) {
@@ -603,12 +764,44 @@ export const addRecurringTransaction = async (
 export const updateRecurringTransaction = async (
   userId: string,
   id: string,
-  updates: any
+  updates: Partial<FinanceRecurringTransaction>
 ): Promise<void> => {
+  // Encrypt sensitive fields in updates before sending
+  let updatesToSend = updates
+  if (isEncryptionEnabled()) {
+    try {
+      const encryptionKey = await ensureUserHasEncryptionKey(userId)
+      // Only encrypt fields that are in the updates and should be encrypted
+      const fieldsToEncrypt = ['name', 'description', 'paymentHistory'].filter(
+        field => field in updates
+      ) as (keyof FinanceRecurringTransaction)[]
+      
+      if (fieldsToEncrypt.length > 0) {
+        const tempTransaction = { ...updates } as FinanceRecurringTransaction
+        const encrypted = await encryptRecurringTransaction(tempTransaction, encryptionKey)
+        updatesToSend = {}
+        for (const field of fieldsToEncrypt) {
+          if (encrypted[field] !== undefined) {
+            updatesToSend[field] = encrypted[field]
+          }
+        }
+        // Add non-encrypted fields
+        for (const [key, value] of Object.entries(updates)) {
+          if (!fieldsToEncrypt.includes(key as keyof FinanceRecurringTransaction)) {
+            updatesToSend[key as keyof FinanceRecurringTransaction] = value
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to encrypt recurring transaction updates:', error)
+      throw new Error('Failed to encrypt recurring transaction updates. Please try again.')
+    }
+  }
+  
   const response = await fetch('/api/finance/recurring', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, id, ...updates }),
+    body: JSON.stringify({ userId, id, ...updatesToSend }),
   })
   
   if (!response.ok) {

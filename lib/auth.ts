@@ -37,6 +37,21 @@ export const getErrorMessage = (error: any): string => {
   }
 }
 
+/**
+ * Initialize encryption key for a user (non-blocking)
+ * This is called after user creation to set up client-side encryption
+ */
+async function initializeUserEncryption(userId: string): Promise<void> {
+  try {
+    const { initializeUserEncryptionKey } = await import('@/lib/utils/encryption/keyManager')
+    await initializeUserEncryptionKey(userId)
+    console.log('✅ Encryption key initialized for user:', userId)
+  } catch (encryptionError) {
+    console.warn('⚠️ Failed to initialize encryption key (non-critical):', encryptionError)
+    // Don't fail signup if encryption key initialization fails
+  }
+}
+
 export const signUp = async (email: string, password: string, name: string): Promise<User | null> => {
   if (!auth) {
     throw new Error('Firebase Auth is not initialized')
@@ -60,6 +75,7 @@ export const signUp = async (email: string, password: string, name: string): Pro
     }
 
     await createUserData(user)
+    await initializeUserEncryption(user.id)
     return user
   } catch (error: any) {
     console.error('Error signing up:', error)
@@ -88,6 +104,7 @@ export const signUp = async (email: string, password: string, name: string): Pro
               joinedAt: new Date(),
             }
             await createUserData(user)
+            await initializeUserEncryption(user.id)
             return user
           }
           
@@ -160,6 +177,7 @@ export const signIn = async (email: string, password: string): Promise<User | nu
           joinedAt: new Date(),
         }
         await createUserData(user)
+        await initializeUserEncryption(user.id)
       }
       
       return user
@@ -283,6 +301,7 @@ export const handleGoogleRedirect = async (): Promise<User | null> => {
       
       try {
         await createUserData(user)
+        await initializeUserEncryption(user.id)
       } catch (createError: any) {
         console.error('❌ Failed to create user data in Firestore:', createError)
         console.error('Create error code:', createError.code)
