@@ -6,13 +6,15 @@ import { subscribeToRecurringTransactions, addRecurringTransaction, updateRecurr
 import AuthGuard from '@/components/common/AuthGuard'
 import Sidebar from '@/components/layout/Sidebar'
 import Header from '@/components/layout/Header'
-import { Bell, Plus, Edit2, Trash2, CheckCircle2, AlertCircle, Calendar, Clock, X } from 'lucide-react'
+import { Bell, Plus, Edit2, Trash2, CheckCircle2, AlertCircle, Calendar, Clock, X, ArrowLeft } from 'lucide-react'
 import type { FinanceRecurringTransaction } from '@/types/finance'
 import { formatCurrency, parseTransactionDate } from '@/lib/utils'
 import { format, addDays, differenceInDays, isPast, isToday } from 'date-fns'
+import { useRouter } from 'next/navigation'
 
 export default function BillsPage() {
   const { user } = useFirestoreStore()
+  const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [bills, setBills] = useState<FinanceRecurringTransaction[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -347,23 +349,32 @@ export default function BillsPage() {
             <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
               <div className="max-w-6xl mx-auto">
                 {/* Header */}
-                <div className="mb-6 flex items-center justify-between">
-                  <div>
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
-                      <Bell className="w-8 h-8 text-purple-600 dark:text-purple-400" />
-                      Bill Reminders
-                    </h1>
-                    <p className="text-gray-600 dark:text-gray-400">
-                      Track recurring bills and never miss a payment
-                    </p>
-                  </div>
+                <div className="mb-6">
                   <button
-                    onClick={() => setShowAddModal(true)}
-                    className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center gap-2"
+                    onClick={() => router.back()}
+                    className="mb-4 flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
                   >
-                    <Plus className="w-5 h-5" />
-                    Add Bill
+                    <ArrowLeft className="w-5 h-5" />
+                    <span>Back</span>
                   </button>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+                        <Bell className="w-8 h-8 text-purple-600 dark:text-purple-400" />
+                        Bill Reminders
+                      </h1>
+                      <p className="text-gray-600 dark:text-gray-400">
+                        Track recurring bills and never miss a payment
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setShowAddModal(true)}
+                      className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors flex items-center gap-2"
+                    >
+                      <Plus className="w-5 h-5" />
+                      Add Bill
+                    </button>
+                  </div>
                 </div>
 
                 {/* Overdue Bills */}

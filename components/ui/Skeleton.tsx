@@ -60,25 +60,6 @@ export function CardSkeleton({ className }: { className?: string }) {
   )
 }
 
-/**
- * Table Skeleton - for table/list components
- */
-export function TableSkeleton({ rows = 5, className }: { rows?: number; className?: string }) {
-  return (
-    <div className={cn('space-y-2', className)}>
-      {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="flex items-center gap-4 p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-          <Skeleton variant="circular" width={40} height={40} />
-          <div className="flex-1 space-y-2">
-            <Skeleton variant="text" className="w-1/3 h-4" />
-            <Skeleton variant="text" className="w-1/4 h-3" />
-          </div>
-          <Skeleton variant="text" className="w-20 h-4" />
-        </div>
-      ))}
-    </div>
-  )
-}
 
 /**
  * List Skeleton - for simple lists
@@ -96,29 +77,6 @@ export function ListSkeleton({ items = 5, className }: { items?: number; classNa
   )
 }
 
-/**
- * Grid Skeleton - for grid layouts
- */
-export function GridSkeleton({
-  columns = 3,
-  rows = 2,
-  className,
-}: {
-  columns?: number
-  rows?: number
-  className?: string
-}) {
-  return (
-    <div
-      className={cn('grid gap-4', className)}
-      style={{ gridTemplateColumns: `repeat(${columns}, 1fr)` }}
-    >
-      {Array.from({ length: columns * rows }).map((_, i) => (
-        <CardSkeleton key={i} />
-      ))}
-    </div>
-  )
-}
 
 /**
  * Transaction List Skeleton - specific to finance transactions

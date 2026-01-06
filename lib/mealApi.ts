@@ -2,7 +2,7 @@
  * Client-side API wrapper for meal plans (calls server-side MongoDB via API routes)
  */
 
-import type { MealPlan, Recipe, ShoppingList } from '@/types/nutrition'
+import type { MealPlan } from '@/types/nutrition'
 
 const API_BASE = '/api/meals'
 
@@ -21,8 +21,10 @@ export const subscribeToMealPlans = (
     try {
       const response = await fetch(`${API_BASE}/plans?userId=${userId}`)
       if (response.ok) {
-        const data = await response.json()
-        callback(data)
+        const responseData = await response.json()
+        // Handle both wrapped response format { data: [...] } and direct array
+        const mealPlans = responseData.data || responseData || []
+        callback(Array.isArray(mealPlans) ? mealPlans : [])
       }
     } catch (error) {
       console.error('Error fetching meal plans:', error)
@@ -41,13 +43,10 @@ export const subscribeToMealPlans = (
 export const getMealPlans = async (userId: string): Promise<MealPlan[]> => {
   const response = await fetch(`${API_BASE}/plans?userId=${userId}`)
   if (!response.ok) throw new Error('Failed to fetch meal plans')
-  return response.json()
-}
-
-export const getMealPlan = async (mealPlanId: string, userId: string): Promise<MealPlan> => {
-  const response = await fetch(`${API_BASE}/plans/${mealPlanId}?userId=${userId}`)
-  if (!response.ok) throw new Error('Failed to fetch meal plan')
-  return response.json()
+  const responseData = await response.json()
+  // Handle both wrapped response format { data: [...] } and direct array
+  const mealPlans = responseData.data || responseData || []
+  return Array.isArray(mealPlans) ? mealPlans : []
 }
 
 export const saveMealPlan = async (mealPlan: MealPlan): Promise<void> => {
@@ -114,51 +113,8 @@ export const deleteMealPlan = async (mealPlanId: string, userId: string): Promis
 }
 
 // ---------- Recipes ----------
-
-export const getRecipes = async (userId?: string): Promise<Recipe[]> => {
-  const url = userId ? `${API_BASE}/recipes?userId=${userId}` : `${API_BASE}/recipes`
-  const response = await fetch(url)
-  if (!response.ok) throw new Error('Failed to fetch recipes')
-  return response.json()
-}
-
-export const saveRecipe = async (recipe: Recipe): Promise<void> => {
-  const response = await fetch(`${API_BASE}/recipes`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(recipe),
-  })
-  if (!response.ok) throw new Error('Failed to save recipe')
-}
-
-export const deleteRecipe = async (recipeId: string, userId: string): Promise<void> => {
-  const response = await fetch(`${API_BASE}/recipes/${recipeId}?userId=${userId}`, {
-    method: 'DELETE',
-  })
-  if (!response.ok) throw new Error('Failed to delete recipe')
-}
+// Note: Recipe operations are handled directly via API routes using MongoDB functions
 
 // ---------- Shopping Lists ----------
-
-export const getShoppingLists = async (userId: string): Promise<ShoppingList[]> => {
-  const response = await fetch(`${API_BASE}/shopping-lists?userId=${userId}`)
-  if (!response.ok) throw new Error('Failed to fetch shopping lists')
-  return response.json()
-}
-
-export const saveShoppingList = async (shoppingList: ShoppingList): Promise<void> => {
-  const response = await fetch(`${API_BASE}/shopping-lists`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(shoppingList),
-  })
-  if (!response.ok) throw new Error('Failed to save shopping list')
-}
-
-export const deleteShoppingList = async (listId: string, userId: string): Promise<void> => {
-  const response = await fetch(`${API_BASE}/shopping-lists/${listId}?userId=${userId}`, {
-    method: 'DELETE',
-  })
-  if (!response.ok) throw new Error('Failed to delete shopping list')
-}
+// Note: Shopping list operations are handled directly via API routes using MongoDB functions
 

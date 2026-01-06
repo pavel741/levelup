@@ -55,19 +55,48 @@ export const subscribeToRoutines = (
     }
   }
 
+  // Use smart polling - adjusts frequency based on user activity
+  // Active: 30s, Hidden: 5min
+  let timeoutId: NodeJS.Timeout | null = null
+  
+  const getInterval = (): number => {
+    if (typeof document === 'undefined' || !document) return 30000
+    if (document.hidden) return 300000 // 5 min when tab hidden
+    return 30000 // 30s when active
+  }
+  
+  const poll = () => {
+    if (!isActive) return
+    fetchRoutines()
+    const interval = getInterval()
+    timeoutId = setTimeout(poll, interval)
+  }
+  
+  // Track visibility changes to adjust polling
+  let visibilityHandler: (() => void) | null = null
+  if (typeof document !== 'undefined') {
+    visibilityHandler = () => {
+      // Restart polling with new interval when visibility changes
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
+      if (isActive) {
+        timeoutId = setTimeout(poll, getInterval())
+      }
+    }
+    document.addEventListener('visibilitychange', visibilityHandler)
+  }
+  
   // Initial fetch
   fetchRoutines()
-
-  // Poll every 30 seconds (reduced frequency to avoid excessive requests)
-  const intervalId = setInterval(() => {
-    if (isActive) {
-      fetchRoutines()
-    }
-  }, 30000)
+  timeoutId = setTimeout(poll, getInterval())
 
   return () => {
     isActive = false
-    clearInterval(intervalId)
+    if (timeoutId) clearTimeout(timeoutId)
+    if (visibilityHandler && typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', visibilityHandler)
+    }
   }
 }
 
@@ -213,19 +242,48 @@ export const subscribeToWorkoutLogs = (
     }
   }
 
+  // Use smart polling - adjusts frequency based on user activity
+  // Active: 30s, Hidden: 5min
+  let timeoutId: NodeJS.Timeout | null = null
+  
+  const getInterval = (): number => {
+    if (typeof document === 'undefined' || !document) return 30000
+    if (document.hidden) return 300000 // 5 min when tab hidden
+    return 30000 // 30s when active
+  }
+  
+  const poll = () => {
+    if (!isActive) return
+    fetchLogs()
+    const interval = getInterval()
+    timeoutId = setTimeout(poll, interval)
+  }
+  
+  // Track visibility changes to adjust polling
+  let visibilityHandler: (() => void) | null = null
+  if (typeof document !== 'undefined') {
+    visibilityHandler = () => {
+      // Restart polling with new interval when visibility changes
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
+      if (isActive) {
+        timeoutId = setTimeout(poll, getInterval())
+      }
+    }
+    document.addEventListener('visibilitychange', visibilityHandler)
+  }
+  
   // Initial fetch
   fetchLogs()
-
-  // Poll every 30 seconds (reduced frequency to avoid excessive requests)
-  const intervalId = setInterval(() => {
-    if (isActive) {
-      fetchLogs()
-    }
-  }, 30000)
+  timeoutId = setTimeout(poll, getInterval())
 
   return () => {
     isActive = false
-    clearInterval(intervalId)
+    if (timeoutId) clearTimeout(timeoutId)
+    if (visibilityHandler && typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', visibilityHandler)
+    }
   }
 }
 

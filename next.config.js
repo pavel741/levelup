@@ -4,14 +4,19 @@ const path = require('path')
 const nextConfig = {
   reactStrictMode: true,
   compress: true, // Enable gzip compression
+  swcMinify: true, // Use SWC for minification (faster than Terser)
   images: {
     domains: ['firebasestorage.googleapis.com'],
+    formats: ['image/avif', 'image/webp'], // Modern image formats
   },
+  // Optimize production builds
+  productionBrowserSourceMaps: false, // Disable source maps in production for smaller bundles
   // Note: serverComponentsExternalPackages is available in Next.js 13.4+
   // For Next.js 14, we handle this via webpack externals instead
   // Experimental features for better performance
   experimental: {
     // optimizeCss: true, // Disabled - requires critters package
+    optimizePackageImports: ['lucide-react', 'date-fns', 'recharts'], // Tree-shake unused exports
   },
   webpack: (config, { isServer, webpack }) => {
     // Ensure TypeScript files can be resolved

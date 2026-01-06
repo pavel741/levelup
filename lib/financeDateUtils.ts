@@ -7,5 +7,4 @@
 export {
   parseTransactionDate,
   getPeriodDates,
-  clearDateCache,
 } from '@/lib/utils'

@@ -50,28 +50,3 @@ export function logInfo(message: string, context?: LogContext, data?: unknown): 
   logger.info(message, context, data)
 }
 
-/**
- * Legacy console.log wrapper for gradual migration
- * This allows existing console.log calls to be replaced gradually
- */
-export const consoleReplacement = {
-  log: (...args: unknown[]) => {
-    const message = args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ')
-    logger.debug(message)
-  },
-  error: (message: string, ...args: unknown[]) => {
-    const error = args.find((a) => a instanceof Error) as Error | undefined
-    logger.error(message, undefined, error, args.length > 0 ? args : undefined)
-  },
-  warn: (message: string, ...args: unknown[]) => {
-    const error = args.find((a) => a instanceof Error) as Error | undefined
-    logger.warn(message, undefined, error, args.length > 0 ? args : undefined)
-  },
-  info: (message: string, ...args: unknown[]) => {
-    logger.info(message, undefined, args.length > 0 ? args : undefined)
-  },
-  debug: (message: string, ...args: unknown[]) => {
-    logger.debug(message, undefined, args.length > 0 ? args : undefined)
-  },
-}
-

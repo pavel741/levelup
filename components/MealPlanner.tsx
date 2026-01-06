@@ -5,8 +5,8 @@ import { Calendar, UtensilsCrossed, Plus, Trash2, ChefHat, Sparkles, X } from 'l
 import { subscribeToMealPlans, getMealPlans, saveMealPlan, deleteMealPlan, updateMealPlan } from '@/lib/mealApi'
 import type { MealPlan, MealPlanDay, PlannedMeal, NutritionInfo } from '@/types/nutrition'
 import { formatDisplayDate } from '@/lib/utils'
-import { addDays, eachDayOfInterval, startOfWeek, endOfWeek, format, isSameDay } from 'date-fns'
-import { showError } from '@/lib/utils'
+import { addDays, eachDayOfInterval, startOfWeek, endOfWeek, format, isSameDay, parseISO } from 'date-fns'
+import { showError, showSuccess } from '@/lib/utils'
 import { getAllMealPlanTemplates, generateMealPlanFromTemplate } from '@/lib/mealPlanTemplates'
 import MealEditor from './MealEditor'
 
@@ -27,54 +27,80 @@ export default function MealPlanner({ userId }: MealPlannerProps) {
   const [showTemplates, setShowTemplates] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<Partial<MealPlan> | null>(null)
   const [editingDay, setEditingDay] = useState<Date | null>(null)
+  const [isCreatingPlan, setIsCreatingPlan] = useState(false)
 
   useEffect(() => {
     if (!userId) return
 
     const unsubscribe = subscribeToMealPlans(userId, (plans) => {
-      setMealPlans(plans)
+      // Parse dates from strings (JSON serialization converts Date to string)
+      const parsedPlans = plans.map(plan => ({
+        ...plan,
+        startDate: plan.startDate instanceof Date ? plan.startDate : parseISO(plan.startDate as string),
+        endDate: plan.endDate instanceof Date ? plan.endDate : parseISO(plan.endDate as string),
+        createdAt: plan.createdAt instanceof Date ? plan.createdAt : parseISO(plan.createdAt as string),
+        updatedAt: plan.updatedAt instanceof Date ? plan.updatedAt : parseISO(plan.updatedAt as string),
+        days: (plan.days || []).map(day => ({
+          ...day,
+          date: day.date instanceof Date ? day.date : parseISO(day.date as string),
+        })),
+      }))
+      setMealPlans(parsedPlans)
     })
 
     return unsubscribe
   }, [userId])
 
   const handleCreatePlan = async () => {
-    if (!newPlanName.trim() || !userId) return
-
-    const startDate = new Date(newPlanStartDate)
-    
-    // Use template if selected, otherwise create empty plan
-    let mealPlan: MealPlan
-    if (selectedTemplate) {
-      mealPlan = generateMealPlanFromTemplate(
-        { ...selectedTemplate, name: newPlanName, description: newPlanDescription || selectedTemplate.description },
-        userId,
-        startDate,
-        newPlanDuration
-      )
-    } else {
-      const endDate = addDays(startDate, newPlanDuration - 1)
-      const days: MealPlanDay[] = eachDayOfInterval({ start: startDate, end: endDate }).map(date => ({
-        date,
-        meals: [],
-        totalNutrition: { calories: 0, protein: 0, carbs: 0, fat: 0 },
-      }))
-
-      mealPlan = {
-        id: Date.now().toString(),
-        userId,
-        name: newPlanName,
-        description: newPlanDescription || undefined,
-        startDate,
-        endDate,
-        days,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }
+    if (!newPlanName.trim() || !userId) {
+      showError('Please enter a plan name', { component: 'MealPlanner', action: 'validatePlanName' })
+      return
     }
 
+    setIsCreatingPlan(true)
+
     try {
+      const startDate = new Date(newPlanStartDate)
+      
+      // Use template if selected, otherwise create empty plan
+      let mealPlan: MealPlan
+      if (selectedTemplate) {
+        mealPlan = generateMealPlanFromTemplate(
+          { ...selectedTemplate, name: newPlanName, description: newPlanDescription || selectedTemplate.description },
+          userId,
+          startDate,
+          newPlanDuration
+        )
+      } else {
+        const endDate = addDays(startDate, newPlanDuration - 1)
+        const days: MealPlanDay[] = eachDayOfInterval({ start: startDate, end: endDate }).map(date => ({
+          date,
+          meals: [],
+          totalNutrition: { calories: 0, protein: 0, carbs: 0, fat: 0 },
+        }))
+
+        mealPlan = {
+          id: Date.now().toString(),
+          userId,
+          name: newPlanName,
+          description: newPlanDescription || undefined,
+          startDate,
+          endDate,
+          days,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }
+      }
+
       await saveMealPlan(mealPlan)
+      
+      // Immediately refresh the meal plans list to show the new plan
+      const updatedPlans = await getMealPlans(userId)
+      setMealPlans(updatedPlans)
+      
+      // Find the newly created plan (it should have the same ID)
+      const createdPlan = updatedPlans.find(p => p.id === mealPlan.id) || mealPlan
+      
       setShowNewPlanModal(false)
       setShowTemplates(false)
       setNewPlanName('')
@@ -82,7 +108,9 @@ export default function MealPlanner({ userId }: MealPlannerProps) {
       setNewPlanStartDate(format(new Date(), 'yyyy-MM-dd'))
       setNewPlanDuration(7)
       setSelectedTemplate(null)
-      setSelectedPlan(mealPlan)
+      setSelectedPlan(createdPlan)
+      
+      showSuccess('Meal plan created successfully!')
     } catch (error: unknown) {
       console.error('Error saving meal plan:', error)
       showError(error, { 
@@ -90,6 +118,8 @@ export default function MealPlanner({ userId }: MealPlannerProps) {
         action: 'saveMealPlan',
         metadata: { note: 'If MongoDB is blocked, meal plans won\'t be available until you\'re on a network that allows MongoDB access.' }
       })
+    } finally {
+      setIsCreatingPlan(false)
     }
   }
 
@@ -142,16 +172,48 @@ export default function MealPlanner({ userId }: MealPlannerProps) {
     if (!selectedPlan) return
 
     const totalNutrition = calculateDayNutrition(meals)
-    const updatedDays = selectedPlan.days.map(day => {
-      if (isSameDay(day.date, dayDate)) {
-        return {
-          ...day,
+    
+    // Normalize dates for comparison (set to start of day to avoid time issues)
+    const normalizedDayDate = new Date(dayDate)
+    normalizedDayDate.setHours(0, 0, 0, 0)
+    
+    // Check if day exists, if not add it
+    const dayExists = selectedPlan.days.some(day => {
+      const normalizedDay = new Date(day.date)
+      normalizedDay.setHours(0, 0, 0, 0)
+      return normalizedDay.getTime() === normalizedDayDate.getTime()
+    })
+    
+    let updatedDays: MealPlanDay[]
+    if (dayExists) {
+      // Update existing day
+      updatedDays = selectedPlan.days.map(day => {
+        const normalizedDay = new Date(day.date)
+        normalizedDay.setHours(0, 0, 0, 0)
+        if (normalizedDay.getTime() === normalizedDayDate.getTime()) {
+          return {
+            ...day,
+            meals,
+            totalNutrition,
+          }
+        }
+        return day
+      })
+    } else {
+      // Add new day
+      updatedDays = [
+        ...selectedPlan.days,
+        {
+          date: normalizedDayDate,
           meals,
           totalNutrition,
         }
-      }
-      return day
-    })
+      ].sort((a, b) => {
+        const dateA = a.date instanceof Date ? a.date : new Date(a.date)
+        const dateB = b.date instanceof Date ? b.date : new Date(b.date)
+        return dateA.getTime() - dateB.getTime()
+      })
+    }
 
     const updatedPlan: MealPlan = {
       ...selectedPlan,
@@ -161,8 +223,21 @@ export default function MealPlanner({ userId }: MealPlannerProps) {
 
     try {
       await updateMealPlan(selectedPlan.id, userId, updatedPlan)
-      setSelectedPlan(updatedPlan)
+      
+      // Refresh the plan from server to ensure consistency
+      const refreshedPlans = await getMealPlans(userId)
+      const refreshedPlan = refreshedPlans.find(p => p.id === selectedPlan.id)
+      
+      if (refreshedPlan) {
+        setSelectedPlan(refreshedPlan)
+        setMealPlans(refreshedPlans)
+      } else {
+        // Fallback to local update if refresh fails
+        setSelectedPlan(updatedPlan)
+      }
+      
       setEditingDay(null)
+      showSuccess('Meals saved successfully!')
     } catch (error: unknown) {
       console.error('Error updating meal plan:', error)
       showError(error, { component: 'MealPlanner', action: 'updateMealPlan' })
@@ -308,7 +383,10 @@ export default function MealPlanner({ userId }: MealPlannerProps) {
                   {/* Week View */}
                   <div className="grid grid-cols-7 gap-2">
                     {currentWeekDays.map((day, index) => {
-                      const planDay = selectedPlan.days.find(d => isSameDay(d.date, day))
+                      const planDay = selectedPlan.days.find(d => {
+                        const dayDate = d.date instanceof Date ? d.date : parseISO(d.date as string)
+                        return isSameDay(dayDate, day)
+                      })
                       const dayNutrition = planDay ? calculateDayNutrition(planDay.meals) : null
 
                       return (
@@ -583,9 +661,10 @@ export default function MealPlanner({ userId }: MealPlannerProps) {
               <div className="flex gap-3 pt-4">
                 <button
                   onClick={handleCreatePlan}
-                  className="flex-1 px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors"
+                  disabled={isCreatingPlan}
+                  className="flex-1 px-4 py-2 bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
                 >
-                  Create Plan
+                  {isCreatingPlan ? 'Creating...' : 'Create Plan'}
                 </button>
                 <button
                   onClick={() => setShowNewPlanModal(false)}
@@ -603,7 +682,10 @@ export default function MealPlanner({ userId }: MealPlannerProps) {
       {editingDay && selectedPlan && (
         <MealEditor
           dayDate={editingDay}
-          existingMeals={selectedPlan.days.find(d => isSameDay(d.date, editingDay))?.meals || []}
+          existingMeals={selectedPlan.days.find(d => {
+            const dayDate = d.date instanceof Date ? d.date : parseISO(d.date as string)
+            return isSameDay(dayDate, editingDay)
+          })?.meals || []}
           onSave={(meals) => handleSaveDayMeals(editingDay, meals)}
           onClose={() => setEditingDay(null)}
         />

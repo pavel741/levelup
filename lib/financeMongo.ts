@@ -33,12 +33,6 @@ const RECURRING_TRANSACTION_ENCRYPTED_FIELDS = [
 
 type WithId<T> = T & { id: string }
 
-interface TransactionPage {
-  transactions: WithId<FinanceTransaction>[]
-  hasMore: boolean
-  lastDoc: ObjectId | string | null
-}
-
 interface TransactionSubscribeMeta {
   hasMore: boolean
   lastDoc: ObjectId | string | null
@@ -290,57 +284,6 @@ export const getAllTransactionsForSummary = async (
       ttl: 30 * 1000, // 30 seconds cache (transactions change frequently)
     }
   )
-}
-
-export const loadMoreTransactions = async (
-  userId: string,
-  lastDoc: ObjectId | string | null,
-  limitCount = 200
-): Promise<TransactionPage> => {
-  try {
-    const collection = await getTransactionsCollection(userId)
-    let query = collection.find({ userId }).sort({ date: -1 }).limit(limitCount)
-
-    if (lastDoc) {
-      query = collection.find({ userId, _id: { $lt: new ObjectId(lastDoc) } }).sort({ date: -1 }).limit(limitCount)
-    }
-
-    const docs = await query.toArray()
-    
-    // Decrypt sensitive fields
-    const client = await clientPromise
-    const transactions = await Promise.all(
-      docs.map(async (doc) => {
-        const converted = convertMongoData(doc) as FinanceTransaction
-        const transaction = {
-          ...converted,
-          id: converted.id || doc._id.toString(),
-        } as WithId<FinanceTransaction>
-        
-        // Decrypt sensitive fields
-        try {
-          return await decryptObjectFields(
-            client,
-            userId,
-            transaction,
-            [...FINANCE_TRANSACTION_ENCRYPTED_FIELDS]
-          ) as WithId<FinanceTransaction>
-        } catch (error) {
-          console.warn('Failed to decrypt transaction fields (backward compatibility):', error)
-          return transaction
-        }
-      })
-    )
-
-    return {
-      transactions,
-      hasMore: docs.length === limitCount,
-      lastDoc: docs.length > 0 ? docs[docs.length - 1]._id : null,
-    }
-  } catch (error) {
-    console.error('Error loading more transactions from MongoDB:', error)
-    return { transactions: [], hasMore: false, lastDoc: null }
-  }
 }
 
 export const addTransaction = async (
@@ -916,46 +859,6 @@ export const subscribeToReconciliationHistory = (
   return () => {
     isActive = false
     clearInterval(intervalId)
-  }
-}
-
-export const getReconciliationRecords = async (
-  userId: string
-): Promise<FinanceReconciliationRecord[]> => {
-  try {
-    const collection = await getReconciliationCollection(userId)
-    const docs = await collection.find({ userId }).sort({ timestamp: -1 }).toArray()
-    
-    return docs.map((doc) => {
-      const converted = convertMongoData(doc) as FinanceReconciliationRecord
-      return {
-        ...converted,
-        id: converted.id || doc._id.toString(),
-      } as FinanceReconciliationRecord
-    })
-  } catch (error) {
-    console.error('Error getting reconciliation records from MongoDB:', error)
-    return []
-  }
-}
-
-export const addReconciliationRecord = async (
-  userId: string,
-  record: Omit<FinanceReconciliationRecord, 'id'>
-): Promise<string> => {
-  try {
-    const collection = await getReconciliationCollection(userId)
-    const recordData = {
-      ...record,
-      userId,
-      timestamp: record.timestamp instanceof Date ? record.timestamp : new Date(record.timestamp),
-      createdAt: new Date(),
-    }
-    const result = await collection.insertOne(recordData)
-    return result.insertedId.toString()
-  } catch (error) {
-    console.error('Error adding reconciliation record to MongoDB:', error)
-    throw error
   }
 }
 

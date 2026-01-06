@@ -550,14 +550,8 @@ export class CSVImportService {
       return header.toLowerCase()
     })
 
-    // Try to detect bank if not specified
-    if (!bankProfile) {
-      // Bank detection removed - user must manually select bank if needed
-      // bankProfile = detectBankProfile(headers)
-      // if (bankProfile) {
-      //   this._detectedBank = bankProfile
-      // }
-    } else {
+    // Bank detection is disabled - user must manually select bank if needed
+    if (bankProfile) {
       this._detectedBank = bankProfile
     }
 

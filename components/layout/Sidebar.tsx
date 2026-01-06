@@ -1,6 +1,6 @@
 'use client'
 
-import { Home, Target, Trophy, Settings, Award, Wallet, X, MessageCircle, Dumbbell, Timer, BarChart3, CheckSquare, Flag, BookOpen } from 'lucide-react'
+import { Home, Target, Trophy, Settings, Award, Wallet, X, MessageCircle, Dumbbell, Timer, CheckSquare, Flag, BookOpen } from 'lucide-react'
 import Link from 'next/link'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
 import { usePathname } from 'next/navigation'
@@ -24,7 +24,6 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
     { icon: Wallet, label: 'Finance', href: '/finance' },
     { icon: Timer, label: 'Focus', href: '/focus' },
     { icon: BookOpen, label: 'Journal', href: '/journal' },
-    { icon: BarChart3, label: 'Statistics', href: '/statistics' },
     { icon: Award, label: 'Achievements', href: '/achievements' },
     { icon: MessageCircle, label: 'Feedback', href: '/feedback' },
     { icon: Settings, label: 'Settings', href: '/settings' },

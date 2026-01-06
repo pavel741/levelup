@@ -1862,33 +1862,450 @@ export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'u
     estimatedDuration: 85,
     difficulty: 'hard',
     tags: ['push-pull-legs', '6-day', 'advanced', 'bulking', 'high-volume']
+  },
+
+  // Cardio Workouts
+  {
+    name: 'Hockey Practice Workout',
+    description: 'Complete hockey practice routine including warm-up, cardio drills, strength work, and cool-down. Perfect for game day preparation or training sessions.',
+    goal: 'endurance',
+    exercises: [],
+    sessions: [
+      {
+        id: 'hockey-practice',
+        name: 'Hockey Practice',
+        order: 0,
+        exercises: [
+          {
+            exerciseId: 'jumping-jacks',
+            order: 0,
+            sets: [
+              { setType: 'warmup', targetReps: 30, restAfter: 30 },
+              { setType: 'warmup', targetReps: 30, restAfter: 30 }
+            ],
+            restTime: 30,
+            notes: 'Warm-up - get heart rate up'
+          },
+          {
+            exerciseId: 'high-knees',
+            order: 1,
+            sets: [
+              { setType: 'warmup', targetDuration: 30, restAfter: 30 },
+              { setType: 'warmup', targetDuration: 30, restAfter: 30 }
+            ],
+            restTime: 30,
+            notes: 'Dynamic warm-up - simulate skating motion'
+          },
+          {
+            exerciseId: 'lunges',
+            order: 2,
+            sets: [
+              { setType: 'warmup', targetReps: 10, restAfter: 0 },
+              { setType: 'warmup', targetReps: 10, restAfter: 60 }
+            ],
+            restTime: 60,
+            notes: 'Each leg - activate leg muscles'
+          },
+          {
+            exerciseId: 'running',
+            order: 3,
+            sets: [
+              { setType: 'working', targetDuration: 300, restAfter: 120 },
+              { setType: 'working', targetDuration: 300, restAfter: 120 },
+              { setType: 'working', targetDuration: 300, restAfter: 120 }
+            ],
+            restTime: 120,
+            notes: '5 min intervals - simulate shift work'
+          },
+          {
+            exerciseId: 'burpees',
+            order: 4,
+            sets: [
+              { setType: 'working', targetReps: 10, restAfter: 60 },
+              { setType: 'working', targetReps: 10, restAfter: 60 },
+              { setType: 'working', targetReps: 8, restAfter: 60 }
+            ],
+            restTime: 60,
+            notes: 'Explosive power - simulate quick bursts'
+          },
+          {
+            exerciseId: 'mountain-climbers',
+            order: 5,
+            sets: [
+              { setType: 'working', targetDuration: 30, restAfter: 30 },
+              { setType: 'working', targetDuration: 30, restAfter: 30 },
+              { setType: 'working', targetDuration: 30, restAfter: 30 }
+            ],
+            restTime: 30,
+            notes: 'Core and cardio - maintain intensity'
+          },
+          {
+            exerciseId: 'squat',
+            order: 6,
+            sets: [
+              { setType: 'working', targetReps: 15, restAfter: 60 },
+              { setType: 'working', targetReps: 15, restAfter: 60 },
+              { setType: 'working', targetReps: 12, restAfter: 60 }
+            ],
+            restTime: 60,
+            notes: 'Leg strength - important for skating'
+          },
+          {
+            exerciseId: 'plank',
+            order: 7,
+            sets: [
+              { setType: 'working', targetDuration: 45, restAfter: 30 },
+              { setType: 'working', targetDuration: 45, restAfter: 30 },
+              { setType: 'working', targetDuration: 30, restAfter: 30 }
+            ],
+            restTime: 30,
+            notes: 'Core stability - essential for balance'
+          },
+          {
+            exerciseId: 'jump-rope',
+            order: 8,
+            sets: [
+              { setType: 'working', targetDuration: 60, restAfter: 30 },
+              { setType: 'working', targetDuration: 60, restAfter: 30 },
+              { setType: 'working', targetDuration: 60, restAfter: 30 }
+            ],
+            restTime: 30,
+            notes: 'Footwork and agility'
+          },
+          {
+            exerciseId: 'quad-stretch',
+            order: 9,
+            sets: [
+              { setType: 'working', targetDuration: 30, restAfter: 0 },
+              { setType: 'working', targetDuration: 30, restAfter: 0 }
+            ],
+            restTime: 0,
+            notes: 'Cool-down - each leg'
+          },
+          {
+            exerciseId: 'hamstring-stretch',
+            order: 10,
+            sets: [
+              { setType: 'working', targetDuration: 30, restAfter: 0 },
+              { setType: 'working', targetDuration: 30, restAfter: 0 }
+            ],
+            restTime: 0,
+            notes: 'Cool-down - each leg'
+          },
+          {
+            exerciseId: 'hip-flexor-stretch',
+            order: 11,
+            sets: [
+              { setType: 'working', targetDuration: 30, restAfter: 0 },
+              { setType: 'working', targetDuration: 30, restAfter: 0 }
+            ],
+            restTime: 0,
+            notes: 'Cool-down - important for hip mobility'
+          }
+        ],
+        estimatedDuration: 45
+      }
+    ],
+    estimatedDuration: 45,
+    difficulty: 'medium',
+    tags: ['cardio', 'hockey', 'sport-specific', 'endurance', 'agility', 'explosive']
+  },
+  {
+    name: 'HIIT Cardio Blast (20 min)',
+    description: 'High-intensity interval training workout. Short bursts of maximum effort followed by brief recovery. Great for improving cardiovascular fitness and burning calories.',
+    goal: 'endurance',
+    exercises: [],
+    sessions: [
+      {
+        id: 'hiit-cardio',
+        name: 'HIIT Cardio',
+        order: 0,
+        exercises: [
+          {
+            exerciseId: 'jumping-jacks',
+            order: 0,
+            sets: [
+              { setType: 'warmup', targetReps: 20, restAfter: 30 }
+            ],
+            restTime: 30,
+            notes: 'Warm-up'
+          },
+          {
+            exerciseId: 'burpees',
+            order: 1,
+            sets: [
+              { setType: 'working', targetReps: 10, restAfter: 30 },
+              { setType: 'working', targetReps: 10, restAfter: 30 },
+              { setType: 'working', targetReps: 8, restAfter: 30 },
+              { setType: 'working', targetReps: 8, restAfter: 30 }
+            ],
+            restTime: 30,
+            notes: 'Round 1 - 30 sec work, 30 sec rest'
+          },
+          {
+            exerciseId: 'mountain-climbers',
+            order: 2,
+            sets: [
+              { setType: 'working', targetDuration: 30, restAfter: 30 },
+              { setType: 'working', targetDuration: 30, restAfter: 30 },
+              { setType: 'working', targetDuration: 30, restAfter: 30 },
+              { setType: 'working', targetDuration: 30, restAfter: 30 }
+            ],
+            restTime: 30
+          },
+          {
+            exerciseId: 'high-knees',
+            order: 3,
+            sets: [
+              { setType: 'working', targetDuration: 30, restAfter: 30 },
+              { setType: 'working', targetDuration: 30, restAfter: 30 },
+              { setType: 'working', targetDuration: 30, restAfter: 30 },
+              { setType: 'working', targetDuration: 30, restAfter: 30 }
+            ],
+            restTime: 30
+          },
+          {
+            exerciseId: 'jump-rope',
+            order: 4,
+            sets: [
+              { setType: 'working', targetDuration: 30, restAfter: 30 },
+              { setType: 'working', targetDuration: 30, restAfter: 30 },
+              { setType: 'working', targetDuration: 30, restAfter: 30 },
+              { setType: 'working', targetDuration: 30, restAfter: 30 }
+            ],
+            restTime: 30
+          },
+          {
+            exerciseId: 'battle-ropes',
+            order: 5,
+            sets: [
+              { setType: 'working', targetDuration: 30, restAfter: 30 },
+              { setType: 'working', targetDuration: 30, restAfter: 30 },
+              { setType: 'working', targetDuration: 30, restAfter: 30 }
+            ],
+            restTime: 30,
+            notes: 'If available, otherwise substitute with burpees'
+          },
+          {
+            exerciseId: 'standing-forward-fold',
+            order: 6,
+            sets: [
+              { setType: 'working', targetDuration: 60, restAfter: 0 }
+            ],
+            restTime: 0,
+            notes: 'Cool-down stretch'
+          }
+        ],
+        estimatedDuration: 20
+      }
+    ],
+    estimatedDuration: 20,
+    difficulty: 'hard',
+    tags: ['cardio', 'hiit', 'high-intensity', 'fat-burning', 'quick', 'endurance']
+  },
+  {
+    name: 'Steady State Running (30 min)',
+    description: 'Moderate-intensity running workout for building endurance. Maintain a steady pace you can hold for the entire duration. Great for improving cardiovascular health.',
+    goal: 'endurance',
+    exercises: [],
+    sessions: [
+      {
+        id: 'steady-running',
+        name: 'Steady Run',
+        order: 0,
+        exercises: [
+          {
+            exerciseId: 'jumping-jacks',
+            order: 0,
+            sets: [
+              { setType: 'warmup', targetReps: 20, restAfter: 30 }
+            ],
+            restTime: 30,
+            notes: 'Warm-up'
+          },
+          {
+            exerciseId: 'quad-stretch',
+            order: 1,
+            sets: [
+              { setType: 'warmup', targetDuration: 20, restAfter: 0 },
+              { setType: 'warmup', targetDuration: 20, restAfter: 30 }
+            ],
+            restTime: 30,
+            notes: 'Dynamic stretch - each leg'
+          },
+          {
+            exerciseId: 'running',
+            order: 2,
+            sets: [
+              { setType: 'working', targetDuration: 1800, restAfter: 0 }
+            ],
+            restTime: 0,
+            notes: '30 minutes steady pace - conversational pace'
+          },
+          {
+            exerciseId: 'standing-forward-fold',
+            order: 3,
+            sets: [
+              { setType: 'working', targetDuration: 60, restAfter: 0 }
+            ],
+            restTime: 0,
+            notes: 'Cool-down'
+          },
+          {
+            exerciseId: 'quad-stretch',
+            order: 4,
+            sets: [
+              { setType: 'working', targetDuration: 30, restAfter: 0 },
+              { setType: 'working', targetDuration: 30, restAfter: 0 }
+            ],
+            restTime: 0,
+            notes: 'Static stretch - each leg'
+          },
+          {
+            exerciseId: 'hamstring-stretch',
+            order: 5,
+            sets: [
+              { setType: 'working', targetDuration: 30, restAfter: 0 },
+              { setType: 'working', targetDuration: 30, restAfter: 0 }
+            ],
+            restTime: 0,
+            notes: 'Static stretch - each leg'
+          }
+        ],
+        estimatedDuration: 35
+      }
+    ],
+    estimatedDuration: 35,
+    difficulty: 'medium',
+    tags: ['cardio', 'running', 'endurance', 'steady-state', 'aerobic']
+  },
+  {
+    name: 'Cycling Endurance (45 min)',
+    description: 'Long-duration cycling workout for building aerobic capacity. Perfect for outdoor rides or stationary bike sessions. Maintain consistent effort throughout.',
+    goal: 'endurance',
+    exercises: [],
+    sessions: [
+      {
+        id: 'cycling-endurance',
+        name: 'Cycling Session',
+        order: 0,
+        exercises: [
+          {
+            exerciseId: 'cycling',
+            order: 0,
+            sets: [
+              { setType: 'warmup', targetDuration: 300, restAfter: 60 },
+              { setType: 'working', targetDuration: 1800, restAfter: 60 },
+              { setType: 'working', targetDuration: 600, restAfter: 0 }
+            ],
+            restTime: 60,
+            notes: '5 min warm-up, 30 min main, 10 min cool-down'
+          },
+          {
+            exerciseId: 'quad-stretch',
+            order: 1,
+            sets: [
+              { setType: 'working', targetDuration: 30, restAfter: 0 },
+              { setType: 'working', targetDuration: 30, restAfter: 0 }
+            ],
+            restTime: 0,
+            notes: 'Post-ride stretch - each leg'
+          },
+          {
+            exerciseId: 'hamstring-stretch',
+            order: 2,
+            sets: [
+              { setType: 'working', targetDuration: 30, restAfter: 0 },
+              { setType: 'working', targetDuration: 30, restAfter: 0 }
+            ],
+            restTime: 0,
+            notes: 'Post-ride stretch - each leg'
+          }
+        ],
+        estimatedDuration: 50
+      }
+    ],
+    estimatedDuration: 50,
+    difficulty: 'medium',
+    tags: ['cardio', 'cycling', 'endurance', 'low-impact', 'aerobic']
+  },
+  {
+    name: 'Quick Cardio Circuit (15 min)',
+    description: 'Fast-paced cardio circuit perfect for when you\'re short on time. Full-body movements to get your heart rate up and burn calories efficiently.',
+    goal: 'endurance',
+    exercises: [],
+    sessions: [
+      {
+        id: 'quick-cardio',
+        name: 'Cardio Circuit',
+        order: 0,
+        exercises: [
+          {
+            exerciseId: 'jumping-jacks',
+            order: 0,
+            sets: [
+              { setType: 'warmup', targetReps: 30, restAfter: 30 }
+            ],
+            restTime: 30
+          },
+          {
+            exerciseId: 'burpees',
+            order: 1,
+            sets: [
+              { setType: 'working', targetReps: 10, restAfter: 30 },
+              { setType: 'working', targetReps: 10, restAfter: 30 },
+              { setType: 'working', targetReps: 8, restAfter: 30 }
+            ],
+            restTime: 30
+          },
+          {
+            exerciseId: 'mountain-climbers',
+            order: 2,
+            sets: [
+              { setType: 'working', targetDuration: 30, restAfter: 30 },
+              { setType: 'working', targetDuration: 30, restAfter: 30 },
+              { setType: 'working', targetDuration: 30, restAfter: 30 }
+            ],
+            restTime: 30
+          },
+          {
+            exerciseId: 'high-knees',
+            order: 3,
+            sets: [
+              { setType: 'working', targetDuration: 30, restAfter: 30 },
+              { setType: 'working', targetDuration: 30, restAfter: 30 },
+              { setType: 'working', targetDuration: 30, restAfter: 30 }
+            ],
+            restTime: 30
+          },
+          {
+            exerciseId: 'jump-rope',
+            order: 4,
+            sets: [
+              { setType: 'working', targetDuration: 60, restAfter: 30 },
+              { setType: 'working', targetDuration: 60, restAfter: 30 },
+              { setType: 'working', targetDuration: 60, restAfter: 30 }
+            ],
+            restTime: 30
+          },
+          {
+            exerciseId: 'jumping-jacks',
+            order: 5,
+            sets: [
+              { setType: 'working', targetReps: 20, restAfter: 30 },
+              { setType: 'working', targetReps: 20, restAfter: 30 },
+              { setType: 'working', targetReps: 15, restAfter: 0 }
+            ],
+            restTime: 30,
+            notes: 'Finisher'
+          }
+        ],
+        estimatedDuration: 15
+      }
+    ],
+    estimatedDuration: 15,
+    difficulty: 'medium',
+    tags: ['cardio', 'quick', 'circuit', 'full-body', 'fat-burning']
   }
 ]
 
-/**
- * Get template by name
- */
-export function getTemplateByName(name: string) {
-  return ROUTINE_TEMPLATES.find(t => t.name === name)
-}
-
-/**
- * Get all templates
- */
-export function getAllTemplates() {
-  return ROUTINE_TEMPLATES
-}
-
-/**
- * Get templates by goal
- */
-export function getTemplatesByGoal(goal: Routine['goal']) {
-  return ROUTINE_TEMPLATES.filter(t => t.goal === goal)
-}
-
-/**
- * Get templates by difficulty
- */
-export function getTemplatesByDifficulty(difficulty: Routine['difficulty']) {
-  return ROUTINE_TEMPLATES.filter(t => t.difficulty === difficulty)
-}

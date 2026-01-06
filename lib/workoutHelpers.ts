@@ -31,34 +31,6 @@ export function getLastWeightForExercise(
 }
 
 /**
- * Get average weight used for a specific exercise from recent logs
- */
-export function getAverageWeightForExercise(
-  logs: WorkoutLog[],
-  exerciseId: string,
-  recentCount: number = 3
-): number | null {
-  const sortedLogs = [...logs].sort((a, b) => b.date.getTime() - a.date.getTime())
-  const weights: number[] = []
-
-  for (const log of sortedLogs.slice(0, recentCount)) {
-    const exercise = log.exercises.find((ex: CompletedExercise) => ex.exerciseId === exerciseId)
-    if (exercise && exercise.sets.length > 0) {
-      exercise.sets.forEach(set => {
-        if (set.weight && set.weight > 0) {
-          weights.push(set.weight)
-        }
-      })
-    }
-  }
-
-  if (weights.length === 0) return null
-
-  const sum = weights.reduce((acc, w) => acc + w, 0)
-  return Math.round((sum / weights.length) * 10) / 10 // Round to 1 decimal
-}
-
-/**
  * Calculate recovery time based on muscle groups trained
  */
 export function calculateRecoveryTime(muscleGroups: string[]): {

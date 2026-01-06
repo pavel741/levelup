@@ -25,16 +25,26 @@ import {
 } from '@/lib/financeApi'
 import { subscribeToSavingsGoals } from '@/lib/savingsGoalsApi'
 import type { SavingsGoal, FinanceRecurringTransaction } from '@/types/finance'
-import { format, differenceInDays, isPast, isToday } from 'date-fns'
+// Optimize date-fns imports - only import what's needed
+import format from 'date-fns/format'
+import differenceInDays from 'date-fns/differenceInDays'
+import isPast from 'date-fns/isPast'
+import isToday from 'date-fns/isToday'
 import type { FinanceTransaction, FinanceCategories, FinanceSettings } from '@/types/finance'
 import { getPeriodDates, parseTransactionDate } from '@/lib/financeDateUtils'
 import { CSVImportService } from '@/lib/csvImport'
 import { ESTONIAN_BANK_PROFILES } from '@/lib/bankProfiles'
 import { getSuggestedCategory } from '@/lib/transactionCategorizer'
-import { formatCurrency, formatDate, formatDisplayDate, normalizeDate, showError, showSuccess } from '@/lib/utils'
+import { formatCurrency, formatDate, formatDisplayDate, showError, showSuccess } from '@/lib/utils'
 import { CardSkeleton, TransactionListSkeleton } from '@/components/ui/Skeleton'
 import { VirtualList } from '@/components/ui/VirtualList'
-import ExpenseForecastComponent from '@/components/finance/ExpenseForecast'
+// Lazy load heavy components for better performance
+import nextDynamic from 'next/dynamic'
+
+const ExpenseForecastComponent = nextDynamic(() => import('@/components/finance/ExpenseForecast').then(m => ({ default: m.default })), {
+  loading: () => <CardSkeleton />,
+  ssr: false, // Disable SSR for this component as it's heavy
+})
 
 export const dynamic = 'force-dynamic'
 
@@ -65,6 +75,7 @@ export default function FinancePage() {
   const [formDescription, setFormDescription] = useState('')
   const [formAmount, setFormAmount] = useState('')
   const [formCategory, setFormCategory] = useState('')
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false)
   const [formDate, setFormDate] = useState<string>('')
   const [formIsRecurring, setFormIsRecurring] = useState(false)
   const [formRecurringInterval, setFormRecurringInterval] = useState<'monthly' | 'weekly' | 'yearly'>('monthly')
@@ -207,12 +218,39 @@ export default function FinancePage() {
     
     const loadCategories = async () => {
       try {
-        // MongoDB doesn't need Firebase initialization
+        const { getCategories, saveCategories } = await import('@/lib/financeApi')
+        
+        // Fetch categories immediately (synchronous feel)
+        const existing = await getCategories(user.id)
+        const hasCategories = existing && 
+          ((Array.isArray(existing.income) && existing.income.length > 0) || 
+           (Array.isArray(existing.expense) && existing.expense.length > 0))
+        
+        if (!hasCategories) {
+          // Create default categories immediately
+          const defaultCategories: FinanceCategories = {
+            income: ['Salary', 'Freelance', 'Investment', 'Rental Income', 'Business', 'Gift', 'Other'],
+            expense: ['Food & Dining', 'Groceries', 'Transport', 'Shopping', 'Bills & Utilities', 'Entertainment', 'Health & Fitness', 'Education', 'Travel', 'Subscriptions', 'Home & Garden', 'Personal Care', 'Insurance', 'Taxes', 'Other'],
+          }
+          await saveCategories(user.id, defaultCategories)
+          setCategories(defaultCategories)
+        } else {
+          // Set categories immediately from DB
+          setCategories(existing)
+        }
+        
+        // Then subscribe for updates (background)
         unsubscribe = subscribeToCategories(user.id, (cats) => {
           setCategories(cats)
         })
       } catch (error) {
         console.error('Failed to load categories from MongoDB:', error)
+        // Set default categories in state even if save fails
+        const defaultCategories: FinanceCategories = {
+          income: ['Salary', 'Freelance', 'Investment', 'Rental Income', 'Business', 'Gift', 'Other'],
+          expense: ['Food & Dining', 'Groceries', 'Transport', 'Shopping', 'Bills & Utilities', 'Entertainment', 'Health & Fitness', 'Education', 'Travel', 'Subscriptions', 'Home & Garden', 'Personal Care', 'Insurance', 'Taxes', 'Other'],
+        }
+        setCategories(defaultCategories)
       }
     }
 
@@ -288,25 +326,42 @@ export default function FinancePage() {
 
   // Initialize categories if they don't exist
   useEffect(() => {
-    if (!user?.id || categories !== null) return
+    if (!user?.id) return
 
     const initCategories = async () => {
-      const existing = await getCategories(user.id)
-      if (!existing) {
-        // Initialize with default categories - match budget app structure
-        const defaultCategories: FinanceCategories = {
-          income: ['Salary', 'Freelance', 'Investment', 'Other'],
-          expense: ['Food', 'Transport', 'Shopping', 'Bills', 'Entertainment', 'Arved', 'Other'],
+      try {
+        const existing = await getCategories(user.id)
+        const hasCategories = existing && 
+          ((Array.isArray(existing.income) && existing.income.length > 0) || 
+           (Array.isArray(existing.expense) && existing.expense.length > 0))
+        
+        if (!hasCategories) {
+          // Initialize with comprehensive default categories
+          const defaultCategories: FinanceCategories = {
+            income: ['Salary', 'Freelance', 'Investment', 'Rental Income', 'Business', 'Gift', 'Other'],
+            expense: ['Food & Dining', 'Groceries', 'Transport', 'Shopping', 'Bills & Utilities', 'Entertainment', 'Health & Fitness', 'Education', 'Travel', 'Subscriptions', 'Home & Garden', 'Personal Care', 'Insurance', 'Taxes', 'Other'],
+          }
+          // Save to MongoDB
+          const { saveCategories } = await import('@/lib/financeApi')
+          await saveCategories(user.id, defaultCategories)
+          setCategories(defaultCategories)
+        } else if (existing && !categories) {
+          // If categories exist but state is null, set them
+          setCategories(existing)
         }
-        // Save to MongoDB
-        const { saveCategories } = await import('@/lib/financeApi')
-        await saveCategories(user.id, defaultCategories)
+      } catch (error) {
+        console.error('Error initializing categories:', error)
+        // Even if there's an error, try to set default categories in state
+        const defaultCategories: FinanceCategories = {
+          income: ['Salary', 'Freelance', 'Investment', 'Rental Income', 'Business', 'Gift', 'Other'],
+          expense: ['Food & Dining', 'Groceries', 'Transport', 'Shopping', 'Bills & Utilities', 'Entertainment', 'Health & Fitness', 'Education', 'Travel', 'Subscriptions', 'Home & Garden', 'Personal Care', 'Insurance', 'Taxes', 'Other'],
+        }
         setCategories(defaultCategories)
       }
     }
 
     initCategories()
-  }, [user?.id, categories])
+  }, [user?.id])
 
   // Get available categories for dropdown
   const availableCategories = useMemo(() => {
@@ -1144,123 +1199,6 @@ export default function FinancePage() {
     return `${monthNames[month - 1]} ${year}`
   }
 
-  // Verify imported dates
-  const handleVerifyDates = () => {
-    if (transactions.length === 0) {
-      showError('No transactions to verify', { component: 'FinancePage', action: 'verifyDates' })
-      return
-    }
-
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const oneYearAgo = new Date(today)
-    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
-
-    const stats = {
-      total: transactions.length,
-      todayCount: 0,
-      futureCount: 0,
-      veryOldCount: 0,
-      invalidCount: 0,
-      suspiciousDates: [] as Array<{ description: string; date: string | Date; issue: string }>,
-    }
-
-    // Helper to normalize date to string or Date for display
-    const normalizeDateForDisplay = (date: string | Date | { toDate?: () => Date }): string | Date => {
-      const normalized = normalizeDate(date)
-      if (normalized) {
-        return normalized
-      }
-      // Fallback: return as string if normalization fails
-      if (typeof date === 'string') {
-        return date
-      }
-      return String(date)
-    }
-
-    transactions.forEach((tx) => {
-      let txDate: Date | null = null
-      try {
-        // Use unified date normalization
-        txDate = normalizeDate(tx.date)
-        if (!txDate) {
-          stats.invalidCount++
-          stats.suspiciousDates.push({
-            description: tx.description || 'Unknown',
-            date: normalizeDateForDisplay(tx.date),
-            issue: 'Invalid date format',
-          })
-          return
-        }
-        txDate.setHours(0, 0, 0, 0)
-
-        if (isNaN(txDate.getTime())) {
-          stats.invalidCount++
-          stats.suspiciousDates.push({
-            description: tx.description || 'Unknown',
-            date: normalizeDateForDisplay(tx.date),
-            issue: 'Invalid date format',
-          })
-          return
-        }
-
-        if (txDate.getTime() === today.getTime()) {
-          stats.todayCount++
-          if (stats.todayCount <= 5) {
-            stats.suspiciousDates.push({
-              description: tx.description || 'Unknown',
-              date: normalizeDateForDisplay(tx.date),
-              issue: 'Date is today (might indicate parsing failure)',
-            })
-          }
-        } else if (txDate > today) {
-          stats.futureCount++
-          if (stats.futureCount <= 5) {
-            stats.suspiciousDates.push({
-              description: tx.description || 'Unknown',
-              date: normalizeDateForDisplay(tx.date),
-              issue: 'Future date',
-            })
-          }
-        } else if (txDate < oneYearAgo) {
-          stats.veryOldCount++
-          if (stats.veryOldCount <= 5) {
-            stats.suspiciousDates.push({
-              description: tx.description || 'Unknown',
-              date: normalizeDateForDisplay(tx.date),
-              issue: 'Very old date (more than 1 year ago)',
-            })
-          }
-        }
-      } catch (error) {
-        stats.invalidCount++
-        stats.suspiciousDates.push({
-          description: tx.description || 'Unknown',
-          date: normalizeDateForDisplay(tx.date),
-          issue: 'Error parsing date',
-        })
-      }
-    })
-
-    let message = `Date Verification Results:\n\n`
-    message += `Total transactions: ${stats.total}\n`
-    message += `Today's date: ${stats.todayCount}\n`
-    message += `Future dates: ${stats.futureCount}\n`
-    message += `Very old dates (>1 year): ${stats.veryOldCount}\n`
-    message += `Invalid dates: ${stats.invalidCount}\n\n`
-
-    if (stats.suspiciousDates.length > 0) {
-      message += `Suspicious dates (showing first 5):\n`
-      stats.suspiciousDates.slice(0, 5).forEach((item, idx) => {
-        message += `${idx + 1}. ${item.description}: ${item.date} (${item.issue})\n`
-      })
-    } else {
-      message += `All dates appear to be valid!`
-    }
-
-    // Show verification results as info message (longer duration for reading)
-    showSuccess(message, 10000)
-  }
 
   // CSV Import handlers
   const handleCsvFileSelect = async (file: File) => {
@@ -1932,28 +1870,73 @@ export default function FinancePage() {
                             className="w-full px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           />
                         </div>
-                        <div>
+                        <div className="relative">
                           <label htmlFor="category" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Category {!availableCategories.includes(formCategory) && formCategory && (
                               <span className="text-xs text-blue-600 dark:text-blue-400">(New category will be created)</span>
                             )}
                           </label>
-                          <input
-                            id="category"
-                            type="text"
-                            list="category-list"
-                            value={formCategory}
-                            onChange={(e) => setFormCategory(e.target.value)}
-                            required
-                            placeholder="Select or type a new category"
-                            className="w-full px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          />
-                          <datalist id="category-list">
-                            {availableCategories.map((cat) => (
-                              <option key={cat} value={cat} />
-                            ))}
-                          </datalist>
-                          {categorySuggestions.length > 0 && (
+                          <div className="relative">
+                            <input
+                              id="category"
+                              type="text"
+                              value={formCategory}
+                              onChange={(e) => {
+                                setFormCategory(e.target.value)
+                                setShowCategoryDropdown(true)
+                              }}
+                              onFocus={() => setShowCategoryDropdown(true)}
+                              onBlur={() => {
+                                // Delay hiding dropdown to allow clicks
+                                setTimeout(() => setShowCategoryDropdown(false), 200)
+                              }}
+                              required
+                              placeholder="Select or type a category name"
+                              className="w-full px-4 py-2 pr-10 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </button>
+                          </div>
+                          {showCategoryDropdown && (
+                            <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                              {availableCategories.length > 0 ? (
+                                <>
+                                  {availableCategories
+                                    .filter(cat => !formCategory || cat.toLowerCase().includes(formCategory.toLowerCase()))
+                                    .map((cat) => (
+                                      <button
+                                        key={cat}
+                                        type="button"
+                                        onClick={() => {
+                                          setFormCategory(cat)
+                                          setShowCategoryDropdown(false)
+                                        }}
+                                        className="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white transition-colors"
+                                      >
+                                        {cat}
+                                      </button>
+                                    ))}
+                                  {availableCategories.filter(cat => !formCategory || cat.toLowerCase().includes(formCategory.toLowerCase())).length === 0 && (
+                                    <div className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">
+                                      No matching categories. Type to create a new one.
+                                    </div>
+                                  )}
+                                </>
+                              ) : (
+                                <div className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">
+                                  Loading categories...
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {categorySuggestions.length > 0 && availableCategories.includes(formCategory) && (
                             <div className="mt-2">
                               <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">Suggested categories:</div>
                               <div className="flex gap-2 flex-wrap">
@@ -2086,16 +2069,6 @@ export default function FinancePage() {
                           >
                             Choose CSV File
                           </label>
-                          {transactions.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={handleVerifyDates}
-                              className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                              title="Verify imported dates"
-                            >
-                              🔍 Verify Dates
-                            </button>
-                          )}
                         </div>
                         
                         {csvImportStatus && (

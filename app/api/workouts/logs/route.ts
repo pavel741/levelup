@@ -1,6 +1,5 @@
 import { NextRequest } from 'next/server'
 import { saveWorkoutLog, getWorkoutLogsByUserId } from '@/lib/workoutMongo'
-import { getWorkoutLogsByUserId as getWorkoutLogsByUserIdFirestore } from '@/lib/firestore'
 import type { WorkoutLog } from '@/types/workout'
 import { getSecureUserIdFromRequest, validateUserId, successResponse, handleApiError, errorResponse } from '@/lib/utils'
 
@@ -18,13 +17,7 @@ export async function GET(request: NextRequest) {
 
     const { userId } = userIdResult
 
-    // Try Firestore first (faster, no network dependency)
-    const firestoreLogs = await getWorkoutLogsByUserIdFirestore(userId)
-    if (firestoreLogs.length > 0) {
-      return successResponse(firestoreLogs)
-    }
-
-    // Fallback to MongoDB if Firestore is empty
+    // Use MongoDB as single source of truth for workout logs
     const logs = await getWorkoutLogsByUserId(userId)
     return successResponse(logs)
   } catch (error: unknown) {

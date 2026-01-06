@@ -1,6 +1,5 @@
 import { NextRequest } from 'next/server'
 import { saveRoutine, getRoutinesByUserId } from '@/lib/workoutMongo'
-import { getRoutinesByUserId as getRoutinesByUserIdFirestore } from '@/lib/firestore'
 import type { Routine } from '@/types/workout'
 import { getSecureUserIdFromRequest, successResponse, handleApiError, validateUserId, errorResponse } from '@/lib/utils'
 import { withRateLimit } from '@/lib/utils'
@@ -25,13 +24,7 @@ async function getRoutinesHandler(request: NextRequest) {
 
     const { userId } = userIdResult
 
-    // Try Firestore first (faster, no network dependency)
-    const firestoreRoutines = await getRoutinesByUserIdFirestore(userId)
-    if (firestoreRoutines.length > 0) {
-      return successResponse(firestoreRoutines)
-    }
-
-    // Fallback to MongoDB if Firestore is empty
+    // Use MongoDB as single source of truth for routines
     const routines = await getRoutinesByUserId(userId)
     return successResponse(routines)
   } catch (error: unknown) {

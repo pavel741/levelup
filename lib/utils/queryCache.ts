@@ -134,17 +134,3 @@ export function createQueryCacheKey(...parts: (string | number | null | undefine
   return parts.filter(Boolean).join(':')
 }
 
-/**
- * Cache wrapper for query functions
- */
-export function withQueryCache<T extends (...args: any[]) => Promise<any>>(
-  fn: T,
-  keyFn: (...args: Parameters<T>) => string,
-  options?: CacheOptions
-): T {
-  return (async (...args: Parameters<T>) => {
-    const key = keyFn(...args)
-    return queryCache.get(key, () => fn(...args), options)
-  }) as T
-}
-

@@ -34,13 +34,18 @@ export default function TemplateModal({ isOpen, onClose, onSelectTemplate }: Tem
     t.tags?.some(tag => tag.includes('stretch') || tag.includes('morning') || tag.includes('yoga'))
   )
   const strengthRoutines = ROUTINE_TEMPLATES.filter(t => 
-    !t.tags?.some(tag => tag.includes('stretch') || tag.includes('morning') || tag.includes('yoga'))
+    !t.tags?.some(tag => tag.includes('stretch') || tag.includes('morning') || tag.includes('yoga') || tag.includes('cardio'))
+  )
+  const cardioRoutines = ROUTINE_TEMPLATES.filter(t => 
+    t.tags?.some(tag => tag.includes('cardio'))
   )
 
   const displayedTemplates = selectedCategory === 'stretch' 
     ? stretchRoutines 
     : selectedCategory === 'strength'
     ? strengthRoutines
+    : selectedCategory === 'cardio'
+    ? cardioRoutines
     : ROUTINE_TEMPLATES
 
   const getDifficultyBadgeClass = (difficulty: string) => {
@@ -93,6 +98,16 @@ export default function TemplateModal({ isOpen, onClose, onSelectTemplate }: Tem
             }`}
           >
             Strength ({strengthRoutines.length})
+          </button>
+          <button
+            onClick={() => setSelectedCategory('cardio')}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              selectedCategory === 'cardio'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+            }`}
+          >
+            Cardio ({cardioRoutines.length})
           </button>
           <button
             onClick={() => setSelectedCategory('stretch')}

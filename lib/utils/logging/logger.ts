@@ -206,68 +206,7 @@ export const logger = new Logger()
 
 /**
  * Convenience functions for common logging patterns
+ * Note: Specific logging helpers (logApiCall, logDbOperation, etc.) were removed as they were unused.
+ * Use logger.debug/info/warn/error directly for logging needs.
  */
-
-/**
- * Log API request/response
- */
-export function logApiCall(
-  method: string,
-  endpoint: string,
-  status?: number,
-  duration?: number,
-  error?: Error
-): void {
-  const context: LogContext = {
-    component: 'API',
-    action: method,
-    endpoint,
-    status,
-    duration,
-  }
-
-  if (error) {
-    logger.error(`API ${method} ${endpoint} failed`, context, error)
-  } else {
-    logger.debug(`API ${method} ${endpoint}`, context, { status, duration })
-  }
-}
-
-/**
- * Log database operation
- */
-export function logDbOperation(
-  operation: string,
-  collection: string,
-  success: boolean,
-  duration?: number,
-  error?: Error
-): void {
-  const context: LogContext = {
-    component: 'Database',
-    action: operation,
-    collection,
-    duration,
-  }
-
-  if (error || !success) {
-    logger.error(`DB ${operation} on ${collection} failed`, context, error)
-  } else {
-    logger.debug(`DB ${operation} on ${collection}`, context, { duration })
-  }
-}
-
-/**
- * Log user action
- */
-export function logUserAction(action: string, userId: string, data?: unknown): void {
-  logger.info(`User action: ${action}`, { component: 'User', action, userId }, data)
-}
-
-/**
- * Log component lifecycle
- */
-export function logComponentLifecycle(component: string, lifecycle: 'mount' | 'unmount' | 'update', props?: unknown): void {
-  logger.debug(`Component ${lifecycle}: ${component}`, { component, action: lifecycle }, props)
-}
 

@@ -56,25 +56,6 @@ export const getTodos = async (userId: string): Promise<WithId<Todo>[]> => {
   )
 }
 
-// Get a single todo by ID
-export const getTodoById = async (userId: string, todoId: string): Promise<WithId<Todo> | null> => {
-  try {
-    const collection = await getTodosCollection()
-    const doc = await collection.findOne({ _id: new ObjectId(todoId), userId })
-    
-    if (!doc) return null
-    
-    const converted = convertMongoData(doc) as Todo
-    return {
-      ...converted,
-      id: converted.id || doc._id.toString(),
-    } as WithId<Todo>
-  } catch (error) {
-    console.error('Error getting todo from MongoDB:', error)
-    return null
-  }
-}
-
 // Add a new todo
 export const addTodo = async (
   userId: string,
@@ -220,24 +201,6 @@ export const completeTodo = async (
     queryCache.invalidatePattern(new RegExp(`^todos:${userId}`))
   } catch (error) {
     console.error('Error completing todo in MongoDB:', error)
-    throw error
-  }
-}
-
-// Batch operations
-export const batchDeleteTodos = async (
-  userId: string,
-  todoIds: string[]
-): Promise<void> => {
-  try {
-    const collection = await getTodosCollection()
-    await collection.deleteMany({
-      _id: { $in: todoIds.map(id => new ObjectId(id)) },
-      userId,
-    })
-    queryCache.invalidatePattern(new RegExp(`^todos:${userId}`))
-  } catch (error) {
-    console.error('Error in batchDeleteTodos MongoDB:', error)
     throw error
   }
 }

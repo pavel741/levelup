@@ -43,35 +43,6 @@ export async function getGoals(
 }
 
 /**
- * Get a single goal by ID
- */
-export async function getGoalById(userId: string, goalId: string): Promise<Goal | null> {
-  const response = await fetch(`${API_BASE}/${goalId}?userId=${userId}`)
-  if (!response.ok) {
-    if (response.status === 404) return null
-    throw new Error(`Failed to fetch goal: ${response.statusText}`)
-  }
-
-  const data = await response.json()
-  const goal = data.data?.goal || data.goal
-  if (!goal) return null
-
-  // Convert date strings to Date objects
-  return {
-    ...goal,
-    deadline: goal.deadline ? new Date(goal.deadline) : goal.deadline,
-    startDate: goal.startDate ? new Date(goal.startDate) : goal.startDate,
-    completedAt: goal.completedAt ? new Date(goal.completedAt) : goal.completedAt,
-    createdAt: goal.createdAt ? new Date(goal.createdAt) : goal.createdAt,
-    updatedAt: goal.updatedAt ? new Date(goal.updatedAt) : goal.updatedAt,
-    milestones: goal.milestones?.map((m: any) => ({
-      ...m,
-      completedAt: m.completedAt ? new Date(m.completedAt) : m.completedAt,
-    })) || [],
-  }
-}
-
-/**
  * Add a new goal
  */
 export async function addGoal(

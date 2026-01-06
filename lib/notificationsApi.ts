@@ -79,45 +79,4 @@ export async function deleteNotification(userId: string, notificationId: string)
   }
 }
 
-/**
- * Delete all read notifications
- */
-export async function deleteAllReadNotifications(userId: string): Promise<void> {
-  const response = await fetch(`${API_BASE}?userId=${userId}`, {
-    method: 'DELETE',
-  })
-
-  if (!response.ok) {
-    throw new Error(`Failed to delete read notifications: ${response.statusText}`)
-  }
-}
-
-/**
- * Create a notification (for testing or system use)
- */
-export async function createNotification(
-  userId: string,
-  notification: Omit<AppNotification, 'id' | 'userId' | 'read' | 'createdAt'>
-): Promise<AppNotification> {
-  const response = await fetch(`${API_BASE}?userId=${userId}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(notification),
-  })
-
-  if (!response.ok) {
-    throw new Error(`Failed to create notification: ${response.statusText}`)
-  }
-
-  const data = await response.json()
-  const newNotification = data.data?.notification || data.notification
-
-  return {
-    ...newNotification,
-    createdAt: newNotification.createdAt ? new Date(newNotification.createdAt) : new Date(),
-    scheduledFor: newNotification.scheduledFor ? new Date(newNotification.scheduledFor) : undefined,
-  }
-}
 

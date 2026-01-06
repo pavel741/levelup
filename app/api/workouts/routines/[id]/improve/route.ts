@@ -4,10 +4,7 @@
  */
 
 import { NextRequest } from 'next/server'
-import { getRoutinesByUserId } from '@/lib/workoutMongo'
-import { getRoutinesByUserId as getRoutinesByUserIdFirestore } from '@/lib/firestore'
-import { saveRoutine } from '@/lib/workoutMongo'
-import { saveRoutine as saveRoutineFirestore } from '@/lib/firestore'
+import { getRoutinesByUserId, saveRoutine } from '@/lib/workoutMongo'
 import { improveRoutine } from '@/scripts/improveRoutine'
 import { getSecureUserIdFromRequest, successResponse, handleApiError, errorResponse } from '@/lib/utils'
 
@@ -28,18 +25,9 @@ export async function POST(
     const { userId } = userIdResult
     const routineId = params.id
 
-    // Get the routine
-    let routine = null
-    
-    // Try Firestore first
-    const firestoreRoutines = await getRoutinesByUserIdFirestore(userId)
-    routine = firestoreRoutines.find(r => r.id === routineId)
-    
-    // Fallback to MongoDB if not found in Firestore
-    if (!routine) {
-      const mongoRoutines = await getRoutinesByUserId(userId)
-      routine = mongoRoutines.find(r => r.id === routineId)
-    }
+    // Get the routine from MongoDB (single source of truth)
+    const mongoRoutines = await getRoutinesByUserId(userId)
+    const routine = mongoRoutines.find(r => r.id === routineId)
 
     if (!routine) {
       return errorResponse('Routine not found', 404)
@@ -48,14 +36,8 @@ export async function POST(
     // Apply improvements
     const improvementResult = improveRoutine(routine)
 
-    // Save the improved routine
-    // Try Firestore first, fallback to MongoDB
-    try {
-      await saveRoutineFirestore(improvementResult.routine)
-    } catch (error) {
-      console.warn('Firestore save failed, trying MongoDB:', error)
-      await saveRoutine(improvementResult.routine)
-    }
+    // Save the improved routine to MongoDB
+    await saveRoutine(improvementResult.routine)
 
     return successResponse({
       routine: improvementResult.routine,

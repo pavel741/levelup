@@ -34,11 +34,6 @@ import { formatDateTime } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
-interface CategoryItem {
-  name: string
-  color: string
-  monthlyLimit?: number
-}
 
 export default function FinanceSettingsPage() {
   const { user } = useFirestoreStore()
@@ -46,12 +41,11 @@ export default function FinanceSettingsPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   // Categories
-  const [categories, setCategories] = useState<CategoryItem[]>([])
-  const [editingCategory, setEditingCategory] = useState<string | null>(null)
+  const [categories, setCategories] = useState<FinanceCategories>({})
+  const [editingCategory, setEditingCategory] = useState<{ name: string; type: 'income' | 'expense' } | null>(null)
   const [newCategoryName, setNewCategoryName] = useState('')
-  const [newCategoryColor, setNewCategoryColor] = useState('#6366f1')
-  const [newCategoryLimit, setNewCategoryLimit] = useState('')
-  const [, setIsSavingCategories] = useState(false)
+  const [newCategoryType, setNewCategoryType] = useState<'income' | 'expense'>('expense')
+  const [isSavingCategories, setIsSavingCategories] = useState(false)
 
   // Budget Goals
   const [monthlySavingsTarget, setMonthlySavingsTarget] = useState('')
@@ -98,12 +92,14 @@ export default function FinanceSettingsPage() {
 
         // Load categories
         if (cats) {
-          const categoryList: CategoryItem[] = Object.entries(cats).map(([name, data]: [string, any]) => ({
-            name,
-            color: data?.color || '#6366f1',
-            monthlyLimit: data?.monthlyLimit || data?.limit,
-          }))
-          setCategories(categoryList)
+          setCategories(cats)
+        } else {
+          // Initialize with default categories if none exist
+          const defaultCategories: FinanceCategories = {
+            income: ['Salary', 'Freelance', 'Investment', 'Rental Income', 'Business', 'Gift', 'Other'],
+            expense: ['Food & Dining', 'Groceries', 'Transport', 'Shopping', 'Bills & Utilities', 'Entertainment', 'Health & Fitness', 'Education', 'Travel', 'Subscriptions', 'Home & Garden', 'Personal Care', 'Insurance', 'Taxes', 'Other'],
+          }
+          setCategories(defaultCategories)
         }
 
         // Load budget goals
@@ -153,16 +149,10 @@ export default function FinanceSettingsPage() {
     if (!user?.id) return
     setIsSavingCategories(true)
     try {
-      const categoriesObj: FinanceCategories = {}
-      categories.forEach((cat) => {
-        categoriesObj[cat.name] = {
-          color: cat.color,
-          ...(cat.monthlyLimit ? { monthlyLimit: Number(cat.monthlyLimit) } : {}),
-        }
-      })
-      await saveCategories(user.id, categoriesObj)
+      await saveCategories(user.id, categories)
     } catch (e: any) {
       console.error('Error saving finance categories:', e)
+      showWarning('Failed to save categories')
     } finally {
       setIsSavingCategories(false)
     }
@@ -170,55 +160,79 @@ export default function FinanceSettingsPage() {
 
   const handleAddCategory = () => {
     if (!newCategoryName.trim()) return
-    if (categories.some(c => c.name.toLowerCase() === newCategoryName.trim().toLowerCase())) {
+    
+    const categoryName = newCategoryName.trim()
+    const typeCategories = Array.isArray(categories[newCategoryType]) 
+      ? categories[newCategoryType] as string[]
+      : []
+    
+    if (typeCategories.includes(categoryName)) {
       showWarning('Category already exists')
       return
     }
-    setCategories([...categories, {
-      name: newCategoryName.trim(),
-      color: newCategoryColor,
-      monthlyLimit: newCategoryLimit ? Number(newCategoryLimit) : undefined,
-    }])
+    
+    const updated = {
+      ...categories,
+      [newCategoryType]: [...typeCategories, categoryName],
+    }
+    setCategories(updated)
     setNewCategoryName('')
-    setNewCategoryColor('#6366f1')
-    setNewCategoryLimit('')
     handleSaveCategories()
   }
 
-  const handleDeleteCategory = (name: string) => {
+  const handleDeleteCategory = (name: string, type: 'income' | 'expense') => {
     if (confirm(`Delete category "${name}"?`)) {
-      setCategories(categories.filter(c => c.name !== name))
+      const typeCategories = Array.isArray(categories[type]) 
+        ? categories[type] as string[]
+        : []
+      const updated = {
+        ...categories,
+        [type]: typeCategories.filter(c => c !== name),
+      }
+      setCategories(updated)
       handleSaveCategories()
     }
   }
 
-  const handleEditCategory = (category: CategoryItem) => {
-    setEditingCategory(category.name)
-    setNewCategoryName(category.name)
-    setNewCategoryColor(category.color)
-    setNewCategoryLimit(category.monthlyLimit?.toString() || '')
+  const handleEditCategory = (name: string, type: 'income' | 'expense') => {
+    setEditingCategory({ name, type })
+    setNewCategoryName(name)
+    setNewCategoryType(type)
   }
 
   const handleSaveEditCategory = () => {
     if (!editingCategory || !newCategoryName.trim()) return
-    const updated = categories.map(c => 
-      c.name === editingCategory 
-        ? { name: newCategoryName.trim(), color: newCategoryColor, monthlyLimit: newCategoryLimit ? Number(newCategoryLimit) : undefined }
-        : c
-    )
+    
+    const oldName = editingCategory.name
+    const type = editingCategory.type
+    const typeCategories = Array.isArray(categories[type]) 
+      ? categories[type] as string[]
+      : []
+    
+    const updated = {
+      ...categories,
+      [type]: typeCategories.map(c => c === oldName ? newCategoryName.trim() : c),
+    }
     setCategories(updated)
     setEditingCategory(null)
     setNewCategoryName('')
-    setNewCategoryColor('#6366f1')
-    setNewCategoryLimit('')
     handleSaveCategories()
   }
 
   const handleCancelEdit = () => {
     setEditingCategory(null)
     setNewCategoryName('')
-    setNewCategoryColor('#6366f1')
-    setNewCategoryLimit('')
+  }
+
+  const handleInitializeDefaults = () => {
+    if (confirm('This will replace all your current categories with default ones. Continue?')) {
+      const defaultCategories: FinanceCategories = {
+        income: ['Salary', 'Freelance', 'Investment', 'Rental Income', 'Business', 'Gift', 'Other'],
+        expense: ['Food & Dining', 'Groceries', 'Transport', 'Shopping', 'Bills & Utilities', 'Entertainment', 'Health & Fitness', 'Education', 'Travel', 'Subscriptions', 'Home & Garden', 'Personal Care', 'Insurance', 'Taxes', 'Other'],
+      }
+      setCategories(defaultCategories)
+      handleSaveCategories()
+    }
   }
 
   const handleSaveGoals = async () => {
@@ -326,10 +340,6 @@ export default function FinanceSettingsPage() {
   }
 
 
-  const categoryColors = [
-    '#6366f1', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899',
-    '#06b6d4', '#84cc16', '#f97316', '#14b8a6', '#a855f7', '#eab308',
-  ]
 
   return (
     <AuthGuard>
@@ -359,56 +369,53 @@ export default function FinanceSettingsPage() {
 
                 {/* Categories */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Categories</h2>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Categories</h2>
+                    <button
+                      onClick={handleInitializeDefaults}
+                      className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors"
+                    >
+                      Reset to Defaults
+                    </button>
+                  </div>
                   
                   {/* Add/Edit Category Form */}
-                  <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+                  <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <select
+                        value={newCategoryType}
+                        onChange={(e) => setNewCategoryType(e.target.value as 'income' | 'expense')}
+                        className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white"
+                      >
+                        <option value="expense">Expense</option>
+                        <option value="income">Income</option>
+                      </select>
                       <input
                         type="text"
                         placeholder="Category name"
                         value={newCategoryName}
                         onChange={(e) => setNewCategoryName(e.target.value)}
-                        className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white"
-                      />
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="color"
-                          value={newCategoryColor}
-                          onChange={(e) => setNewCategoryColor(e.target.value)}
-                          className="w-full h-10 rounded-lg border border-gray-300 dark:border-gray-600 cursor-pointer"
-                        />
-                        <div className="flex gap-1 flex-wrap">
-                          {categoryColors.map((color) => (
-                            <button
-                              key={color}
-                              onClick={() => setNewCategoryColor(color)}
-                              className="w-8 h-8 rounded border-2 border-gray-300 dark:border-gray-600"
-                              style={{ backgroundColor: color }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                      <input
-                        type="number"
-                        placeholder="Monthly limit (optional)"
-                        value={newCategoryLimit}
-                        onChange={(e) => setNewCategoryLimit(e.target.value)}
-                        className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && newCategoryName.trim()) {
+                            editingCategory ? handleSaveEditCategory() : handleAddCategory()
+                          }
+                        }}
+                        className="flex-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white"
                       />
                       <div className="flex gap-2">
                         {editingCategory ? (
                           <>
                             <button
                               onClick={handleSaveEditCategory}
-                              className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm flex items-center justify-center gap-1"
+                              disabled={!newCategoryName.trim()}
+                              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               <Save className="w-4 h-4" />
                               Save
                             </button>
                             <button
                               onClick={handleCancelEdit}
-                              className="px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm flex items-center justify-center gap-1"
+                              className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm flex items-center justify-center gap-1"
                             >
                               <X className="w-4 h-4" />
                             </button>
@@ -416,60 +423,98 @@ export default function FinanceSettingsPage() {
                         ) : (
                           <button
                             onClick={handleAddCategory}
-                            disabled={!newCategoryName.trim()}
-                            className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={!newCategoryName.trim() || isSavingCategories}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <Plus className="w-4 h-4" />
-                            Add Category
+                            Add
                           </button>
                         )}
                       </div>
                     </div>
                   </div>
 
-                  {/* Categories List */}
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {categories.length === 0 ? (
-                      <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-                        No categories yet. Add your first category above.
-                      </p>
-                    ) : (
-                      categories.map((category) => (
-                        <div
-                          key={category.name}
-                          className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700"
-                        >
-                          <div className="flex items-center gap-3">
+                  {/* Categories Lists */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Income Categories */}
+                    <div>
+                      <h3 className="text-sm font-semibold text-green-600 dark:text-green-400 mb-3 flex items-center gap-2">
+                        <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                        Income Categories
+                      </h3>
+                      <div className="space-y-2 max-h-80 overflow-y-auto">
+                        {Array.isArray(categories.income) && categories.income.length > 0 ? (
+                          categories.income.map((category) => (
                             <div
-                              className="w-6 h-6 rounded"
-                              style={{ backgroundColor: category.color }}
-                            />
-                            <div>
-                              <p className="font-medium text-gray-900 dark:text-white">{category.name}</p>
-                              {category.monthlyLimit && (
-                                <p className="text-xs text-gray-500 dark:text-gray-400">
-                                  Limit: €{category.monthlyLimit.toLocaleString()}
-                                </p>
-                              )}
+                              key={category}
+                              className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors"
+                            >
+                              <span className="font-medium text-gray-900 dark:text-white">{category}</span>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleEditCategory(category, 'income')}
+                                  className="p-1.5 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                  title="Edit"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteCategory(category, 'income')}
+                                  className="p-1.5 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleEditCategory(category)}
-                              className="p-1.5 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                          ))
+                        ) : (
+                          <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                            No income categories yet
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Expense Categories */}
+                    <div>
+                      <h3 className="text-sm font-semibold text-red-600 dark:text-red-400 mb-3 flex items-center gap-2">
+                        <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+                        Expense Categories
+                      </h3>
+                      <div className="space-y-2 max-h-80 overflow-y-auto">
+                        {Array.isArray(categories.expense) && categories.expense.length > 0 ? (
+                          categories.expense.map((category) => (
+                            <div
+                              key={category}
+                              className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors"
                             >
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteCategory(category.name)}
-                              className="p-1.5 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      ))
-                    )}
+                              <span className="font-medium text-gray-900 dark:text-white">{category}</span>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleEditCategory(category, 'expense')}
+                                  className="p-1.5 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                  title="Edit"
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteCategory(category, 'expense')}
+                                  className="p-1.5 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                            No expense categories yet
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
 

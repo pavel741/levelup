@@ -1,6 +1,5 @@
 import { NextRequest } from 'next/server'
-import { deleteAllWorkoutLogs as deleteAllWorkoutLogsFirestore } from '@/lib/firestore'
-import { deleteAllWorkoutLogs as deleteAllWorkoutLogsMongo } from '@/lib/workoutMongo'
+import { deleteAllWorkoutLogs } from '@/lib/workoutMongo'
 import { getSecureUserIdFromRequest, successResponse, handleApiError } from '@/lib/utils'
 
 export async function DELETE(request: NextRequest) {
@@ -16,15 +15,8 @@ export async function DELETE(request: NextRequest) {
 
     const { userId } = userIdResult
 
-    // Try Firestore first
-    let deletedCount = 0
-    try {
-      deletedCount = await deleteAllWorkoutLogsFirestore(userId)
-    } catch (error) {
-      // Fallback to MongoDB if Firestore fails or is empty
-      console.warn('Firestore delete failed, trying MongoDB:', error)
-      deletedCount = await deleteAllWorkoutLogsMongo(userId)
-    }
+    // Use MongoDB as single source of truth for workout logs
+    const deletedCount = await deleteAllWorkoutLogs(userId)
 
     return successResponse({ deletedCount })
   } catch (error: unknown) {

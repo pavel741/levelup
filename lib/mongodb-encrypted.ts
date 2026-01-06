@@ -5,7 +5,7 @@
  * encrypts/decrypts sensitive fields based on encryption schemas.
  */
 
-import { MongoClient, Db } from 'mongodb'
+import { MongoClient } from 'mongodb'
 
 // Dynamic import to avoid webpack resolution issues
 let getKmsProviders: any
@@ -115,30 +115,5 @@ export async function getEncryptedClient(userId: string): Promise<MongoClient> {
   encryptionClientsCache.set(userId, clientPromise)
 
   return clientPromise
-}
-
-/**
- * Get encrypted database for a specific user
- */
-export async function getEncryptedDatabase(userId: string): Promise<Db> {
-  const client = await getEncryptedClient(userId)
-  
-  // Extract database name from URI or use default
-  let dbName = 'levelup'
-  const dbMatch = cleanUri.match(/mongodb\+srv:\/\/[^/]+\/([^?]+)/)
-  if (dbMatch && dbMatch[1]) {
-    dbName = dbMatch[1]
-  }
-  
-  return client.db(dbName)
-}
-
-/**
- * Cleanup: Close all encrypted clients
- */
-export async function closeAllEncryptedClients(): Promise<void> {
-  const clients = await Promise.all(Array.from(encryptionClientsCache.values()))
-  await Promise.all(clients.map(client => client.close()))
-  encryptionClientsCache.clear()
 }
 

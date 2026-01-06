@@ -3562,30 +3562,6 @@ export function searchExercises(query: string): Exercise[] {
 }
 
 /**
- * Filter exercises by category
- */
-export function getExercisesByCategory(category: Exercise['category']): Exercise[] {
-  return EXERCISE_DATABASE.filter(ex => ex.category === category)
-}
-
-/**
- * Filter exercises by muscle group
- */
-export function getExercisesByMuscleGroup(muscleGroup: string): Exercise[] {
-  return EXERCISE_DATABASE.filter(ex => 
-    ex.muscleGroups.primary.includes(muscleGroup) ||
-    ex.muscleGroups.secondary.includes(muscleGroup)
-  )
-}
-
-/**
- * Filter exercises by equipment
- */
-export function getExercisesByEquipment(equipment: string): Exercise[] {
-  return EXERCISE_DATABASE.filter(ex => ex.equipment.includes(equipment))
-}
-
-/**
  * Find similar exercises to a given exercise
  * Returns exercises with similar muscle groups, equipment, and difficulty
  */

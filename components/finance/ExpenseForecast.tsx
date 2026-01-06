@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, memo } from 'react'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
 import { getExpenseForecast } from '@/lib/forecastApi'
 import type { ExpenseForecast } from '@/types/finance'
@@ -12,7 +12,7 @@ interface ExpenseForecastProps {
   monthsOfHistory?: number
 }
 
-export default function ExpenseForecastComponent({ period = 'month', monthsOfHistory = 6 }: ExpenseForecastProps) {
+function ExpenseForecastComponent({ period = 'month', monthsOfHistory = 6 }: ExpenseForecastProps) {
   const { user } = useFirestoreStore()
   const [forecast, setForecast] = useState<ExpenseForecast | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -166,4 +166,7 @@ export default function ExpenseForecastComponent({ period = 'month', monthsOfHis
     </div>
   )
 }
+
+// Memoize to prevent unnecessary re-renders
+export default memo(ExpenseForecastComponent)
 

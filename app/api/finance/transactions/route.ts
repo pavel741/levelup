@@ -27,7 +27,13 @@ export async function GET(request: NextRequest) {
       ? await getAllTransactionsForSummary(userId!, limit)
       : await getAllTransactionsForSummary(userId!)
     
-    return successResponse({ transactions })
+    const response = successResponse({ transactions })
+    
+    // Add caching headers for better performance
+    // Cache for 10 seconds (transactions change frequently)
+    response.headers.set('Cache-Control', 'private, max-age=10, stale-while-revalidate=30')
+    
+    return response
   } catch (error: unknown) {
     return handleApiError(error, 'GET /api/finance/transactions')
   }

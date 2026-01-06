@@ -253,13 +253,3 @@ export const saveShoppingList = async (shoppingList: ShoppingList): Promise<void
   }
 }
 
-export const deleteShoppingList = async (listId: string, userId: string): Promise<void> => {
-  try {
-    const collection = await getShoppingListsCollection()
-    await collection.deleteOne({ id: listId, userId })
-  } catch (error) {
-    console.error('Error deleting shopping list:', error)
-    throw error
-  }
-}
-

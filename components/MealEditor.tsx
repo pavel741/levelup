@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X, Save, Trash2 } from 'lucide-react'
 import type { PlannedMeal } from '@/types/nutrition'
 import { showWarning } from '@/lib/utils'
@@ -14,6 +14,11 @@ interface MealEditorProps {
 
 export default function MealEditor({ dayDate, existingMeals, onSave, onClose }: MealEditorProps) {
   const [meals, setMeals] = useState<PlannedMeal[]>(existingMeals || [])
+  
+  // Update meals when existingMeals prop changes (e.g., after saving and reopening)
+  useEffect(() => {
+    setMeals(existingMeals || [])
+  }, [existingMeals])
   const [editingIndex, setEditingIndex] = useState<number | null>(null)
   
   const [mealName, setMealName] = useState('')

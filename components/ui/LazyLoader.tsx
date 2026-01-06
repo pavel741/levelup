@@ -3,7 +3,7 @@
  * Wrapper for lazy-loaded components with loading state
  */
 
-import { Suspense, ComponentType, ReactNode } from 'react'
+import { Suspense, ReactNode } from 'react'
 import { Skeleton, CardSkeleton } from './Skeleton'
 
 interface LazyLoaderProps {
@@ -37,24 +37,6 @@ export function LazyLoader({ children, fallback, variant = 'default' }: LazyLoad
       {children}
     </Suspense>
   )
-}
-
-/**
- * Create a lazy-loaded component with loading fallback
- */
-export function createLazyComponent<T extends ComponentType<any>>(
-  importFn: () => Promise<{ default: T }>,
-  fallback?: ReactNode
-) {
-  const LazyComponent = lazy(importFn)
-  
-  return function LazyComponentWithFallback(props: React.ComponentProps<T>) {
-    return (
-      <LazyLoader fallback={fallback}>
-        <LazyComponent {...props} />
-      </LazyLoader>
-    )
-  }
 }
 
 import { lazy } from 'react'

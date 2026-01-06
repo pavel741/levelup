@@ -37,37 +37,6 @@ export const showNotification = (title: string, options?: NotificationOptions) =
   return notification
 }
 
-export const scheduleNotification = (
-  title: string,
-  body: string,
-  scheduledTime: Date,
-  options?: NotificationOptions
-): number | null => {
-  if (!('Notification' in window) || Notification.permission !== 'granted') {
-    return null
-  }
-
-  const now = new Date().getTime()
-  const scheduled = scheduledTime.getTime()
-  const delay = scheduled - now
-
-  if (delay <= 0) {
-    // Show immediately if time has passed
-    showNotification(title, { body, ...options })
-    return null
-  }
-
-  const timeoutId = window.setTimeout(() => {
-    showNotification(title, { body, ...options })
-  }, delay)
-
-  return timeoutId
-}
-
-export const cancelScheduledNotification = (timeoutId: number) => {
-  clearTimeout(timeoutId)
-}
-
 // Check if it's time for a reminder
 export const shouldShowReminder = (reminderTime: string, lastReminderDate?: string): boolean => {
   if (!reminderTime) return false
