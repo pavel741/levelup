@@ -89,16 +89,27 @@ export default function JournalPage() {
   const [showEditModal, setShowEditModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showFilters, setShowFilters] = useState(false)
+  const [validationError, setValidationError] = useState<string>('')
 
-  const [newEntry, setNewEntry] = useState({
+  const [newEntry, setNewEntry] = useState<{
+    date: string
+    type: JournalEntry['type']
+    title: string
+    content: string
+    mood?: JournalEntry['mood']
+    moodRating?: number
+    gratitudeItems: string[]
+    tags: string[]
+    linkedHabitId: string
+  }>({
     date: format(new Date(), 'yyyy-MM-dd'),
-    type: 'daily' as JournalEntry['type'],
+    type: 'daily',
     title: '',
     content: '',
-    mood: undefined as JournalEntry['mood'],
-    moodRating: undefined as number | undefined,
-    gratitudeItems: [] as string[],
-    tags: [] as string[],
+    mood: undefined,
+    moodRating: undefined,
+    gratitudeItems: [],
+    tags: [],
     linkedHabitId: '',
   })
 
@@ -124,24 +135,59 @@ export default function JournalPage() {
   }, [unsubscribe])
 
   const handleAddEntry = async () => {
-    if (!newEntry.content.trim() || !user) return
+    console.log('handleAddEntry called')
+    // For gratitude entries, check gratitudeItems instead of content
+    const hasContent = newEntry.type === 'gratitude' 
+      ? newEntry.gratitudeItems.length > 0 && newEntry.gratitudeItems.some(item => item.trim())
+      : !!newEntry.content.trim()
+    
+    if (!hasContent || !user) {
+      console.log('Validation failed:', { 
+        hasContent, 
+        hasUser: !!user,
+        type: newEntry.type,
+        contentLength: newEntry.content.length,
+        gratitudeItemsLength: newEntry.gratitudeItems.length
+      })
+      if (!hasContent) {
+        setValidationError(
+          newEntry.type === 'gratitude' 
+            ? 'Please add at least one gratitude item'
+            : 'Please enter some content'
+        )
+        setTimeout(() => setValidationError(''), 3000)
+      }
+      return
+    }
+    
+    setValidationError('')
 
     try {
+      // For gratitude entries, use gratitude items as content if content is empty
+      let content = newEntry.content.trim()
+      if (newEntry.type === 'gratitude' && !content && newEntry.gratitudeItems.length > 0) {
+        content = newEntry.gratitudeItems.filter(item => item.trim()).join('\n')
+      }
+      
       const entryData: Omit<JournalEntry, 'id' | 'userId' | 'createdAt' | 'updatedAt'> = {
         date: newEntry.date,
         type: newEntry.type,
         title: newEntry.title.trim() || undefined,
-        content: newEntry.content.trim(),
+        content: content || ' ', // Ensure content is never empty (API requirement)
         mood: newEntry.mood,
         moodRating: newEntry.moodRating,
         gratitudeItems: newEntry.type === 'gratitude' && newEntry.gratitudeItems.length > 0
-          ? newEntry.gratitudeItems
+          ? newEntry.gratitudeItems.filter(item => item.trim())
           : undefined,
         tags: newEntry.tags.length > 0 ? newEntry.tags : undefined,
         linkedHabitId: newEntry.linkedHabitId || undefined,
       }
+      
+      console.log('Sending entry data:', entryData)
 
+      console.log('Calling addEntry with:', entryData)
       await addEntry(user.id, entryData)
+      console.log('addEntry completed successfully')
 
       // Reset form
       setNewEntry({
@@ -156,8 +202,10 @@ export default function JournalPage() {
         linkedHabitId: '',
       })
       setShowAddModal(false)
+      console.log('Form reset and modal closed')
     } catch (error) {
       console.error('Failed to add journal entry:', error)
+      alert('Failed to add journal entry: ' + (error instanceof Error ? error.message : 'Unknown error'))
     }
   }
 
@@ -393,6 +441,22 @@ export default function JournalPage() {
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 <p className="mt-4 text-gray-600 dark:text-gray-400">Loading journal entries...</p>
               </div>
+            ) : filteredEntries.length === 0 && entries.length > 0 ? (
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-12 text-center">
+                <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                  No entries match your filters
+                </h3>
+                <p className="text-gray-600 dark:text-gray-400 mb-6">
+                  You have {entries.length} {entries.length === 1 ? 'entry' : 'entries'} but none match the current filters
+                </p>
+                <button
+                  onClick={() => setFilters({})}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Clear Filters
+                </button>
+              </div>
             ) : filteredEntries.length === 0 ? (
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-12 text-center">
                 <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
@@ -587,8 +651,11 @@ export default function JournalPage() {
                 {newEntry.type === 'gratitude' ? (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Gratitude Items
+                      Gratitude Items <span className="text-red-500">*</span>
                     </label>
+                    {validationError && newEntry.type === 'gratitude' && (
+                      <p className="text-red-500 text-sm mb-2">{validationError}</p>
+                    )}
                     <div className="space-y-2">
                       {newEntry.gratitudeItems.map((item, idx) => (
                         <input
@@ -617,14 +684,21 @@ export default function JournalPage() {
                 ) : (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Content
+                      Content <span className="text-red-500">*</span>
                     </label>
+                    {validationError && (
+                      <p className="text-red-500 text-sm mb-1">{validationError}</p>
+                    )}
                     <textarea
                       value={newEntry.content}
                       onChange={(e) => setNewEntry((prev) => ({ ...prev, content: e.target.value }))}
                       placeholder="Write your thoughts..."
                       rows={8}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                      className={`w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
+                        validationError 
+                          ? 'border-red-500' 
+                          : 'border-gray-300 dark:border-gray-600'
+                      }`}
                     />
                   </div>
                 )}

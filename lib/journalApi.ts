@@ -26,13 +26,14 @@ const _getJournalEntries = async (
     search?: string
   }
 ): Promise<JournalEntry[]> => {
+  const { authenticatedFetch } = await import('@/lib/utils')
   const params = new URLSearchParams({ userId })
   if (filters?.type) params.append('type', filters.type)
   if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom)
   if (filters?.dateTo) params.append('dateTo', filters.dateTo)
   if (filters?.search) params.append('search', filters.search)
   
-  const response = await fetch(`/api/journal?${params}`)
+  const response = await authenticatedFetch(`/api/journal?${params}`)
   if (!response.ok) {
     const error = await response.json()
     throw new Error(error.error || 'Failed to get journal entries')
@@ -47,10 +48,11 @@ export const getJournalEntryByDate = async (
   date: string,
   type?: JournalEntry['type']
 ): Promise<JournalEntry | null> => {
+  const { authenticatedFetch } = await import('@/lib/utils')
   const params = new URLSearchParams({ userId, date })
   if (type) params.append('type', type)
   
-  const response = await fetch(`/api/journal?${params}`)
+  const response = await authenticatedFetch(`/api/journal?${params}`)
   if (!response.ok) {
     const error = await response.json()
     throw new Error(error.error || 'Failed to get journal entry')
@@ -61,8 +63,9 @@ export const getJournalEntryByDate = async (
 
 // GET - Get journal entry by ID
 export const getJournalEntryById = async (userId: string, entryId: string): Promise<JournalEntry | null> => {
+  const { authenticatedFetch } = await import('@/lib/utils')
   const params = new URLSearchParams({ userId, id: entryId })
-  const response = await fetch(`/api/journal?${params}`)
+  const response = await authenticatedFetch(`/api/journal?${params}`)
   if (!response.ok) {
     const error = await response.json()
     throw new Error(error.error || 'Failed to get journal entry')
@@ -81,11 +84,12 @@ export const getMoodStatistics = async (
   averageMoodRating: number
   moodTrend: Array<{ date: string; moodRating: number }>
 }> => {
+  const { authenticatedFetch } = await import('@/lib/utils')
   const params = new URLSearchParams({ userId, stats: 'mood' })
   if (dateFrom) params.append('dateFrom', dateFrom)
   if (dateTo) params.append('dateTo', dateTo)
   
-  const response = await fetch(`/api/journal?${params}`)
+  const response = await authenticatedFetch(`/api/journal?${params}`)
   if (!response.ok) {
     const error = await response.json()
     throw new Error(error.error || 'Failed to get mood statistics')
@@ -99,7 +103,8 @@ export const addJournalEntry = async (
   userId: string,
   entry: Omit<JournalEntry, 'id' | 'userId' | 'createdAt' | 'updatedAt'>
 ): Promise<string> => {
-  const response = await fetch('/api/journal', {
+  const { authenticatedFetch } = await import('@/lib/utils')
+  const response = await authenticatedFetch('/api/journal', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userId, ...entry }),
@@ -110,7 +115,13 @@ export const addJournalEntry = async (
   }
   const data = await response.json()
   cache.invalidatePattern(new RegExp(`^journal:${userId}`))
-  return data.id
+  // Handle both wrapped response format { data: { id: ... } } and direct { id: ... }
+  const entryId = data.data?.id || data.id
+  if (!entryId) {
+    console.error('No entry ID returned from API:', data)
+    throw new Error('Failed to get entry ID from response')
+  }
+  return entryId
 }
 
 // PUT - Update a journal entry
@@ -119,7 +130,8 @@ export const updateJournalEntry = async (
   entryId: string,
   updates: Partial<JournalEntry>
 ): Promise<void> => {
-  const response = await fetch('/api/journal', {
+  const { authenticatedFetch } = await import('@/lib/utils')
+  const response = await authenticatedFetch('/api/journal', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userId, id: entryId, ...updates }),
@@ -136,8 +148,9 @@ export const deleteJournalEntry = async (
   userId: string,
   entryId: string
 ): Promise<void> => {
+  const { authenticatedFetch } = await import('@/lib/utils')
   const params = new URLSearchParams({ id: entryId })
-  const response = await fetch(`/api/journal?${params}`, {
+  const response = await authenticatedFetch(`/api/journal?${params}`, {
     method: 'DELETE',
   })
   if (!response.ok) {
@@ -152,8 +165,9 @@ export const exportJournalEntries = async (
   userId: string,
   format: 'json' | 'csv' = 'json'
 ): Promise<string> => {
+  const { authenticatedFetch } = await import('@/lib/utils')
   const params = new URLSearchParams({ userId, export: format })
-  const response = await fetch(`/api/journal?${params}`)
+  const response = await authenticatedFetch(`/api/journal?${params}`)
   if (!response.ok) {
     const error = await response.text()
     throw new Error(error || 'Failed to export journal entries')

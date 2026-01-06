@@ -6,7 +6,7 @@ import { useFocusStore } from '@/store/useFocusStore'
 import AuthGuard from '@/components/common/AuthGuard'
 import Sidebar from '@/components/layout/Sidebar'
 import Header from '@/components/layout/Header'
-import { Timer, Play, Pause, Square, Target, TrendingUp, Clock, X } from 'lucide-react'
+import { Timer, Play, Pause, Square, Target, TrendingUp, Clock, X, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
 import type { FocusSession } from '@/types'
 
@@ -28,6 +28,7 @@ export default function FocusPage() {
     subscribeSessions,
     addSession,
     updateSession,
+    deleteSession,
     loadStats,
     unsubscribe,
   } = useFocusStore()
@@ -244,6 +245,27 @@ export default function FocusPage() {
     return `${minutes}m`
   }
 
+  const handleDeleteSession = async (sessionId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation()
+    e?.preventDefault()
+    
+    if (!user?.id) {
+      console.error('No user ID available')
+      return
+    }
+    
+    if (window.confirm('Are you sure you want to delete this session? This action cannot be undone.')) {
+      try {
+        console.log('Deleting session:', sessionId)
+        await deleteSession(user.id, sessionId)
+        console.log('Session deleted successfully')
+      } catch (error) {
+        console.error('Failed to delete session:', error)
+        alert('Failed to delete session. Please try again.')
+      }
+    }
+  }
+
   const recentSessions = sessions.slice(0, 10)
   const todaySessions = sessions.filter(
     (s) => format(new Date(s.startedAt), 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
@@ -437,12 +459,17 @@ export default function FocusPage() {
                         </button>
                       </div>
                       <div className="space-y-2">
+                        {isLoadingSessions && sessions.length === 0 && (
+                          <div className="text-center text-gray-500 dark:text-gray-400 py-4">
+                            Loading sessions...
+                          </div>
+                        )}
                         {(showSessionHistory ? sessions : recentSessions).map((session) => (
                           <div
                             key={session.id}
-                            className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                            className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg group"
                           >
-                            <div>
+                            <div className="flex-1">
                               <div className="font-medium text-gray-900 dark:text-white capitalize">
                                 {session.type === 'short-break' ? 'Short Break' : session.type === 'long-break' ? 'Long Break' : session.type}
                               </div>
@@ -450,13 +477,28 @@ export default function FocusPage() {
                                 {format(new Date(session.startedAt), 'MMM d, yyyy HH:mm')}
                               </div>
                             </div>
-                            <div className="text-right">
-                              <div className="font-medium text-gray-900 dark:text-white">
-                                {formatDuration(session.completedDuration)}
+                            <div className="flex items-center gap-3">
+                              <div className="text-right">
+                                <div className="font-medium text-gray-900 dark:text-white">
+                                  {formatDuration(session.completedDuration)}
+                                </div>
+                                {session.isCompleted && session.xpReward && (
+                                  <div className="text-sm text-green-600 dark:text-green-400">+{session.xpReward} XP</div>
+                                )}
                               </div>
-                              {session.isCompleted && session.xpReward && (
-                                <div className="text-sm text-green-600 dark:text-green-400">+{session.xpReward} XP</div>
-                              )}
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  handleDeleteSession(session.id, e)
+                                }}
+                                className="opacity-60 hover:opacity-100 transition-opacity p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg flex-shrink-0"
+                                title="Delete session"
+                                type="button"
+                                aria-label="Delete session"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
                             </div>
                           </div>
                         ))}

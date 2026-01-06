@@ -53,6 +53,12 @@ export const subscribeToFocusSessions = (
     return getFocusSessions(userId, { limit })
   }
 
+  // Fetch immediately before starting polling to avoid initial loading delay
+  fetchSessions().then(callback).catch((error) => {
+    console.error('Initial focus sessions fetch error:', error)
+    // Still start polling even if initial fetch fails
+  })
+
   return createSmartPoll(
     fetchSessions,
     callback,

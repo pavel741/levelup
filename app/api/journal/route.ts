@@ -9,7 +9,7 @@ import {
   getMoodStatistics,
   exportJournalEntries,
 } from '@/lib/journalMongo'
-import { getUserIdFromRequest, validateUserIdForApi, successResponse, errorResponse, handleApiError } from '@/lib/utils'
+import { getUserIdFromRequest, getSecureUserIdFromRequest, validateUserIdForApi, successResponse, errorResponse, handleApiError } from '@/lib/utils'
 import type { JournalEntry } from '@/types'
 
 export const dynamic = 'force-dynamic'
@@ -85,8 +85,13 @@ export async function POST(request: NextRequest) {
     const validationError = validateUserIdForApi(userId, 401)
     if (validationError) return validationError
 
-    if (!entry.date || !entry.type || !entry.content) {
-      return errorResponse('Date, type, and content are required', 400)
+    if (!entry.date || !entry.type) {
+      return errorResponse('Date and type are required', 400)
+    }
+    
+    // For gratitude entries, allow empty content if gratitudeItems are provided
+    if (!entry.content && (!entry.gratitudeItems || entry.gratitudeItems.length === 0)) {
+      return errorResponse('Content or gratitude items are required', 400)
     }
 
     const entryId = await addJournalEntry(userId!, entry)
@@ -118,18 +123,24 @@ export async function PUT(request: NextRequest) {
 // DELETE - Delete a journal entry
 export async function DELETE(request: NextRequest) {
   try {
+    const userIdResult = await getSecureUserIdFromRequest(request, {
+      allowQueryParam: false,
+      validateOwnership: true,
+    })
+
+    if ('error' in userIdResult) {
+      return userIdResult.error
+    }
+
+    const { userId } = userIdResult
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
-    const userId = getUserIdFromRequest(request)
-    
-    const validationError = validateUserIdForApi(userId, 401)
-    if (validationError) return validationError
     
     if (!id) {
       return errorResponse('Journal entry ID is required', 400)
     }
 
-    await deleteJournalEntry(userId!, id)
+    await deleteJournalEntry(userId, id)
     return successResponse()
   } catch (error: unknown) {
     return handleApiError(error, 'DELETE /api/journal')
