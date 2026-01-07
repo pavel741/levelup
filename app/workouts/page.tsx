@@ -185,15 +185,15 @@ export default function WorkoutsPage() {
           <Sidebar isOpen={isMobileMenuOpen} onClose={() => setIsMobileMenuOpen(false)} />
           <div className="flex-1 flex flex-col overflow-hidden lg:ml-0">
             <Header onMenuToggle={() => setIsMobileMenuOpen(!isMobileMenuOpen)} isMenuOpen={isMobileMenuOpen} />
-            <main className="flex-1 overflow-y-auto p-4 sm:p-6">
+            <main className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6">
               <div className="max-w-7xl mx-auto">
                 {/* Header */}
-                <div className="mb-6">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Dumbbell className="w-8 h-8 text-blue-600 dark:text-blue-400" />
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Workouts</h1>
+                <div className="mb-4 sm:mb-6">
+                  <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+                    <Dumbbell className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600 dark:text-blue-400" />
+                    <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Workouts</h1>
                   </div>
-                  <p className="text-gray-600 dark:text-gray-400">
+                  <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
                     Build routines, track workouts, and achieve your fitness goals
                   </p>
                 </div>
@@ -212,23 +212,25 @@ export default function WorkoutsPage() {
                           onCancel={handleCancelRoutineBuilder}
                         />
                       ) : (
-                        <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-                          <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">My Routines</h2>
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => setShowTemplates(true)}
-                                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium flex items-center gap-2"
-                              >
-                                <Sparkles className="w-4 h-4" />
-                                Templates
-                              </button>
-                              <button
-                                onClick={() => setShowRoutineBuilder(true)}
-                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                              >
-                                + Create Routine
-                              </button>
+                        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 shadow-sm border border-gray-200 dark:border-gray-700">
+                          <div className="mb-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">My Routines</h2>
+                              <div className="flex flex-col sm:flex-row gap-2">
+                                <button
+                                  onClick={() => setShowTemplates(true)}
+                                  className="w-full sm:w-auto px-4 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 active:bg-purple-800 transition-colors font-medium flex items-center justify-center gap-2 text-sm sm:text-base"
+                                >
+                                  <Sparkles className="w-4 h-4" />
+                                  <span>Templates</span>
+                                </button>
+                                <button
+                                  onClick={() => setShowRoutineBuilder(true)}
+                                  className="w-full sm:w-auto px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 active:bg-blue-800 transition-colors font-medium text-sm sm:text-base"
+                                >
+                                  + Create Routine
+                                </button>
+                              </div>
                             </div>
                           </div>
                           {isLoadingRoutines ? (
@@ -240,7 +242,7 @@ export default function WorkoutsPage() {
                               onAction={() => setShowRoutineBuilder(true)}
                             />
                           ) : (
-                            <div className="space-y-3">
+                            <div className="space-y-2 sm:space-y-3">
                               {routines.map((routine) => (
                                 <RoutineCard
                                   key={routine.id}

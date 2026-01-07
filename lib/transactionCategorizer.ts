@@ -25,9 +25,11 @@ export function categorizeTransaction(
   // Define patterns early so they can be used throughout the function
   const posPattern = /pos\s*:/i
   const cardPattern = /\d{4}\s+\d{2}\*+\s+\*+\s+\d{4}|\d{4}\s+\d{2}\*+\s+\d{4}/
+  // LHV card payment pattern: (..XXXX) YYYY-MM-DD HH:MM MERCHANT_NAME
+  const lhvCardPattern = /\(\.\.\d+\)\s+\d{4}-\d{2}-\d{2}\s+\d{1,2}:\d{2}/
 
   // PRIORITY ORDER:
-  // 1. Card payment patterns (POS:, card numbers, ATM:) - highest priority
+  // 1. Card payment patterns (POS:, card numbers, LHV pattern, ATM:) - highest priority
   // 2. Reference number (viitenumber) - if present and not empty, it's Bills
   // 3. Other patterns (loans, utilities, etc.)
   
@@ -35,6 +37,7 @@ export function categorizeTransaction(
   // This ensures we catch POS: even if it's in different parts of the transaction data
   const hasPosPattern = posPattern.test(desc) || posPattern.test(combinedText)
   const hasCardPattern = cardPattern.test(desc)
+  const hasLhvCardPattern = lhvCardPattern.test(desc) || lhvCardPattern.test(combinedText)
   const hasAtmPattern = /^atm\s*:/i.test(desc) || /^atm\s+/i.test(desc) || /atm\s*:/i.test(combinedText)
   
   // Check for POS: prefix → Card Payment (highest priority for card payments)
@@ -43,6 +46,16 @@ export function categorizeTransaction(
       category: 'Card Payment',
       confidence: 'high',
       reason: 'POS: prefix detected (card payment)',
+    }
+  }
+
+  // Check for LHV card payment pattern → Card Payment
+  // Pattern: (..XXXX) YYYY-MM-DD HH:MM MERCHANT_NAME (found in Arhiveerimistunnus/Selgitus)
+  if (hasLhvCardPattern) {
+    return {
+      category: 'Card Payment',
+      confidence: 'high',
+      reason: 'LHV card payment pattern detected (..XXXX) YYYY-MM-DD HH:MM',
     }
   }
 

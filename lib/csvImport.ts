@@ -385,10 +385,15 @@ export class CSVImportService {
       providedCategory.match(/^[A-Z0-9\s#\/\\-]+$/) && providedCategory.length > 20 // Long alphanumeric strings
     
     // Always try to get a smart category
-    // Include selgitus in description if it exists (for PSD2-KLIX detection, etc.)
-    const fullDescription = selgitus && selgitus.trim().length > 0 
-      ? `${description} ${selgitus}`.trim() 
-      : description
+    // Include selgitus and archiveId in description if they exist (for PSD2-KLIX detection, LHV card payment pattern, etc.)
+    const parts = [description]
+    if (selgitus && selgitus.trim().length > 0) {
+      parts.push(selgitus.trim())
+    }
+    if (archiveId && archiveId.trim().length > 0) {
+      parts.push(archiveId.trim())
+    }
+    const fullDescription = parts.join(' ').trim() || description
     
     const suggestedCategory = getSuggestedCategory(
       fullDescription,

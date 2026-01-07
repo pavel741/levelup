@@ -708,16 +708,48 @@ export const saveCategories = async (
   try {
     const collection = await getCategoriesCollection(userId)
     // MongoDB allows custom _id values, but TypeScript types are strict - use type assertion
-    await collection.updateOne(
-      { userId, _id: 'categories' as any },
-      { $set: { userId, ...categories, updatedAt: new Date() } },
-      { upsert: true }
-    )
+    // Try to match by _id first (in case document exists without userId field)
+    // Then update with userId to ensure consistency
+    const filter = { _id: 'categories' as any }
+    const update = { 
+      $set: { 
+        _id: 'categories' as any,
+        userId, 
+        ...categories, 
+        updatedAt: new Date() 
+      } 
+    }
+    
+    const result = await collection.updateOne(filter, update, { upsert: true })
+    
+    // If upsert created a new document but we got a duplicate key error,
+    // it means another request created it simultaneously - just update it
+    if (result.upsertedCount === 0 && result.matchedCount === 0) {
+      // Document might have been created by another request, try update again
+      await collection.updateOne(filter, update)
+    }
     
     // Invalidate categories cache
     const cacheKey = createQueryCacheKey('categories', userId)
     queryCache.invalidate(cacheKey)
-  } catch (error) {
+  } catch (error: any) {
+    // Handle duplicate key errors gracefully (race condition)
+    if (error.code === 11000 || error.message?.includes('duplicate key')) {
+      // Document was created by another request, just update it
+      try {
+        const collection = await getCategoriesCollection(userId)
+        await collection.updateOne(
+          { _id: 'categories' as any },
+          { $set: { userId, ...categories, updatedAt: new Date() } }
+        )
+        const cacheKey = createQueryCacheKey('categories', userId)
+        queryCache.invalidate(cacheKey)
+        return
+      } catch (retryError) {
+        console.error('Error retrying saveCategories after duplicate key:', retryError)
+        throw retryError
+      }
+    }
     console.error('Error saving categories to MongoDB:', error)
     throw error
   }
@@ -930,15 +962,19 @@ export const subscribeToRecurringTransactions = (
           
           // Decrypt sensitive fields
           try {
-            return await decryptObjectFields(
+            const decrypted = await decryptObjectFields(
               client,
               userId,
               transaction,
               [...RECURRING_TRANSACTION_ENCRYPTED_FIELDS]
             ) as FinanceRecurringTransaction
+            
+            // Ensure all Binary objects are converted to strings (safety net)
+            return ensureJsonSerializable(decrypted) as FinanceRecurringTransaction
           } catch (error) {
             console.warn('Failed to decrypt recurring transaction fields:', error instanceof Error ? error.message : error)
-            return transaction
+            // Even if decryption fails, ensure Binary objects are converted
+            return ensureJsonSerializable(transaction) as FinanceRecurringTransaction
           }
         })
       )
@@ -1045,8 +1081,9 @@ export const addRecurringTransaction = async (
         [...RECURRING_TRANSACTION_ENCRYPTED_FIELDS]
       ) as typeof txData
     } catch (error) {
-      console.error('Failed to encrypt recurring transaction fields:', error)
-      // Continue without encryption for backward compatibility
+      console.error('Failed to encrypt recurring transaction fields:', error instanceof Error ? error.message : String(error))
+      // Don't save unencrypted sensitive data - throw error
+      throw new Error(`Encryption failed: ${error instanceof Error ? error.message : String(error)}`)
     }
     
     const result = await collection.insertOne(txData)
@@ -1066,7 +1103,7 @@ export const updateRecurringTransaction = async (
     const collection = await getRecurringTransactionsCollection(userId)
     // Convert dates if present
     const { nextDate, dueDate, lastPaidDate, ...updatesWithoutDates } = updates
-    const updateData: Partial<FinanceRecurringTransaction> & { nextDate?: Date; dueDate?: Date; lastPaidDate?: Date } = { ...updatesWithoutDates }
+    let updateData: Partial<FinanceRecurringTransaction> & { nextDate?: Date; dueDate?: Date; lastPaidDate?: Date } = { ...updatesWithoutDates }
     
     const convertDate = (date: any): Date | undefined => {
       if (!date) return undefined
@@ -1091,6 +1128,27 @@ export const updateRecurringTransaction = async (
     }
     
     updateData.updatedAt = new Date()
+    
+    // Encrypt sensitive fields in updates before saving
+    const client = await clientPromise
+    try {
+      // Only encrypt fields that are being updated and are in the encrypted fields list
+      const fieldsToEncrypt = RECURRING_TRANSACTION_ENCRYPTED_FIELDS.filter(
+        field => field in updateData && updateData[field as keyof typeof updateData] != null
+      )
+      if (fieldsToEncrypt.length > 0) {
+        updateData = await encryptObjectFields(
+          client,
+          userId,
+          updateData,
+          [...fieldsToEncrypt]
+        ) as Partial<FinanceRecurringTransaction> & { nextDate?: Date; dueDate?: Date; lastPaidDate?: Date }
+      }
+    } catch (error) {
+      console.error('Failed to encrypt recurring transaction update fields:', error instanceof Error ? error.message : String(error))
+      // Don't save unencrypted sensitive data - throw error
+      throw new Error(`Encryption failed: ${error instanceof Error ? error.message : String(error)}`)
+    }
 
     await collection.updateOne(
       { _id: new ObjectId(id), userId },

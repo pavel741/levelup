@@ -191,7 +191,24 @@ export const deleteJournalEntry = async (
 ): Promise<void> => {
   try {
     const collection = await getJournalCollection()
-    await collection.deleteOne({ _id: new ObjectId(entryId), userId })
+    
+    // Validate ObjectId format
+    if (!ObjectId.isValid(entryId)) {
+      throw new Error(`Invalid journal entry ID format: ${entryId}`)
+    }
+    
+    const result = await collection.deleteOne({ _id: new ObjectId(entryId), userId })
+    
+    // Check if anything was actually deleted
+    if (result.deletedCount === 0) {
+      // Try to find if the entry exists but with different userId
+      const existingEntry = await collection.findOne({ _id: new ObjectId(entryId) })
+      if (existingEntry) {
+        throw new Error(`Journal entry exists but belongs to a different user`)
+      }
+      throw new Error(`Journal entry not found: ${entryId}`)
+    }
+    
     queryCache.invalidatePattern(new RegExp(`^journal:${userId}`))
   } catch (error) {
     console.error('Error deleting journal entry from MongoDB:', error)

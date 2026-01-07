@@ -21,8 +21,8 @@ const VIEWS = [
 
 export default function ViewTabs({ currentView, onViewChange }: ViewTabsProps) {
   return (
-    <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
-      <nav className="flex space-x-1 overflow-x-auto">
+    <div className="mb-4 sm:mb-6 border-b border-gray-200 dark:border-gray-700 -mx-3 sm:mx-0 px-3 sm:px-0">
+      <nav className="flex space-x-0.5 sm:space-x-1 overflow-x-auto scrollbar-hide pb-1">
         {VIEWS.map((view) => {
           const Icon = view.icon
           const isActive = currentView === view.id
@@ -31,16 +31,17 @@ export default function ViewTabs({ currentView, onViewChange }: ViewTabsProps) {
               key={view.id}
               onClick={() => onViewChange(view.id)}
               className={`
-                flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap
+                flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-shrink-0
                 ${
                   isActive
                     ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
-                    : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600'
+                    : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-600 active:text-gray-900 dark:active:text-gray-200'
                 }
               `}
             >
-              <Icon className="w-5 h-5" />
-              <span>{view.label}</span>
+              <Icon className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+              <span className="hidden sm:inline">{view.label}</span>
+              <span className="sm:hidden">{view.label.split(' ')[0]}</span>
             </button>
           )
         })}

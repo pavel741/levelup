@@ -33,7 +33,7 @@ import isToday from 'date-fns/isToday'
 import type { FinanceTransaction, FinanceCategories, FinanceSettings } from '@/types/finance'
 import { getPeriodDates, parseTransactionDate } from '@/lib/financeDateUtils'
 import { CSVImportService } from '@/lib/csvImport'
-import { ESTONIAN_BANK_PROFILES } from '@/lib/bankProfiles'
+import { ESTONIAN_BANK_PROFILES, detectBankProfile } from '@/lib/bankProfiles'
 import { getSuggestedCategory } from '@/lib/transactionCategorizer'
 import { formatCurrency, formatDate, formatDisplayDate, showError, showSuccess } from '@/lib/utils'
 import { CardSkeleton, TransactionListSkeleton } from '@/components/ui/Skeleton'
@@ -92,6 +92,9 @@ export default function FinancePage() {
   }, [])
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  
+  // Track recently deleted transaction IDs to prevent them from being re-added by subscription
+  const recentlyDeletedIdsRef = useRef<Set<string>>(new Set())
   
   // Transaction list filters
   const [currentFilter, setCurrentFilter] = useState<'all' | 'income' | 'expense'>('all')
@@ -163,28 +166,26 @@ export default function FinancePage() {
         setAllTransactionsForSummary(allTxs)
         setIsLoading(false)
         setIsLoadingAllTransactions(false)
-        console.log('✅ Loaded all transactions for summary:', allTxs.length)
-        
-        // Calculate total amount for verification
-        const totalAmount = allTxs.reduce((sum, tx) => {
-          const amount = Math.abs(Number(tx.amount) || 0)
-          return sum + amount
-        }, 0)
-        console.log('💰 Total transaction amount sum:', totalAmount.toFixed(2))
         
         // Then set up subscription for ongoing updates (load recent transactions for display)
         unsubscribe = subscribeToTransactions(
           user.id,
           (txs) => {
-            setTransactions(txs)
+            // Filter out recently deleted transactions to prevent them from being re-added
+            const filteredTxs = txs.filter(tx => !recentlyDeletedIdsRef.current.has(tx.id))
+            
+            setTransactions(filteredTxs)
             setIsLoading(false)
             // Merge new transactions into allTransactionsForSummary
             // This ensures we have the latest transactions for date filtering
             setAllTransactionsForSummary(prev => {
+              // Filter out recently deleted transactions first
+              const filteredPrev = prev.filter(tx => !recentlyDeletedIdsRef.current.has(tx.id))
+              
               // Create a map of existing transactions by ID for quick lookup
-              const existingMap = new Map(prev.map(tx => [tx.id, tx]))
+              const existingMap = new Map(filteredPrev.map(tx => [tx.id, tx]))
               // Add/update transactions from subscription
-              txs.forEach(tx => {
+              filteredTxs.forEach(tx => {
                 existingMap.set(tx.id, tx)
               })
               // Convert back to array and sort by date descending
@@ -856,12 +857,29 @@ export default function FinancePage() {
     const deletedTx = transactions.find(tx => tx.id === id)
     setTransactions(prev => prev.filter(tx => tx.id !== id))
     setAllTransactionsForSummary(prev => prev.filter(tx => tx.id !== id))
+    
+    // Track deleted transaction ID to prevent it from being re-added by subscription
+    recentlyDeletedIdsRef.current.add(id)
 
     try {
       await deleteTransaction(user.id, id)
+      
+      // Reload all transactions for summary to ensure consistency
+      // This prevents deleted transactions from reappearing due to subscription cache issues
+      const { getAllTransactionsForSummary } = await import('@/lib/financeApi')
+      const allTxs = await getAllTransactionsForSummary(user.id)
+      setAllTransactionsForSummary(allTxs)
+      
+      // Remove from recently deleted set after successful reload (cleanup after 30 seconds)
+      setTimeout(() => {
+        recentlyDeletedIdsRef.current.delete(id)
+      }, 30000)
+      
       showSuccess('Transaction deleted')
     } catch (error) {
       console.error('Error deleting transaction:', error)
+      // Remove from recently deleted set on error
+      recentlyDeletedIdsRef.current.delete(id)
       // Revert optimistic update on error
       if (deletedTx) {
         setTransactions(prev => [...prev, deletedTx].sort((a, b) => {
@@ -1210,15 +1228,40 @@ export default function FinancePage() {
       setCsvSelectedBank(null)
       
       const csvService = new CSVImportService()
-      const result = csvService.parseCSV(text)
+      
+      // Try to auto-detect bank from headers before parsing
+      const lines = text.split('\n').filter((line) => line.trim())
+      let detectedBankId: string | null = null
+      if (lines.length > 0) {
+        const delimiter = csvService.detectDelimiter(lines[0])
+        const headers = lines[0].split(delimiter).map(h => h.trim().replace(/^["']+/, '').replace(/["']+$/, ''))
+        const detectedBank = detectBankProfile(headers)
+        if (detectedBank) {
+          detectedBankId = detectedBank.id
+          setCsvSelectedBank(detectedBank.id)
+          console.log(`🏦 Auto-detected bank: ${detectedBank.displayName}`)
+        }
+      }
+      
+      // Parse CSV with detected bank if found
+      const result = csvService.parseCSV(text, detectedBankId || undefined)
       
       console.log(`📊 Parsed ${result.transactions.length} transactions from CSV`)
+      
+      // If bank was detected during parsing, ensure it's set
+      if (result.detectedBank && !detectedBankId) {
+        setCsvSelectedBank(result.detectedBank.id)
+        console.log(`🏦 Bank detected during parsing: ${result.detectedBank.displayName}`)
+      }
       
       setCsvParsedData(result.transactions)
       setCsvColumnMapping(result.columnMapping)
       setCsvHeaders(result.columnMapping._allHeaders || [])
       setShowCsvMapping(true)
-      setCsvImportStatus(`Found ${result.transactions.length} transactions`)
+      const bankInfo = detectedBankId || result.detectedBank?.id 
+        ? ` (Bank: ${ESTONIAN_BANK_PROFILES.find(b => b.id === (detectedBankId || result.detectedBank?.id))?.displayName || 'Unknown'})`
+        : ''
+      setCsvImportStatus(`Found ${result.transactions.length} transactions${bankInfo}`)
     } catch (error: unknown) {
       const errorMessage = error && typeof error === 'object' && 'message' in error && typeof error.message === 'string' ? error.message : 'Unknown error'
       if (errorMessage.includes('parsing')) {
@@ -2491,46 +2534,112 @@ export default function FinancePage() {
                                   // Display amount: if expense with positive amount, show as negative
                                   const displayAmount = !isIncome && amount > 0 ? -amount : amount
                                   
-                                  // Clean description - remove card/account info if it's in the description
-                                  let cleanDescription = tx.description || '—'
-                                  if (cleanDescription.includes('POS:') || cleanDescription.match(/\d{4}\s+\d{2}\*\*/)) {
-                                    // Extract merchant name if it exists after card info
-                                    const parts = cleanDescription.split(',').map(p => p.trim())
-                                    const merchantPart = parts.find(p => !p.includes('POS:') && !p.match(/\d{4}\s+\d{2}\*\*/))
-                                    if (merchantPart) {
-                                      cleanDescription = merchantPart
+                                  // Format transaction display
+                                  const txDate = parseTransactionDate(tx.date)
+                                  const description = tx.description || '—'
+                                  const archiveId = (tx as any).archiveId || ''
+                                  const bankName = (tx as any).sourceBank || ''
+                                  const isCoop = bankName.toLowerCase().includes('coop')
+                                  
+                                  // Extract LHV card pattern: (..XXXX) YYYY-MM-DD HH:MM MERCHANT_NAME
+                                  const lhvPattern = /\(\.\.(\d+)\)\s+(\d{4}-\d{2}-\d{2})\s+(\d{1,2}:\d{2})/
+                                  const lhvMatch = description.match(lhvPattern) || archiveId.match(lhvPattern)
+                                  
+                                  // Extract COOP card pattern: POS: 1234 56** **** 7890, DD.MM.YYYY HH:MM:SS MERCHANT_NAME
+                                  // Or: 1234 56** **** 7890, DD.MM.YYYY HH:MM:SS MERCHANT_NAME
+                                  const coopPosPattern = /pos\s*:\s*(\d{4})\s+\d{2}\*+\s+\*+\s+(\d{4})/i
+                                  const coopCardPattern = /(\d{4})\s+\d{2}\*+\s+\*+\s+(\d{4})/
+                                  const coopDateTimePattern = /(\d{1,2}\.\d{1,2}\.\d{4})\s+(\d{1,2}:\d{2}(:\d{2})?)/
+                                  
+                                  let firstLine = description
+                                  let cardInfo = ''
+                                  let transactionDateTime = ''
+                                  
+                                  if (lhvMatch) {
+                                    // Extract card last 4 digits, date, and time from LHV pattern
+                                    cardInfo = `(..${lhvMatch[1]})`
+                                    transactionDateTime = `${lhvMatch[2]} ${lhvMatch[3]}`
+                                    // Extract merchant name (everything after the time)
+                                    const merchantMatch = description.match(lhvPattern)
+                                    if (merchantMatch) {
+                                      const merchantName = description.substring(merchantMatch[0].length).trim()
+                                      firstLine = merchantName || description
                                     } else {
-                                      // Just use the first part that's not card info
-                                      cleanDescription = parts.find(p => !p.includes('POS:') && !p.match(/\d{4}\s+\d{2}\*\*/)) || cleanDescription
+                                      // Try archiveId
+                                      const archiveMatch = archiveId.match(lhvPattern)
+                                      if (archiveMatch) {
+                                        const merchantName = archiveId.substring(archiveMatch[0].length).trim()
+                                        firstLine = merchantName || description
+                                      }
                                     }
+                                  } else if (isCoop && (coopPosPattern.test(description) || coopCardPattern.test(description))) {
+                                    // Extract COOP card info and date/time
+                                    const posMatch = description.match(coopPosPattern)
+                                    const cardMatch = description.match(coopCardPattern)
+                                    const dateTimeMatch = description.match(coopDateTimePattern)
+                                    
+                                    if (posMatch) {
+                                      // Extract from POS: pattern
+                                      cardInfo = `(..${posMatch[2]})` // Last 4 digits
+                                    } else if (cardMatch) {
+                                      // Extract from card number pattern
+                                      cardInfo = `(..${cardMatch[2]})` // Last 4 digits
+                                    }
+                                    
+                                    if (dateTimeMatch) {
+                                      // Convert DD.MM.YYYY HH:MM:SS to YYYY-MM-DD HH:MM
+                                      const [day, month, year] = dateTimeMatch[1].split('.')
+                                      const timePart = dateTimeMatch[2].split(':').slice(0, 2).join(':') // Remove seconds if present
+                                      transactionDateTime = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')} ${timePart}`
+                                      
+                                      // Extract merchant name (everything after the date/time)
+                                      const dateTimeIndex = description.indexOf(dateTimeMatch[0])
+                                      if (dateTimeIndex !== -1) {
+                                        const afterDateTime = description.substring(dateTimeIndex + dateTimeMatch[0].length).trim()
+                                        // Remove leading comma if present
+                                        const merchantName = afterDateTime.replace(/^,\s*/, '').trim()
+                                        if (merchantName) {
+                                          firstLine = merchantName
+                                        }
+                                      }
+                                    } else {
+                                      // No date/time in description, use transaction date
+                                      transactionDateTime = format(txDate, 'yyyy-MM-dd HH:mm')
+                                    }
+                                  } else {
+                                    // Format date/time from transaction date
+                                    transactionDateTime = format(txDate, 'yyyy-MM-dd HH:mm')
                                   }
+                                  
+                                  // Format first line: (..XXXX) YYYY-MM-DD HH:MM Description
+                                  const formattedFirstLine = cardInfo 
+                                    ? `${cardInfo} ${transactionDateTime} ${firstLine}`
+                                    : `${transactionDateTime} ${firstLine}`
+                                  
+                                  // Format second line: DD.MM.YYYY • Category • Bank
+                                  const processingDate = formatDisplayDate(tx.date)
+                                  const category = tx.category || 'Other'
                                   
                                   return (
                                     <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 sm:p-4 hover:shadow-md transition-all">
                                       {/* Mobile: Stacked layout, Desktop: Side by side */}
                                       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                                         <div className="flex-1 min-w-0">
-                                          <h3 className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base mb-1.5 sm:mb-1 truncate">
-                                            {cleanDescription}
+                                          <h3 className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base mb-1.5 sm:mb-1 break-words">
+                                            {formattedFirstLine}
                                           </h3>
-                                          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap mb-2 sm:mb-0">
-                                            <span className="text-xs text-gray-500 dark:text-gray-400">
-                                              {formatDisplayDate(tx.date)}
-                                            </span>
-                                            {tx.category && (
+                                          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap text-xs text-gray-500 dark:text-gray-400">
+                                            <span>{processingDate}</span>
+                                            {category && (
                                               <>
                                                 <span className="text-gray-400 dark:text-gray-500">•</span>
-                                                <span className="text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 sm:px-2 py-0.5 rounded-md">
-                                                  {tx.category}
-                                                </span>
+                                                <span>{category}</span>
                                               </>
                                             )}
-                                            {(tx as any).sourceBank && (
+                                            {bankName && (
                                               <>
-                                                <span className="text-gray-400 dark:text-gray-500 hidden sm:inline">•</span>
-                                                <span className="text-xs text-gray-500 dark:text-gray-400 hidden sm:inline">
-                                                  {(tx as any).sourceBank}
-                                                </span>
+                                                <span className="text-gray-400 dark:text-gray-500">•</span>
+                                                <span>{bankName}</span>
                                               </>
                                             )}
                                           </div>
@@ -2593,19 +2702,91 @@ export default function FinancePage() {
                                 // Display amount: if expense with positive amount, show as negative
                                 const displayAmount = !isIncome && amount > 0 ? -amount : amount
                                 
-                                // Clean description - remove card/account info if it's in the description
-                                let cleanDescription = tx.description || '—'
-                                if (cleanDescription.includes('POS:') || cleanDescription.match(/\d{4}\s+\d{2}\*\*/)) {
-                                  // Extract merchant name if it exists after card info
-                                  const parts = cleanDescription.split(',').map(p => p.trim())
-                                  const merchantPart = parts.find(p => !p.includes('POS:') && !p.match(/\d{4}\s+\d{2}\*\*/))
-                                  if (merchantPart) {
-                                    cleanDescription = merchantPart
+                                // Format transaction display
+                                const txDate = parseTransactionDate(tx.date)
+                                const description = tx.description || '—'
+                                const archiveId = (tx as any).archiveId || ''
+                                const bankName = (tx as any).sourceBank || ''
+                                const isCoop = bankName.toLowerCase().includes('coop')
+                                
+                                // Extract LHV card pattern: (..XXXX) YYYY-MM-DD HH:MM MERCHANT_NAME
+                                const lhvPattern = /\(\.\.(\d+)\)\s+(\d{4}-\d{2}-\d{2})\s+(\d{1,2}:\d{2})/
+                                const lhvMatch = description.match(lhvPattern) || archiveId.match(lhvPattern)
+                                
+                                // Extract COOP card pattern: POS: 1234 56** **** 7890, DD.MM.YYYY HH:MM:SS MERCHANT_NAME
+                                // Or: 1234 56** **** 7890, DD.MM.YYYY HH:MM:SS MERCHANT_NAME
+                                const coopPosPattern = /pos\s*:\s*(\d{4})\s+\d{2}\*+\s+\*+\s+(\d{4})/i
+                                const coopCardPattern = /(\d{4})\s+\d{2}\*+\s+\*+\s+(\d{4})/
+                                const coopDateTimePattern = /(\d{1,2}\.\d{1,2}\.\d{4})\s+(\d{1,2}:\d{2}(:\d{2})?)/
+                                
+                                let firstLine = description
+                                let cardInfo = ''
+                                let transactionDateTime = ''
+                                
+                                if (lhvMatch) {
+                                  // Extract card last 4 digits, date, and time from LHV pattern
+                                  cardInfo = `(..${lhvMatch[1]})`
+                                  transactionDateTime = `${lhvMatch[2]} ${lhvMatch[3]}`
+                                  // Extract merchant name (everything after the time)
+                                  const merchantMatch = description.match(lhvPattern)
+                                  if (merchantMatch) {
+                                    const merchantName = description.substring(merchantMatch[0].length).trim()
+                                    firstLine = merchantName || description
                                   } else {
-                                    // Just use the first part that's not card info
-                                    cleanDescription = parts.find(p => !p.includes('POS:') && !p.match(/\d{4}\s+\d{2}\*\*/)) || cleanDescription
+                                    // Try archiveId
+                                    const archiveMatch = archiveId.match(lhvPattern)
+                                    if (archiveMatch) {
+                                      const merchantName = archiveId.substring(archiveMatch[0].length).trim()
+                                      firstLine = merchantName || description
+                                    }
                                   }
+                                } else if (isCoop && (coopPosPattern.test(description) || coopCardPattern.test(description))) {
+                                  // Extract COOP card info and date/time
+                                  const posMatch = description.match(coopPosPattern)
+                                  const cardMatch = description.match(coopCardPattern)
+                                  const dateTimeMatch = description.match(coopDateTimePattern)
+                                  
+                                  if (posMatch) {
+                                    // Extract from POS: pattern
+                                    cardInfo = `(..${posMatch[2]})` // Last 4 digits
+                                  } else if (cardMatch) {
+                                    // Extract from card number pattern
+                                    cardInfo = `(..${cardMatch[2]})` // Last 4 digits
+                                  }
+                                  
+                                  if (dateTimeMatch) {
+                                    // Convert DD.MM.YYYY HH:MM:SS to YYYY-MM-DD HH:MM
+                                    const [day, month, year] = dateTimeMatch[1].split('.')
+                                    const timePart = dateTimeMatch[2].split(':').slice(0, 2).join(':') // Remove seconds if present
+                                    transactionDateTime = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')} ${timePart}`
+                                    
+                                    // Extract merchant name (everything after the date/time)
+                                    const dateTimeIndex = description.indexOf(dateTimeMatch[0])
+                                    if (dateTimeIndex !== -1) {
+                                      const afterDateTime = description.substring(dateTimeIndex + dateTimeMatch[0].length).trim()
+                                      // Remove leading comma if present
+                                      const merchantName = afterDateTime.replace(/^,\s*/, '').trim()
+                                      if (merchantName) {
+                                        firstLine = merchantName
+                                      }
+                                    }
+                                  } else {
+                                    // No date/time in description, use transaction date
+                                    transactionDateTime = format(txDate, 'yyyy-MM-dd HH:mm')
+                                  }
+                                } else {
+                                  // Format date/time from transaction date
+                                  transactionDateTime = format(txDate, 'yyyy-MM-dd HH:mm')
                                 }
+                                
+                                // Format first line: (..XXXX) YYYY-MM-DD HH:MM Description
+                                const formattedFirstLine = cardInfo 
+                                  ? `${cardInfo} ${transactionDateTime} ${firstLine}`
+                                  : `${transactionDateTime} ${firstLine}`
+                                
+                                // Format second line: DD.MM.YYYY • Category • Bank
+                                const processingDate = formatDisplayDate(tx.date)
+                                const category = tx.category || 'Other'
                                 
                                 return (
                                   <div
@@ -2615,28 +2796,22 @@ export default function FinancePage() {
                                     {/* Mobile: Stacked layout, Desktop: Side by side */}
                                     <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                                       <div className="flex-1 min-w-0">
-                                        <h3 className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base mb-1.5 sm:mb-1 truncate">
-                                          {cleanDescription}
+                                        <h3 className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base mb-1.5 sm:mb-1 break-words">
+                                          {formattedFirstLine}
                                         </h3>
-                                        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap mb-2 sm:mb-0">
-                                          <span className="text-xs text-gray-500 dark:text-gray-400">
-                                            {formatDisplayDate(tx.date)}
-                                          </span>
-                                          {tx.category && (
-                                            <span key="category" className="flex items-center gap-1.5 sm:gap-2">
+                                        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap text-xs text-gray-500 dark:text-gray-400">
+                                          <span>{processingDate}</span>
+                                          {category && (
+                                            <>
                                               <span className="text-gray-400 dark:text-gray-500">•</span>
-                                              <span className="text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 sm:px-2 py-0.5 rounded-md">
-                                                {tx.category}
-                                              </span>
-                                            </span>
+                                              <span>{category}</span>
+                                            </>
                                           )}
-                                          {(tx as any).sourceBank && (
-                                            <span key="sourceBank" className="flex items-center gap-1.5 sm:gap-2">
-                                              <span className="text-gray-400 dark:text-gray-500 hidden sm:inline">•</span>
-                                              <span className="text-xs text-gray-500 dark:text-gray-400 hidden sm:inline">
-                                                {(tx as any).sourceBank}
-                                              </span>
-                                            </span>
+                                          {bankName && (
+                                            <>
+                                              <span className="text-gray-400 dark:text-gray-500">•</span>
+                                              <span>{bankName}</span>
+                                            </>
                                           )}
                                         </div>
                                       </div>

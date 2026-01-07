@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import AuthGuard from '@/components/common/AuthGuard'
 import Sidebar from '@/components/layout/Sidebar'
@@ -53,9 +53,6 @@ const FinanceSpendingAlerts = nextDynamic(() => import('@/components/finance/cha
   loading: () => <CardSkeleton />,
 })
 const FinanceRecurringExpenses = nextDynamic(() => import('@/components/finance/charts/FinanceRecurringExpenses').then(m => ({ default: m.FinanceRecurringExpenses })), {
-  loading: () => <CardSkeleton />,
-})
-const FinanceVerificationPanel = nextDynamic(() => import('@/components/finance/FinanceVerificationPanel').then(m => ({ default: m.FinanceVerificationPanel })), {
   loading: () => <CardSkeleton />,
 })
 const BudgetVsActualDashboard = nextDynamic(() => import('@/components/finance/charts/BudgetVsActualDashboard').then(m => ({ default: m.default })), {
@@ -114,7 +111,7 @@ import { startOfMonth, endOfMonth } from 'date-fns'
 import { subscribeToSavingsGoals } from '@/lib/savingsGoalsApi'
 import { parseTransactionDate } from '@/lib/financeDateUtils'
 import type { FinanceTransaction, FinanceSettings, FinanceRecurringTransaction, BudgetCategoryLimit, FinanceCategories } from '@/types/finance'
-import { BarChart3, ArrowLeft, TrendingUp, TrendingDown, DollarSign, Percent, Loader2 } from 'lucide-react'
+import { BarChart3, ArrowLeft, TrendingDown, DollarSign, Percent, Loader2 } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -189,14 +186,6 @@ export default function FinanceAnalyticsPage() {
     getAllTransactionsForSummary(user.id).then(txs => {
       setTransactions(txs)
       setIsLoading(false)
-      console.log(`✅ Analytics: Loaded ${txs.length} transactions for analytics`)
-      
-      // Calculate total amount for verification
-      const totalAmount = txs.reduce((sum, tx) => {
-        const amount = Math.abs(Number(tx.amount) || 0)
-        return sum + amount
-      }, 0)
-      console.log(`💰 Analytics: Total transaction amount sum: ${totalAmount.toFixed(2)}`)
     }).catch(error => {
       console.error('Error fetching transactions on mount:', error)
       setIsLoading(false)
@@ -259,7 +248,6 @@ export default function FinanceAnalyticsPage() {
         setIsLoading(false)
         // Log how many transactions are loaded
         if (txs.length > 0) {
-          console.log(`📊 Analytics: Subscription updated with ${txs.length} transactions`)
         }
       },
       { limitCount: 0 } // Load ALL transactions for analytics (no limit)
@@ -352,7 +340,7 @@ export default function FinanceAnalyticsPage() {
     })
   }, [transactions, timeRange, customDateFrom, customDateTo, financeSettings])
 
-  // Calculate date range info for verification panel
+  // Calculate date range info
   const dateRangeInfo = useMemo(() => {
     const now = new Date()
     let startDate: Date | null = null
@@ -434,42 +422,42 @@ export default function FinanceAnalyticsPage() {
     return { start: startDate, end: endDate, label }
   }, [timeRange, customDateFrom, customDateTo, financeSettings, transactions])
 
-  // Calculate summary stats based on filtered transactions
-  const summaryStats = useMemo(() => {
-    let totalIncome = 0
-    let totalExpenses = 0
-    let categoryCount = new Set<string>()
-
-    filteredTransactions.forEach((tx) => {
+  // Filter to only expenses
+  const expenseTransactions = useMemo(() => {
+    return filteredTransactions.filter((tx) => {
       const amount = Number(tx.amount) || 0
       const type = (tx.type || '').toLowerCase()
-      
-      const isIncome = type === 'income' || (type !== 'expense' && amount > 0)
-      const absAmount = Math.abs(amount)
+      return type === 'expense' || amount < 0
+    })
+  }, [filteredTransactions])
 
-      if (isIncome) {
-        totalIncome += absAmount
-      } else {
-        totalExpenses += absAmount
-        if (tx.category) {
-          categoryCount.add(tx.category)
-        }
+  // Calculate summary stats based on filtered transactions
+  const summaryStats = useMemo(() => {
+    let totalAmount = 0
+    let categoryCount = new Set<string>()
+
+    expenseTransactions.forEach((tx) => {
+      const amount = Number(tx.amount) || 0
+      const absAmount = Math.abs(amount)
+      totalAmount += absAmount
+      
+      if (tx.category) {
+        categoryCount.add(tx.category)
       }
     })
 
-    const savingsRate = totalIncome > 0 
-      ? ((totalIncome - totalExpenses) / totalIncome * 100) 
+    // Calculate average per transaction
+    const averageAmount = expenseTransactions.length > 0 
+      ? totalAmount / expenseTransactions.length 
       : 0
 
     return {
-      totalIncome,
-      totalExpenses,
-      balance: totalIncome - totalExpenses,
-      savingsRate,
+      totalAmount,
+      averageAmount,
       categoryCount: categoryCount.size,
-      transactionCount: filteredTransactions.length,
+      transactionCount: expenseTransactions.length,
     }
-  }, [filteredTransactions])
+  }, [expenseTransactions])
 
   return (
     <AuthGuard>
@@ -663,60 +651,34 @@ export default function FinanceAnalyticsPage() {
                   )}
                   
                   {/* Active Filter Info */}
-                  {filteredTransactions.length !== transactions.length && (
-                    <div className="mt-3 text-xs text-gray-600 dark:text-gray-400">
-                      Showing {filteredTransactions.length.toLocaleString()} of {transactions.length.toLocaleString()} transactions
-                    </div>
-                  )}
+                  <div className="mt-3 text-xs text-gray-600 dark:text-gray-400">
+                    Showing {expenseTransactions.length.toLocaleString()} expense transactions
+                    {expenseTransactions.length !== filteredTransactions.length && (
+                      <span> (filtered from {filteredTransactions.length.toLocaleString()} total transactions)</span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Summary Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                   <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-gray-600 dark:text-gray-400">Total Income</span>
-                      <TrendingUp className="w-5 h-5 text-green-600 dark:text-green-400" />
-                    </div>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {new Intl.NumberFormat('et-EE', { style: 'currency', currency: 'EUR' }).format(summaryStats.totalIncome)}
-                    </p>
-                  </div>
-                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-gray-600 dark:text-gray-400">Total Expenses</span>
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        Total Expenses
+                      </span>
                       <TrendingDown className="w-5 h-5 text-red-600 dark:text-red-400" />
                     </div>
-                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                      {new Intl.NumberFormat('et-EE', { style: 'currency', currency: 'EUR' }).format(summaryStats.totalExpenses)}
+                    <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                      {new Intl.NumberFormat('et-EE', { style: 'currency', currency: 'EUR' }).format(summaryStats.totalAmount)}
                     </p>
                   </div>
                   <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-gray-600 dark:text-gray-400">Balance</span>
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Average per Transaction</span>
                       <DollarSign className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                     </div>
-                    <p className={`text-2xl font-bold ${
-                      summaryStats.balance >= 0 
-                        ? 'text-green-600 dark:text-green-400' 
-                        : 'text-red-600 dark:text-red-400'
-                    }`}>
-                      {new Intl.NumberFormat('et-EE', { style: 'currency', currency: 'EUR' }).format(summaryStats.balance)}
-                    </p>
-                  </div>
-                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-gray-600 dark:text-gray-400">Savings Rate</span>
-                      <Percent className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                    </div>
-                    <p className={`text-2xl font-bold ${
-                      summaryStats.savingsRate >= 0 
-                        ? 'text-green-600 dark:text-green-400' 
-                        : 'text-red-600 dark:text-red-400'
-                    }`}>
-                      {summaryStats.savingsRate.toFixed(1)}%
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      {summaryStats.savingsRate >= 0 ? 'Positive' : 'Negative'} savings
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                      {new Intl.NumberFormat('et-EE', { style: 'currency', currency: 'EUR' }).format(summaryStats.averageAmount)}
                     </p>
                   </div>
                   <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
@@ -731,20 +693,34 @@ export default function FinanceAnalyticsPage() {
                       {summaryStats.categoryCount} categories
                     </p>
                   </div>
+                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        Top Spending Category
+                      </span>
+                      <Percent className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <p className="text-lg font-bold text-gray-900 dark:text-white">
+                      {(() => {
+                        const categoryTotals: Record<string, number> = {}
+                        expenseTransactions.forEach((tx) => {
+                          const amount = Math.abs(Number(tx.amount) || 0)
+                          const category = tx.category || 'Other'
+                          categoryTotals[category] = (categoryTotals[category] || 0) + amount
+                        })
+                        const topCategory = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])[0]
+                        return topCategory ? topCategory[0] : 'N/A'
+                      })()}
+                    </p>
+                  </div>
                 </div>
 
-                {/* Verification Panel */}
-                <FinanceVerificationPanel
-                  transactions={transactions}
-                  filteredTransactions={filteredTransactions}
-                  dateRange={dateRangeInfo}
-                />
 
                 {/* New Analytics Sections */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                   {/* Financial Health Score */}
                   <FinancialHealthScore
-                    transactions={filteredTransactions}
+                    transactions={expenseTransactions}
                     periodMonths={
                       timeRange === 'month' ? 3 :
                       timeRange === '6months' ? 6 :
@@ -755,7 +731,7 @@ export default function FinanceAnalyticsPage() {
 
                   {/* Budget vs Actual */}
                   <BudgetVsActualDashboard
-                    transactions={filteredTransactions}
+                    transactions={expenseTransactions}
                     budgetGoals={budgetGoals}
                     period="monthly"
                     referenceDate={referenceDate}
@@ -765,11 +741,11 @@ export default function FinanceAnalyticsPage() {
                 {/* Spending Personality & Milestones */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                   {/* Spending Personality */}
-                  <SpendingPersonality transactions={filteredTransactions} />
+                  <SpendingPersonality transactions={expenseTransactions} />
 
                   {/* Money Milestones */}
                   <MoneyMilestones
-                    transactions={filteredTransactions}
+                    transactions={expenseTransactions}
                     periodMonths={
                       timeRange === 'month' ? 1 :
                       timeRange === '6months' ? 6 :
@@ -782,16 +758,16 @@ export default function FinanceAnalyticsPage() {
                 {/* Gamification Section */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                   {/* Savings Streaks */}
-                  <SavingsStreaks transactions={filteredTransactions} />
+                  <SavingsStreaks transactions={expenseTransactions} />
 
                   {/* Budget Challenges */}
-                  <BudgetChallenges transactions={filteredTransactions} />
+                  <BudgetChallenges transactions={expenseTransactions} />
                 </div>
 
                 {/* Spending Heatmap */}
                 <div className="mb-6">
                   <SpendingHeatmap
-                    transactions={filteredTransactions}
+                    transactions={expenseTransactions}
                     months={
                       timeRange === 'today' || timeRange === 'week' ? 1 :
                       timeRange === 'month' ? 3 :
@@ -807,7 +783,7 @@ export default function FinanceAnalyticsPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                   {/* Merchant Analysis */}
                   <MerchantAnalysis
-                    transactions={filteredTransactions}
+                    transactions={expenseTransactions}
                     topN={10}
                     months={
                       timeRange === 'month' ? 3 :
@@ -820,7 +796,7 @@ export default function FinanceAnalyticsPage() {
                   {/* Subscription Cost Analysis */}
                   <SubscriptionCostAnalysis
                     recurringTransactions={recurringTransactions}
-                    transactions={filteredTransactions}
+                    transactions={expenseTransactions}
                     months={12}
                   />
                 </div>
@@ -833,10 +809,10 @@ export default function FinanceAnalyticsPage() {
                       Spending Trends
                     </h2>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-                      Income, expenses, and balance over time
+                      Expenses over time
                     </p>
                     <FinanceTrendChart 
-                      transactions={filteredTransactions} 
+                      transactions={expenseTransactions} 
                       months={
                         timeRange === 'today' || timeRange === 'week' ? 1 :
                         timeRange === 'month' ? 3 :
@@ -857,7 +833,7 @@ export default function FinanceAnalyticsPage() {
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
                       Visual breakdown of your expenses
                     </p>
-                    <FinanceCategoryChart transactions={filteredTransactions} />
+                    <FinanceCategoryChart transactions={expenseTransactions} />
                   </div>
                 </div>
 
@@ -868,10 +844,10 @@ export default function FinanceAnalyticsPage() {
                       Monthly Comparison
                     </h2>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-                      Income vs expenses by month
+                      Expenses by month
                     </p>
                     <FinanceMonthlyComparison 
-                      transactions={filteredTransactions} 
+                      transactions={expenseTransactions} 
                       months={
                         timeRange === 'today' || timeRange === 'week' ? 1 :
                         timeRange === 'month' ? 3 :
@@ -892,7 +868,7 @@ export default function FinanceAnalyticsPage() {
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
                       Your biggest expense categories
                     </p>
-                    <FinanceCategoryBarChart transactions={filteredTransactions} limit={10} />
+                    <FinanceCategoryBarChart transactions={expenseTransactions} limit={10} />
                   </div>
                 </div>
 
@@ -905,7 +881,7 @@ export default function FinanceAnalyticsPage() {
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
                       See which days you spend the most
                     </p>
-                    <FinanceSpendingByDayOfWeek transactions={filteredTransactions} />
+                    <FinanceSpendingByDayOfWeek transactions={expenseTransactions} />
                   </div>
 
                   {/* Payment Method Breakdown */}
@@ -916,7 +892,7 @@ export default function FinanceAnalyticsPage() {
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
                       How you pay for expenses
                     </p>
-                    <FinancePaymentMethodBreakdown transactions={filteredTransactions} />
+                    <FinancePaymentMethodBreakdown transactions={expenseTransactions} />
                   </div>
                 </div>
 
@@ -930,7 +906,7 @@ export default function FinanceAnalyticsPage() {
                       How your top categories change month-over-month
                     </p>
                     <FinanceCategoryTrends 
-                      transactions={filteredTransactions} 
+                      transactions={expenseTransactions} 
                       months={
                         timeRange === 'today' || timeRange === 'week' ? 1 :
                         timeRange === 'month' ? 3 :
@@ -953,7 +929,7 @@ export default function FinanceAnalyticsPage() {
                       Compare current period to same period last year
                     </p>
                     <FinanceYearOverYear 
-                      transactions={filteredTransactions} 
+                      transactions={expenseTransactions} 
                       months={
                         timeRange === 'today' || timeRange === 'week' ? 1 :
                         timeRange === 'month' ? 3 :
@@ -977,7 +953,7 @@ export default function FinanceAnalyticsPage() {
                       Average expense per transaction over time
                     </p>
                     <FinanceAverageTransactionAmount 
-                      transactions={filteredTransactions} 
+                      transactions={expenseTransactions} 
                       months={
                         timeRange === 'today' || timeRange === 'week' ? 1 :
                         timeRange === 'month' ? 3 :
@@ -999,7 +975,7 @@ export default function FinanceAnalyticsPage() {
                       Daily/weekly average spending rate
                     </p>
                     <FinanceSpendingVelocity 
-                      transactions={filteredTransactions} 
+                      transactions={expenseTransactions} 
                       view={timeRange === 'today' || timeRange === 'week' ? 'daily' : 'weekly'}
                       days={30}
                       weeks={
@@ -1022,7 +998,7 @@ export default function FinanceAnalyticsPage() {
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
                     Histogram showing transaction amount distribution
                   </p>
-                  <FinanceExpenseDistribution transactions={filteredTransactions} bins={20} />
+                  <FinanceExpenseDistribution transactions={expenseTransactions} bins={20} />
                 </div>
 
                 {/* Cash Flow Calendar */}
@@ -1034,7 +1010,7 @@ export default function FinanceAnalyticsPage() {
                     Net cash flow by day (Income - Expenses). Green = positive, Red = negative
                   </p>
                   <FinanceCashFlowCalendar 
-                    transactions={filteredTransactions} 
+                    transactions={expenseTransactions} 
                     months={
                       timeRange === 'today' || timeRange === 'week' ? 1 :
                       timeRange === 'month' ? 1 :
@@ -1058,7 +1034,7 @@ export default function FinanceAnalyticsPage() {
                       Predict next month's spending per category
                     </p>
                     <FinanceCategoryForecast 
-                      transactions={filteredTransactions} 
+                      transactions={expenseTransactions} 
                       months={
                         timeRange === 'today' || timeRange === 'week' ? 3 :
                         timeRange === 'month' ? 6 :
@@ -1080,7 +1056,7 @@ export default function FinanceAnalyticsPage() {
                       Unusual spending patterns and trends
                     </p>
                     <FinanceSpendingAlerts 
-                      transactions={filteredTransactions} 
+                      transactions={expenseTransactions} 
                       months={
                         timeRange === 'today' || timeRange === 'week' ? 3 :
                         timeRange === 'month' ? 6 :
@@ -1103,7 +1079,7 @@ export default function FinanceAnalyticsPage() {
                     Identify and highlight recurring transactions
                   </p>
                   <FinanceRecurringExpenses 
-                    transactions={filteredTransactions} 
+                    transactions={expenseTransactions} 
                     months={
                       timeRange === 'today' || timeRange === 'week' ? 3 :
                       timeRange === 'month' ? 6 :
@@ -1118,7 +1094,7 @@ export default function FinanceAnalyticsPage() {
 
                 {/* Duplicate Detection */}
                 <div className="mb-6">
-                  <DuplicateDetection transactions={filteredTransactions} />
+                  <DuplicateDetection transactions={expenseTransactions} />
                 </div>
 
                 {/* Visual & Fun Section */}
@@ -1129,18 +1105,18 @@ export default function FinanceAnalyticsPage() {
                   
                   {/* Spending Mood Board */}
                   <div className="mb-6">
-                    <SpendingMoodBoard transactions={filteredTransactions} />
+                    <SpendingMoodBoard transactions={expenseTransactions} />
                   </div>
 
                   {/* Category Emoji Map */}
                   <div className="mb-6">
-                    <CategoryEmojiMap transactions={filteredTransactions} />
+                    <CategoryEmojiMap transactions={expenseTransactions} />
                   </div>
 
                   {/* Spending Story */}
                   <div className="mb-6">
                     <SpendingStory 
-                      transactions={filteredTransactions}
+                      transactions={expenseTransactions}
                       periodStart={
                         timeRange === 'month' ? startOfMonth(new Date()) :
                         timeRange === 'year' ? new Date(new Date().getFullYear(), 0, 1) :
@@ -1156,7 +1132,7 @@ export default function FinanceAnalyticsPage() {
 
                   {/* Financial Timeline */}
                   <div className="mb-6">
-                    <FinancialTimeline transactions={filteredTransactions} />
+                    <FinancialTimeline transactions={expenseTransactions} />
                   </div>
                 </div>
 
@@ -1169,7 +1145,7 @@ export default function FinanceAnalyticsPage() {
                   {/* PDF Export */}
                   <div className="mb-6">
                     <PDFExport 
-                      transactions={filteredTransactions}
+                      transactions={expenseTransactions}
                       periodStart={
                         timeRange === 'month' ? startOfMonth(new Date()) :
                         timeRange === 'year' ? new Date(new Date().getFullYear(), 0, 1) :
@@ -1187,7 +1163,7 @@ export default function FinanceAnalyticsPage() {
                   {/* Multi-Currency Support */}
                   <div className="mb-6">
                     <MultiCurrencySupport 
-                      transactions={filteredTransactions}
+                      transactions={expenseTransactions}
                       baseCurrency="EUR"
                     />
                   </div>
@@ -1209,5 +1185,3 @@ export default function FinanceAnalyticsPage() {
     </AuthGuard>
   )
 }
-
-

@@ -37,6 +37,13 @@ export function FinanceCategoryBarChart({ transactions, limit = 10 }: Props) {
 
       const absAmount = Math.abs(amount)
       
+      // Check for LHV card payment pattern in description or archiveId
+      const description = tx.description || ''
+      const archiveId = (tx as any).archiveId || ''
+      const combinedText = `${description} ${archiveId}`.toLowerCase()
+      const lhvCardPattern = /\(\.\.\d+\)\s+\d{4}-\d{2}-\d{2}\s+\d{1,2}:\d{2}/
+      const hasLhvCardPattern = lhvCardPattern.test(description) || lhvCardPattern.test(archiveId) || lhvCardPattern.test(combinedText)
+      
       // Normalize category: if category looks like a description (contains POS pattern), recategorize it
       let category = tx.category || 'Other'
       
@@ -44,17 +51,24 @@ export function FinanceCategoryBarChart({ transactions, limit = 10 }: Props) {
       // 1. Category looks like a description (contains POS:, card numbers, etc.)
       // 2. Category is empty or "Other"
       // 3. Category contains card number patterns
+      // 4. LHV card payment pattern detected
       const needsRecategorization = 
         !category || 
         category === 'Other' ||
         category.includes('POS:') ||
         category.match(/\d{4}\s+\d{2}\*+/) ||
         category.toLowerCase().includes('pos') ||
-        category.match(/^\d{4}\s+\d{2}\*+/)
+        category.match(/^\d{4}\s+\d{2}\*+/) ||
+        hasLhvCardPattern // Always recategorize if LHV pattern detected
       
       if (needsRecategorization) {
+        // Include archiveId in description for LHV pattern detection
+        const fullDescription = archiveId && archiveId.trim().length > 0
+          ? `${description} ${archiveId}`.trim()
+          : description
+        
         const suggestedCategory = getSuggestedCategory(
-          tx.description || category,
+          fullDescription || category,
           tx.referenceNumber,
           tx.recipientName,
           amount

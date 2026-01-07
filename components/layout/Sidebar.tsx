@@ -31,7 +31,8 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
 
   const handleLinkClick = (_e: React.MouseEvent) => {
     // Close mobile menu when a link is clicked
-    if (onClose && window.innerWidth < 1024) {
+    // Call immediately to ensure menu closes before navigation
+    if (onClose) {
       onClose()
     }
     // Don't prevent default - let Next.js Link handle navigation

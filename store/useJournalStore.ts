@@ -240,19 +240,72 @@ export const useJournalStore = create<JournalState>((set, get) => ({
   },
 
   updateEntry: async (userId: string, entryId: string, updates: Partial<JournalEntry>) => {
+    const previousEntries = get().entries
+    const previousCurrentEntry = get().currentEntry
+    
+    // Optimistically update the entry in local state for immediate UI update
+    set((state) => ({
+      entries: state.entries.map((e) =>
+        e.id === entryId ? { ...e, ...updates } : e
+      ),
+    }))
+    
+    // Update current entry if it's the one being edited
+    if (get().currentEntry?.id === entryId) {
+      set({ currentEntry: { ...get().currentEntry, ...updates } as JournalEntry })
+    }
+    
     try {
       await updateJournalEntryApi(userId, entryId, updates)
-      // Immediately fetch and update entries to show the updated one
+      
+      // Force immediate fresh fetch bypassing cache
+      const { cache } = await import('@/lib/utils/cache')
+      
+      // Invalidate cache first
+      cache.invalidatePattern(new RegExp(`^journal:${userId}`))
+      
+      // Fetch fresh data directly from API, bypassing cache
       const currentFilters = get().filters
-      const entries = await fetchJournalEntries(userId, currentFilters)
-      set({ entries, isLoadingEntries: false })
-      // Update current entry if it's the one being edited
-      if (get().currentEntry?.id === entryId) {
-        set({ currentEntry: { ...get().currentEntry, ...updates } as JournalEntry })
+      const { authenticatedFetch } = await import('@/lib/utils')
+      const params = new URLSearchParams({ userId })
+      if (currentFilters?.type) params.append('type', currentFilters.type)
+      if (currentFilters?.dateFrom) params.append('dateFrom', currentFilters.dateFrom)
+      if (currentFilters?.dateTo) params.append('dateTo', currentFilters.dateTo)
+      if (currentFilters?.search) params.append('search', currentFilters.search)
+      
+      try {
+        const response = await authenticatedFetch(`/api/journal?${params}`)
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({ error: 'Failed to fetch entries' }))
+          throw new Error(error.error || 'Failed to fetch entries')
+        }
+        
+        const data = await response.json()
+        // Handle both wrapped response format { data: { entries: ... } } and direct { entries: ... }
+        const updatedEntries = data.data?.entries || data.entries || []
+        
+        // Update state with fresh data and mark as manual update
+        lastManualUpdate = Date.now()
+        set({ entries: updatedEntries, isLoadingEntries: false })
+        
+        // Update current entry with fresh data if it's the one being edited
+        if (get().currentEntry?.id === entryId) {
+          const updatedEntry = updatedEntries.find((e: JournalEntry) => e.id === entryId)
+          if (updatedEntry) {
+            set({ currentEntry: updatedEntry })
+          }
+        }
+      } catch (fetchError) {
+        // If fetch fails, keep the optimistic update - polling will correct it
+        console.warn('Failed to fetch fresh entries after update, but entry was updated:', fetchError)
+        lastManualUpdate = Date.now()
       }
     } catch (error) {
+      // On error, restore previous state
       console.error('Error updating journal entry:', error)
       showError('Failed to update journal entry')
+      // Restore previous entries and current entry
+      set({ entries: previousEntries, currentEntry: previousCurrentEntry })
       throw error
     }
   },

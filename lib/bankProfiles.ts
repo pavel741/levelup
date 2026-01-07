@@ -81,14 +81,23 @@ export const ESTONIAN_BANK_PROFILES: BankProfile[] = [
       date: ['kuupäev', 'date', 'kuupaev', 'tehingu kuupäev'],
       amount: ['summa', 'amount', 'summa eur', 'summa (eur)'],
       description: ['kirjeldus', 'description', 'selgitus', 'märkused'],
-      recipientName: ['saaja', 'recipient', 'saaja nimi', 'maksja nimi'],
+      type: ['deebet/kreedit (d/c)', 'deebet/kreedit', 'd/k', 'debit/credit', 'd c', 'dc', 'tüüp', 'type', 'd', 'k', 'deebet', 'kreedit'],
+      recipientName: ['saaja/maksja nimi', 'saaja/maksja', 'saaja', 'recipient', 'saaja nimi', 'maksja nimi', 'vastaspool'],
+      recipientAccount: ['saaja/maksja konto', 'saaja konto', 'maksja konto'],
       referenceNumber: ['viitenumber', 'reference', 'viitenr', 'ref'],
-      archiveId: ['arhiveerimistunnus', 'archive id', 'archiveid'],
+      archiveId: ['kande viide', 'arhiveerimistunnus', 'archive id', 'archiveid'],
       selgitus: ['selgitus', 'details', 'lisainfo'],
+      documentNumber: ['dokumendi number', 'document number'],
+      clientAccount: ['kliendi konto', 'client account'],
+      serviceFee: ['teenustasu', 'service fee'],
+      currency: ['valuuta', 'currency'],
+      personalId: ['isikukood või registrikood', 'isikukood', 'registrikood', 'personal id'],
     },
-    delimiter: ';',
-    dateFormat: 'DD.MM.YYYY',
-    amountFormat: 'comma',
+    delimiter: ',', // LHV uses comma delimiter, not semicolon
+    dateFormat: 'YYYY-MM-DD', // LHV uses ISO date format
+    amountFormat: 'dot', // Amounts use dot as decimal separator (e.g., -8.93)
+    // LHV CSV has signed amounts (negative for expenses, positive for income)
+    // D/C column exists but amounts are already signed, so we can use it for validation
   },
   {
     id: 'coop',

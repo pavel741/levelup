@@ -48,17 +48,30 @@ export function FinancePaymentMethodBreakdown({ transactions }: Props) {
       const absAmount = Math.abs(amount)
       let category = tx.category || 'Other'
       
+      // Check for LHV card payment pattern in description or archiveId
+      const description = tx.description || ''
+      const archiveId = (tx as any).archiveId || ''
+      const combinedText = `${description} ${archiveId}`.toLowerCase()
+      const lhvCardPattern = /\(\.\.\d+\)\s+\d{4}-\d{2}-\d{2}\s+\d{1,2}:\d{2}/
+      const hasLhvCardPattern = lhvCardPattern.test(description) || lhvCardPattern.test(archiveId) || lhvCardPattern.test(combinedText)
+      
       // Normalize category to determine payment method
       const needsRecategorization = 
         !category || 
         category === 'Other' ||
         category.includes('POS:') ||
         category.includes('ATM:') ||
-        category.match(/\d{4}\s+\d{2}\*+/)
+        category.match(/\d{4}\s+\d{2}\*+/) ||
+        hasLhvCardPattern // Always recategorize if LHV pattern detected
       
       if (needsRecategorization) {
+        // Include archiveId in description for LHV pattern detection
+        const fullDescription = archiveId && archiveId.trim().length > 0
+          ? `${description} ${archiveId}`.trim()
+          : description
+        
         const suggestedCategory = getSuggestedCategory(
-          tx.description || category,
+          fullDescription || category,
           tx.referenceNumber,
           tx.recipientName,
           amount
