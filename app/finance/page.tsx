@@ -5,7 +5,7 @@ import { useFirestoreStore } from '@/store/useFirestoreStore'
 import AuthGuard from '@/components/common/AuthGuard'
 import Sidebar from '@/components/layout/Sidebar'
 import Header from '@/components/layout/Header'
-import { Wallet, TrendingUp, TrendingDown, DollarSign, Target, Bell, Calendar, Clock, AlertCircle, Edit2, Trash2 } from 'lucide-react'
+import { Wallet, TrendingUp, TrendingDown, DollarSign, Target, Bell, Calendar, Clock, AlertCircle, Edit2, Trash2, Loader2 } from 'lucide-react'
 // Using MongoDB for finance data (no quota limits!)
 // Client-side API wrapper (calls server-side MongoDB via API routes)
 import {
@@ -137,6 +137,8 @@ export default function FinancePage() {
   const [csvFile, setCsvFile] = useState<File | null>(null)
   const [csvImportStatus, setCsvImportStatus] = useState<string>('')
   const [csvImportProgress, setCsvImportProgress] = useState(0)
+  const [isParsingCsv, setIsParsingCsv] = useState(false)
+  const [isImportingCsv, setIsImportingCsv] = useState(false)
   const [showCsvMapping, setShowCsvMapping] = useState(false)
   const [csvColumnMapping, setCsvColumnMapping] = useState<any>(null)
   const [csvParsedData, setCsvParsedData] = useState<any[]>([])
@@ -1220,9 +1222,14 @@ export default function FinancePage() {
 
   // CSV Import handlers
   const handleCsvFileSelect = async (file: File) => {
+    setIsParsingCsv(true)
+    setCsvImportStatus('📄 Reading CSV file...')
+    
     try {
       const text = await file.text()
       console.log(`📁 File loaded: ${(text.length / 1024).toFixed(2)} KB, ${text.split('\n').length} lines`)
+      
+      setCsvImportStatus('🔍 Analyzing CSV structure...')
       
       // Reset bank selection for new file
       setCsvSelectedBank(null)
@@ -1233,6 +1240,7 @@ export default function FinancePage() {
       const lines = text.split('\n').filter((line) => line.trim())
       let detectedBankId: string | null = null
       if (lines.length > 0) {
+        setCsvImportStatus('🏦 Detecting bank profile...')
         const delimiter = csvService.detectDelimiter(lines[0])
         const headers = lines[0].split(delimiter).map(h => h.trim().replace(/^["']+/, '').replace(/["']+$/, ''))
         // Get sample data rows (first 3 rows after header) for pattern analysis
@@ -1244,6 +1252,8 @@ export default function FinancePage() {
           console.log(`🏦 Auto-detected bank: ${detectedBank.displayName}`)
         }
       }
+      
+      setCsvImportStatus('📊 Parsing transactions...')
       
       // Parse CSV with detected bank if found
       const result = csvService.parseCSV(text, detectedBankId || undefined)
@@ -1263,15 +1273,17 @@ export default function FinancePage() {
       const bankInfo = detectedBankId || result.detectedBank?.id 
         ? ` (Bank: ${ESTONIAN_BANK_PROFILES.find(b => b.id === (detectedBankId || result.detectedBank?.id))?.displayName || 'Unknown'})`
         : ''
-      setCsvImportStatus(`Found ${result.transactions.length} transactions${bankInfo}`)
+      setCsvImportStatus(`✅ Found ${result.transactions.length} transactions${bankInfo}`)
     } catch (error: unknown) {
       const errorMessage = error && typeof error === 'object' && 'message' in error && typeof error.message === 'string' ? error.message : 'Unknown error'
       if (errorMessage.includes('parsing')) {
-        setCsvImportStatus(`Error parsing CSV: ${errorMessage}`)
+        setCsvImportStatus(`❌ Error parsing CSV: ${errorMessage}`)
       } else {
-        setCsvImportStatus(`Error reading file: ${errorMessage}`)
+        setCsvImportStatus(`❌ Error reading file: ${errorMessage}`)
       }
       setShowCsvMapping(false)
+    } finally {
+      setIsParsingCsv(false)
     }
   }
 
@@ -1279,6 +1291,8 @@ export default function FinancePage() {
   const handleBankSelectionChange = async (bankId: string) => {
     setCsvSelectedBank(bankId)
     if (csvFile) {
+      setIsParsingCsv(true)
+      setCsvImportStatus('🔄 Re-parsing CSV with selected bank profile...')
       // Re-parse with new bank profile
       try {
         const text = await csvFile.text()
@@ -1288,10 +1302,12 @@ export default function FinancePage() {
         setCsvParsedData(result.transactions)
         setCsvColumnMapping(result.columnMapping)
         setCsvHeaders(result.columnMapping._allHeaders || [])
-        setCsvImportStatus(`Re-parsed ${result.transactions.length} transactions using ${ESTONIAN_BANK_PROFILES.find(b => b.id === bankId)?.displayName || 'selected bank'} profile`)
+        setCsvImportStatus(`✅ Re-parsed ${result.transactions.length} transactions using ${ESTONIAN_BANK_PROFILES.find(b => b.id === bankId)?.displayName || 'selected bank'} profile`)
       } catch (error: unknown) {
         const errorMessage = error && typeof error === 'object' && 'message' in error && typeof error.message === 'string' ? error.message : 'Unknown error'
-        setCsvImportStatus(`Error re-parsing CSV: ${errorMessage}`)
+        setCsvImportStatus(`❌ Error re-parsing CSV: ${errorMessage}`)
+      } finally {
+        setIsParsingCsv(false)
       }
     }
   }
@@ -1300,14 +1316,15 @@ export default function FinancePage() {
     if (!user?.id || !csvFile || csvParsedData.length === 0) return
     
     if (!csvColumnMapping?.amount && csvColumnMapping?.amount !== 0) {
-      setCsvImportStatus('Error: Amount column mapping is required')
+      setCsvImportStatus('❌ Error: Amount column mapping is required')
       return
     }
 
     setIsSubmitting(true)
+    setIsImportingCsv(true)
     // MongoDB has no quota limits - imports will be fast!
     const estimatedSeconds = Math.ceil(csvParsedData.length / 1000 * 0.5) // ~0.5s per 1000 transactions
-    setCsvImportStatus(`Importing ${csvParsedData.length} transactions... This should take ~${estimatedSeconds} second${estimatedSeconds !== 1 ? 's' : ''} (MongoDB - no limits!).`)
+    setCsvImportStatus(`⏳ Importing ${csvParsedData.length} transactions... This should take ~${estimatedSeconds} second${estimatedSeconds !== 1 ? 's' : ''} (MongoDB - no limits!).`)
     setCsvImportProgress(0)
 
     try {
@@ -2106,23 +2123,32 @@ export default function FinancePage() {
                                 handleCsvFileSelect(file)
                               }
                             }}
+                            disabled={isParsingCsv || isImportingCsv}
                             className="hidden"
                           />
                           <label
                             htmlFor="csvFileInput"
-                            className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                            className={`px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2 ${
+                              isParsingCsv || isImportingCsv ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                            }`}
                           >
+                            {(isParsingCsv || isImportingCsv) && <Loader2 className="w-4 h-4 animate-spin" />}
                             Choose CSV File
                           </label>
                         </div>
                         
-                        {csvImportStatus && (
-                          <div className={`text-sm mb-2 ${csvImportStatus.includes('Error') ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
-                            {csvImportStatus}
-                  </div>
-                )}
+                        {(isParsingCsv || isImportingCsv || csvImportStatus) && (
+                          <div className="mb-2">
+                            <div className={`flex items-center gap-2 text-sm ${csvImportStatus.includes('Error') || csvImportStatus.includes('❌') ? 'text-red-600 dark:text-red-400' : csvImportStatus.includes('✅') ? 'text-green-600 dark:text-green-400' : 'text-blue-600 dark:text-blue-400'}`}>
+                              {(isParsingCsv || isImportingCsv) && (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              )}
+                              <span>{csvImportStatus || (isParsingCsv ? 'Processing CSV file...' : isImportingCsv ? 'Importing transactions...' : '')}</span>
+                            </div>
+                          </div>
+                        )}
                         
-                        {csvImportProgress > 0 && csvImportProgress < 100 && (
+                        {(csvImportProgress > 0 && csvImportProgress < 100) && (
                           <div className="mb-2">
                             <div className="flex items-center gap-2">
                               <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
@@ -2202,10 +2228,17 @@ export default function FinancePage() {
                               <button
                                 type="button"
                                 onClick={handleCsvImport}
-                                disabled={!csvColumnMapping?.amount && csvColumnMapping?.amount !== 0}
-                                className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg text-sm font-medium hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={!csvColumnMapping?.amount && csvColumnMapping?.amount !== 0 || isImportingCsv || isParsingCsv}
+                                className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg text-sm font-medium hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                               >
-                                Import Selected Fields
+                                {isImportingCsv ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Importing...
+                                  </>
+                                ) : (
+                                  'Import Selected Fields'
+                                )}
                               </button>
                               <button
                                 type="button"
