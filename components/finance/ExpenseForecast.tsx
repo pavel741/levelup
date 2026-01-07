@@ -10,9 +10,10 @@ import { TrendingUp, TrendingDown, Minus, BarChart3, AlertCircle } from 'lucide-
 interface ExpenseForecastProps {
   period?: 'month' | 'quarter' | 'year'
   monthsOfHistory?: number
+  refreshKey?: number | string // Key to force refresh when transactions change
 }
 
-function ExpenseForecastComponent({ period = 'month', monthsOfHistory = 6 }: ExpenseForecastProps) {
+function ExpenseForecastComponent({ period = 'month', monthsOfHistory = 6, refreshKey }: ExpenseForecastProps) {
   const { user } = useFirestoreStore()
   const [forecast, setForecast] = useState<ExpenseForecast | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -23,7 +24,8 @@ function ExpenseForecastComponent({ period = 'month', monthsOfHistory = 6 }: Exp
     const loadForecast = async () => {
       try {
         setIsLoading(true)
-        const data = await getExpenseForecast(user.id, period, monthsOfHistory)
+        // Bypass cache to ensure fresh data when refreshKey changes
+        const data = await getExpenseForecast(user.id, period, monthsOfHistory, !!refreshKey)
         setForecast(data)
       } catch (error) {
         console.error('Error loading expense forecast:', error)
@@ -33,7 +35,7 @@ function ExpenseForecastComponent({ period = 'month', monthsOfHistory = 6 }: Exp
     }
 
     loadForecast()
-  }, [user?.id, period, monthsOfHistory])
+  }, [user?.id, period, monthsOfHistory, refreshKey]) // Add refreshKey to dependencies
 
   if (isLoading) {
     return (

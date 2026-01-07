@@ -23,6 +23,10 @@ interface WorkoutState {
   
   // Actions
   setRoutines: (routines: Routine[]) => void
+  addRoutine: (routine: Routine) => void
+  updateRoutineInStore: (routineId: string, updates: Partial<Routine>) => void
+  removeRoutine: (routineId: string) => void
+  refreshRoutines: () => Promise<void>
   setWorkoutLogs: (logs: WorkoutLog[]) => void
   setActiveRoutine: (routine: Routine | null) => void
   setEditingRoutine: (routine: Routine | null) => void
@@ -46,6 +50,49 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
 
   setRoutines: (routines) => {
     set({ routines, isLoadingRoutines: false })
+  },
+
+  addRoutine: (routine) => {
+    const currentRoutines = get().routines
+    // Check if routine already exists (by id)
+    const exists = currentRoutines.some(r => r.id === routine.id)
+    if (!exists) {
+      set({ routines: [...currentRoutines, routine] })
+    }
+  },
+
+  updateRoutineInStore: (routineId, updates) => {
+    const currentRoutines = get().routines
+    set({
+      routines: currentRoutines.map(r =>
+        r.id === routineId ? { ...r, ...updates, updatedAt: new Date() } : r
+      )
+    })
+  },
+
+  removeRoutine: (routineId) => {
+    const currentRoutines = get().routines
+    set({ routines: currentRoutines.filter(r => r.id !== routineId) })
+  },
+
+  refreshRoutines: async () => {
+    // Get userId from routines or we'll fetch without it (API will get it from auth)
+    try {
+      const { authenticatedFetch } = await import('@/lib/utils')
+      const response = await authenticatedFetch('/api/workouts/routines')
+      if (response.ok) {
+        const responseData = await response.json()
+        const routines: Routine[] = responseData.data || responseData || []
+        const convertedRoutines = routines.map((r) => ({
+          ...r,
+          createdAt: r.createdAt instanceof Date ? r.createdAt : new Date(r.createdAt),
+          updatedAt: r.updatedAt instanceof Date ? r.updatedAt : new Date(r.updatedAt),
+        }))
+        get().setRoutines(convertedRoutines)
+      }
+    } catch (error) {
+      console.error('Error refreshing routines:', error)
+    }
   },
 
   setWorkoutLogs: (logs) => {

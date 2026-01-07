@@ -2342,14 +2342,14 @@ export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'u
 
   // Muscle Building Plan (3-Days) - From JEFIT
   {
-    name: 'Muscle Building Plan - Day 1: Chest/Shoulders/Tricep',
-    description: 'Push day focusing on chest, shoulders, and triceps. 9 exercises targeting upper body pushing muscles. Estimated duration: ~1h39m.',
+    name: "Pavel's routine",
+    description: 'Complete 4-day muscle building split: Day 1 (Chest/Shoulders/Tricep), Day 2 (Back/Bicep), Day 3 (Legs/Core), Day 4 (Arms Focus). Perfect for 4 workouts per week.',
     goal: 'bulking',
     exercises: [],
     sessions: [
       {
-        id: 'muscle-building-day1',
-        name: 'Chest/Shoulders/Tricep',
+        id: 'pavel-day1',
+        name: 'Day 1: Chest/Shoulders/Tricep',
         order: 0,
         estimatedDuration: 99,
         exercises: [
@@ -2417,23 +2417,11 @@ export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'u
             notes: 'Dumbbell one-arm tricep kickback'
           }
         ]
-      }
-    ],
-    estimatedDuration: 99,
-    difficulty: 'medium',
-    tags: ['muscle-building', 'push-day', 'chest', 'shoulders', 'triceps', 'bulking']
-  },
-
-  {
-    name: 'Muscle Building Plan - Day 2: Back/Bicep',
-    description: 'Pull day focusing on back and biceps. 8 exercises targeting upper body pulling muscles. Estimated duration: ~1h28m.',
-    goal: 'bulking',
-    exercises: [],
-    sessions: [
+      },
       {
-        id: 'muscle-building-day2',
-        name: 'Back/Bicep',
-        order: 0,
+        id: 'pavel-day2',
+        name: 'Day 2: Back/Bicep',
+        order: 1,
         estimatedDuration: 88,
         exercises: [
           {
@@ -2473,23 +2461,11 @@ export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'u
           }
           // Note: 3 more exercises not visible in screenshot (total 8 exercises)
         ]
-      }
-    ],
-    estimatedDuration: 88,
-    difficulty: 'medium',
-    tags: ['muscle-building', 'pull-day', 'back', 'biceps', 'bulking']
-  },
-
-  {
-    name: 'Muscle Building Plan - Day 3: Legs/Core',
-    description: 'Legs and core day. 7 exercises targeting lower body and core muscles. Estimated duration: ~1h27m.',
-    goal: 'bulking',
-    exercises: [],
-    sessions: [
+      },
       {
-        id: 'muscle-building-day3',
-        name: 'Legs/Core',
-        order: 0,
+        id: 'pavel-day3',
+        name: 'Day 3: Legs/Core',
+        order: 2,
         estimatedDuration: 87,
         exercises: [
           {
@@ -2536,23 +2512,11 @@ export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'u
           }
           // Note: 1 more exercise not visible in screenshot (total 7 exercises)
         ]
-      }
-    ],
-    estimatedDuration: 87,
-    difficulty: 'medium',
-    tags: ['muscle-building', 'legs', 'core', 'bulking']
-  },
-
-  {
-    name: 'Muscle Building Plan - Day 4: Arms Focus',
-    description: 'Arm-focused day with bicep variations. 4 exercises targeting biceps with different angles and grips. Estimated duration: ~41m.',
-    goal: 'bulking',
-    exercises: [],
-    sessions: [
+      },
       {
-        id: 'muscle-building-day4',
-        name: 'Arms Focus',
-        order: 0,
+        id: 'pavel-day4',
+        name: 'Day 4: Arms Focus',
+        order: 3,
         estimatedDuration: 41,
         exercises: [
           {
@@ -2586,9 +2550,9 @@ export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'u
         ]
       }
     ],
-    estimatedDuration: 41,
+    estimatedDuration: 315, // Total duration for all 4 days
     difficulty: 'medium',
-    tags: ['muscle-building', 'arms', 'biceps', 'bulking']
+    tags: ['muscle-building', '4-day-split', 'bulking', 'chest', 'back', 'legs', 'arms']
   }
 ]
 

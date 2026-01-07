@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, useRef } from 'react'
+import { useEffect, useMemo, useState, useRef, useCallback } from 'react'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
 import AuthGuard from '@/components/common/AuthGuard'
 import Sidebar from '@/components/layout/Sidebar'
@@ -22,6 +22,8 @@ import {
   getTransactions,
   subscribeToRecurringTransactions,
   addRecurringTransaction,
+  getRecurringTransactions,
+  updateRecurringTransaction,
 } from '@/lib/financeApi'
 import { subscribeToSavingsGoals } from '@/lib/savingsGoalsApi'
 import type { SavingsGoal, FinanceRecurringTransaction } from '@/types/finance'
@@ -38,6 +40,8 @@ import { getSuggestedCategory } from '@/lib/transactionCategorizer'
 import { formatCurrency, formatDate, formatDisplayDate, showError, showSuccess } from '@/lib/utils'
 import { CardSkeleton, TransactionListSkeleton } from '@/components/ui/Skeleton'
 import { VirtualList } from '@/components/ui/VirtualList'
+import { findBillMatches, calculateNextDueDate, DEFAULT_MATCHING_SETTINGS, type BillMatch } from '@/lib/billMatching'
+import BillMatchingPreview from '@/components/finance/BillMatchingPreview'
 // Lazy load heavy components for better performance
 import nextDynamic from 'next/dynamic'
 
@@ -53,6 +57,8 @@ export default function FinancePage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [transactions, setTransactions] = useState<FinanceTransaction[]>([])
   const [allTransactionsForSummary, setAllTransactionsForSummary] = useState<FinanceTransaction[]>([])
+  const [forecastRefreshKey, setForecastRefreshKey] = useState(0) // Key to trigger forecast refresh
+  const forecastRefreshTimeoutRef = useRef<NodeJS.Timeout | null>(null) // Debounce forecast refresh
   const [categories, setCategories] = useState<FinanceCategories | null>(null)
   const [financeSettings, setFinanceSettings] = useState<FinanceSettings | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -92,9 +98,23 @@ export default function FinancePage() {
   }, [])
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isDeletingTransaction, setIsDeletingTransaction] = useState<string | null>(null)
   
   // Track recently deleted transaction IDs to prevent them from being re-added by subscription
   const recentlyDeletedIdsRef = useRef<Set<string>>(new Set())
+  
+  // Debounced forecast refresh function
+  const triggerForecastRefresh = useCallback(() => {
+    // Clear existing timeout
+    if (forecastRefreshTimeoutRef.current) {
+      clearTimeout(forecastRefreshTimeoutRef.current)
+    }
+    // Debounce forecast refresh to avoid rapid calls
+    forecastRefreshTimeoutRef.current = setTimeout(() => {
+      setForecastRefreshKey(prev => prev + 1)
+      forecastRefreshTimeoutRef.current = null
+    }, 500) // 500ms debounce - reduces rapid refreshes
+  }, [])
   
   // Transaction list filters
   const [currentFilter, setCurrentFilter] = useState<'all' | 'income' | 'expense'>('all')
@@ -144,6 +164,11 @@ export default function FinancePage() {
   const [csvParsedData, setCsvParsedData] = useState<any[]>([])
   const [csvHeaders, setCsvHeaders] = useState<string[]>([])
   const [csvSelectedBank, setCsvSelectedBank] = useState<string | null>(null)
+  
+  // Bill matching state
+  const [billMatches, setBillMatches] = useState<BillMatch[]>([])
+  const [showBillMatchingPreview, setShowBillMatchingPreview] = useState(false)
+  const [pendingTransactions, setPendingTransactions] = useState<any[]>([])
   
   // Load transactions with optimized initial load (limit to 100 for fast initial render)
   useEffect(() => {
@@ -210,6 +235,11 @@ export default function FinancePage() {
     
     return () => {
       if (unsubscribe) unsubscribe()
+      // Cleanup forecast refresh timeout on unmount
+      if (forecastRefreshTimeoutRef.current) {
+        clearTimeout(forecastRefreshTimeoutRef.current)
+        forecastRefreshTimeoutRef.current = null
+      }
     }
   }, [user?.id])
 
@@ -299,8 +329,48 @@ export default function FinancePage() {
   useEffect(() => {
     if (!user?.id) return
 
-    const unsubscribe = subscribeToRecurringTransactions(user.id, (billsList) => {
-      setBills(billsList)
+    const unsubscribe = subscribeToRecurringTransactions(user.id, async (billsList) => {
+      // Auto-reset bills to unpaid when their due date has passed
+      // This handles the case when a new billing period starts
+      const billsToUpdate: Array<{ id: string; updates: Partial<FinanceRecurringTransaction> }> = []
+      
+      for (const bill of billsList) {
+        if (bill.isPaid && bill.dueDate) {
+          const dueDate = parseTransactionDate(bill.dueDate)
+          // If due date has passed, automatically reset to unpaid for new billing period
+          if (isPast(dueDate) && !isToday(dueDate)) {
+            billsToUpdate.push({
+              id: bill.id,
+              updates: { isPaid: false }
+            })
+          }
+        }
+      }
+      
+      // Update bills that need to be reset (non-blocking)
+      if (billsToUpdate.length > 0) {
+        Promise.all(
+          billsToUpdate.map(({ id, updates }) =>
+            updateRecurringTransaction(user.id, id, updates).catch(err => {
+              console.warn(`Failed to auto-reset bill ${id}:`, err)
+            })
+          )
+        ).then(() => {
+          // Refetch bills after updates
+          getRecurringTransactions(user.id).then(updatedBills => {
+            setBills(updatedBills)
+          }).catch(() => {
+            // If refetch fails, still show current bills
+            setBills(billsList)
+          })
+        }).catch(() => {
+          // If updates fail, still show current bills
+          setBills(billsList)
+        })
+      } else {
+        setBills(billsList)
+      }
+      
       setIsLoadingBills(false)
     })
 
@@ -448,89 +518,116 @@ export default function FinancePage() {
   }, [formDescription, transactions, availableCategories, formCategory])
 
   // Filter transactions based on current filters
+  // Optimized: combine all filters in single pass, pre-calculate boundaries
   const filteredTransactions = useMemo(() => {
-    let filtered = [...transactions]
+    // Early return if no transactions
+    if (transactions.length === 0) return []
 
-    // Filter by type
-    if (currentFilter !== 'all') {
-      filtered = filtered.filter((tx) => (tx.type || '').toLowerCase() === currentFilter)
-    }
+    // Pre-calculate filter values once
+    const filterType = currentFilter !== 'all' ? currentFilter.toLowerCase() : null
+    const searchQuery = debouncedSearchQuery.trim().toLowerCase()
+    const minAmount = filterMinAmount ? parseFloat(filterMinAmount) : null
+    const maxAmount = filterMaxAmount ? parseFloat(filterMaxAmount) : null
+    const hasCategoryFilter = filterCategories.length > 0
+    const categorySet = hasCategoryFilter ? new Set(filterCategories) : null
 
-    // Filter by date range
-    const now = new Date()
+    // Pre-calculate date boundaries
     let startDate: Date | null = null
     let endDate: Date | null = null
+    let startTime: number | null = null
+    let endTime: number | null = null
 
-    if (dateRange === 'today') {
-      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-      endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
-    } else if (dateRange === 'week') {
-      // Calculate start of week (Monday) - more robust approach
-      const dayOfWeek = now.getDay() // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1 // Days to subtract to get to Monday
-      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysToMonday)
-      startDate.setHours(0, 0, 0, 0)
-      // End date is today at end of day
-      endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
-    } else if (dateRange === 'month') {
-      startDate = new Date(now.getFullYear(), now.getMonth(), 1)
-      endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
-    } else if (dateRange === 'year') {
-      startDate = new Date(now.getFullYear(), 0, 1)
-      endDate = new Date(now.getFullYear(), 11, 31, 23, 59, 59)
-    } else if (dateRange === 'custom' && customDateFrom && customDateTo) {
-      startDate = new Date(customDateFrom)
-      endDate = new Date(customDateTo)
-      endDate.setHours(23, 59, 59)
+    if (dateRange !== 'all') {
+      const now = new Date()
+      if (dateRange === 'today') {
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
+      } else if (dateRange === 'week') {
+        const dayOfWeek = now.getDay()
+        const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysToMonday)
+        startDate.setHours(0, 0, 0, 0)
+        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
+      } else if (dateRange === 'month') {
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1)
+        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59)
+      } else if (dateRange === 'year') {
+        startDate = new Date(now.getFullYear(), 0, 1)
+        endDate = new Date(now.getFullYear(), 11, 31, 23, 59, 59)
+      } else if (dateRange === 'custom' && customDateFrom && customDateTo) {
+        startDate = new Date(customDateFrom)
+        endDate = new Date(customDateTo)
+        endDate.setHours(23, 59, 59)
+      }
+
+      if (startDate && endDate) {
+        startTime = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()).getTime()
+        endTime = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate()).getTime()
+      }
     }
 
-    if (startDate && endDate) {
-      filtered = filtered.filter((tx) => {
-        const txDate = parseTransactionDate(tx.date)
-        // Normalize dates to midnight for accurate comparison
-        const txDateOnly = new Date(txDate.getFullYear(), txDate.getMonth(), txDate.getDate())
-        const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate())
-        const endDateOnly = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate())
-        return txDateOnly >= startDateOnly && txDateOnly <= endDateOnly
+    // Single pass filtering with early continues
+    const filtered: FinanceTransaction[] = []
+    const dateCache = new Map<string, number>() // Cache parsed dates
+
+    for (let i = 0; i < transactions.length; i++) {
+      const tx = transactions[i]
+
+      // Filter by type
+      if (filterType && (tx.type || '').toLowerCase() !== filterType) {
+        continue
+      }
+
+      // Filter by date range (most expensive, so cache parsed dates)
+      if (startTime !== null && endTime !== null) {
+        const txDateStr = typeof tx.date === 'string' ? tx.date : tx.date.toString()
+        let txTime = dateCache.get(txDateStr)
+        if (txTime === undefined) {
+          const txDate = parseTransactionDate(tx.date)
+          txTime = new Date(txDate.getFullYear(), txDate.getMonth(), txDate.getDate()).getTime()
+          dateCache.set(txDateStr, txTime)
+        }
+        if (txTime < startTime || txTime > endTime) {
+          continue
+        }
+      }
+
+      // Filter by search query
+      if (searchQuery) {
+        const matchesSearch =
+          (tx.description || '').toLowerCase().includes(searchQuery) ||
+          (tx.category || '').toLowerCase().includes(searchQuery) ||
+          String(tx.amount || '').includes(searchQuery)
+        if (!matchesSearch) {
+          continue
+        }
+      }
+
+      // Filter by amount range
+      const txAmount = Math.abs(Number(tx.amount) || 0)
+      if (minAmount !== null && txAmount < minAmount) {
+        continue
+      }
+      if (maxAmount !== null && txAmount > maxAmount) {
+        continue
+      }
+
+      // Filter by categories
+      if (categorySet && !categorySet.has(tx.category || '')) {
+        continue
+      }
+
+      filtered.push(tx)
+    }
+
+    // Sort by date descending (only if needed)
+    if (filtered.length > 0) {
+      filtered.sort((a, b) => {
+        const dateA = parseTransactionDate(a.date)
+        const dateB = parseTransactionDate(b.date)
+        return dateB.getTime() - dateA.getTime()
       })
     }
-
-    // Filter by search query (using debounced value)
-    if (debouncedSearchQuery.trim()) {
-      const query = debouncedSearchQuery.toLowerCase()
-      filtered = filtered.filter(
-        (tx) =>
-          (tx.description || '').toLowerCase().includes(query) ||
-          (tx.category || '').toLowerCase().includes(query) ||
-          String(tx.amount || '').includes(query)
-      )
-    }
-
-    // Filter by min/max amount
-    if (filterMinAmount) {
-      const min = parseFloat(filterMinAmount)
-      if (!isNaN(min)) {
-        filtered = filtered.filter((tx) => Math.abs(Number(tx.amount) || 0) >= min)
-      }
-    }
-    if (filterMaxAmount) {
-      const max = parseFloat(filterMaxAmount)
-      if (!isNaN(max)) {
-        filtered = filtered.filter((tx) => Math.abs(Number(tx.amount) || 0) <= max)
-      }
-    }
-
-    // Filter by categories
-    if (filterCategories.length > 0) {
-      filtered = filtered.filter((tx) => filterCategories.includes(tx.category || ''))
-    }
-
-    // Sort by date descending (using optimized date parser)
-    filtered.sort((a, b) => {
-      const dateA = parseTransactionDate(a.date)
-      const dateB = parseTransactionDate(b.date)
-      return dateB.getTime() - dateA.getTime()
-    })
 
     return filtered
   }, [transactions, currentFilter, dateRange, debouncedSearchQuery, customDateFrom, customDateTo, filterMinAmount, filterMaxAmount, filterCategories])
@@ -586,66 +683,51 @@ export default function FinancePage() {
       endDate = new Date(year, month, 0, 23, 59, 59)
     }
 
+    // Pre-calculate date boundaries once for performance
+    const usePaydayPeriod = financeSettings?.usePaydayPeriod || false
+    const startDateOnly = new Date(startDate)
+    startDateOnly.setHours(0, 0, 0, 0)
+    const endDateOnly = new Date(endDate)
+    if (usePaydayPeriod) {
+      endDateOnly.setHours(0, 0, 0, 0)
+    } else {
+      endDateOnly.setHours(23, 59, 59, 999)
+    }
+    const startTime = startDateOnly.getTime()
+    const endTime = endDateOnly.getTime()
+
     let income = 0
     let expenses = 0
 
-    allTransactionsForSummary.forEach((tx) => {
+    // Optimized loop: pre-calculate boundaries, use early continues
+    for (let i = 0; i < allTransactionsForSummary.length; i++) {
+      const tx = allTransactionsForSummary[i]
       const txDate = parseTransactionDate(tx.date)
+      const txDateOnly = new Date(txDate)
+      txDateOnly.setHours(0, 0, 0, 0)
+      const txTime = txDateOnly.getTime()
+      
       let isInPeriod = false
-      if (financeSettings?.usePaydayPeriod) {
-        // Check if transaction is within the period boundaries
-        // For payday periods:
-        // - Start: Last working day of previous month - ALL transactions on this date belong to this period
-        // - End: Last working day of current month - ALL transactions on this date belong to NEXT period
-        //   Note: New transactions on the last working day are automatically moved to first of next month
-        //   during creation/import, but legacy transactions on the end date are excluded from this period
-        //   Since CSV imports only have dates (no time), all transactions are at midnight (00:00:00)
-        
-        // Get date-only components for comparison (normalize all to midnight for accurate date comparison)
-        const startDateOnly = new Date(startDate)
-        startDateOnly.setHours(0, 0, 0, 0)
-        const endDateOnly = new Date(endDate)
-        endDateOnly.setHours(0, 0, 0, 0)
-        const txDateOnly = new Date(txDate)
-        txDateOnly.setHours(0, 0, 0, 0)
-        
-        // Check if transaction is before start date (definitely not in period)
-        if (txDateOnly < startDateOnly) {
-          isInPeriod = false
+      
+      if (usePaydayPeriod) {
+        // Payday period logic: exclude end date, include start date
+        if (txTime < startTime) {
+          continue // Before period
         }
-        // Check if transaction is after end date (definitely not in period)
-        // Note: Transactions on last working day are moved to first of next month, so they'll be excluded here
-        else if (txDateOnly > endDateOnly) {
-          isInPeriod = false
+        if (txTime > endTime) {
+          continue // After period
         }
-        // Check if transaction is on start date (last working day of previous month)
-        // ALL transactions on the start date belong to this period (they were moved from previous period)
-        else if (txDateOnly.getTime() === startDateOnly.getTime()) {
-          // Include all transactions on the start date - they belong to this period
-          isInPeriod = true
+        if (txTime === endTime) {
+          continue // On end date - exclude
         }
-        // Check if transaction is on end date (last working day of current month)
-        // ALL transactions on the end date should go to the next period
-        // (New transactions are moved during creation, but legacy data might still be on the end date)
-        else if (txDateOnly.getTime() === endDateOnly.getTime()) {
-          // Exclude all transactions on the end date - they belong to the next period
-          isInPeriod = false
-        }
-        // Transaction is between start and end dates (not on boundary days)
-        else {
-          isInPeriod = true
-        }
+        // Include: on start date or between dates
+        isInPeriod = true
       } else {
-        // Standard period check (inclusive boundaries)
-        // For custom periods, compare dates properly (handle time components)
-        const txDateOnly = new Date(txDate)
-        txDateOnly.setHours(0, 0, 0, 0)
-        const startDateOnly = new Date(startDate)
-        startDateOnly.setHours(0, 0, 0, 0)
-        const endDateOnly = new Date(endDate)
-        endDateOnly.setHours(23, 59, 59, 999) // Include entire end date
-        
-        isInPeriod = txDateOnly >= startDateOnly && txDateOnly <= endDateOnly
+        // Standard period: inclusive boundaries
+        if (txTime < startTime || txTime > endTime) {
+          continue // Outside period
+        }
+        isInPeriod = true
       }
       
       if (isInPeriod) {
@@ -660,7 +742,7 @@ export default function FinancePage() {
           else income += Math.abs(amount)
         }
       }
-    })
+    }
 
     return {
       income,
@@ -672,32 +754,37 @@ export default function FinancePage() {
   }, [allTransactionsForSummary, selectedMonth, financeSettings])
 
   // Calculate all-time summary (using all loaded transactions from MongoDB)
+  // Optimized with early continues and efficient loop
   const allTimeSummary = useMemo(() => {
     let income = 0
     let expenses = 0
 
-    allTransactionsForSummary.forEach((tx) => {
+    // Use for loop for better performance than forEach
+    for (let i = 0; i < allTransactionsForSummary.length; i++) {
+      const tx = allTransactionsForSummary[i]
       const amount = Number(tx.amount) || 0
-      const type = (tx.type || '').toLowerCase()
       
-      // Skip zero or invalid amounts
+      // Skip zero or invalid amounts early
       if (amount === 0 || isNaN(amount) || !isFinite(amount)) {
-        return
+        continue
       }
       
+      const type = (tx.type || '').toLowerCase()
+      const absAmount = Math.abs(amount)
+      
       if (type === 'income') {
-        income += Math.abs(amount) // Always positive
+        income += absAmount
       } else if (type === 'expense') {
-        expenses += Math.abs(amount) // Always positive
+        expenses += absAmount
       } else {
         // Untyped transactions: negative = expense, positive = income
         if (amount < 0) {
-          expenses += Math.abs(amount)
+          expenses += absAmount
         } else {
-          income += Math.abs(amount)
+          income += absAmount
         }
       }
-    })
+    }
 
     return { income, expenses, balance: income - expenses }
   }, [allTransactionsForSummary])
@@ -855,8 +942,13 @@ export default function FinancePage() {
   const handleDelete = async (id: string) => {
     if (!user?.id || !confirm('Are you sure you want to delete this transaction?')) return
 
-    // Optimistically remove the transaction from local state
+    setIsDeletingTransaction(id)
+    
+    // Optimistically remove the transaction from local state immediately
+    // This ensures balances update instantly without waiting for server response
     const deletedTx = transactions.find(tx => tx.id === id)
+    const deletedTxFromSummary = allTransactionsForSummary.find(tx => tx.id === id)
+    
     setTransactions(prev => prev.filter(tx => tx.id !== id))
     setAllTransactionsForSummary(prev => prev.filter(tx => tx.id !== id))
     
@@ -866,13 +958,32 @@ export default function FinancePage() {
     try {
       await deleteTransaction(user.id, id)
       
-      // Reload all transactions for summary to ensure consistency
-      // This prevents deleted transactions from reappearing due to subscription cache issues
-      const { getAllTransactionsForSummary } = await import('@/lib/financeApi')
-      const allTxs = await getAllTransactionsForSummary(user.id)
-      setAllTransactionsForSummary(allTxs)
+      // Refresh transactions in background (non-blocking)
+      // Optimistic update already applied, so UI is responsive
+      void (async () => {
+        try {
+          const { getAllTransactionsForSummary } = await import('@/lib/financeApi')
+          // Small delay to ensure server has processed deletion
+          await new Promise(resolve => setTimeout(resolve, 100))
+          // Bypass cache to ensure fresh data
+          const allTxs = await getAllTransactionsForSummary(user.id, true)
+          // Use requestAnimationFrame for smooth UI update
+          requestAnimationFrame(() => {
+            setAllTransactionsForSummary([...allTxs])
+            // Trigger debounced forecast refresh
+            triggerForecastRefresh()
+          })
+        } catch (refreshError) {
+          console.warn('Failed to refresh transactions after deletion:', refreshError)
+          // Still trigger forecast refresh with optimistic data
+          triggerForecastRefresh()
+        }
+      })()
       
-      // Remove from recently deleted set after successful reload (cleanup after 30 seconds)
+      // Don't await - let it run in background
+      // UI is already updated optimistically
+      
+      // Remove from recently deleted set after successful deletion (cleanup after 30 seconds)
       setTimeout(() => {
         recentlyDeletedIdsRef.current.delete(id)
       }, 30000)
@@ -889,13 +1000,17 @@ export default function FinancePage() {
           const dateB = parseTransactionDate(b.date).getTime()
           return dateB - dateA
         }))
-        setAllTransactionsForSummary(prev => [...prev, deletedTx].sort((a, b) => {
+      }
+      if (deletedTxFromSummary) {
+        setAllTransactionsForSummary(prev => [...prev, deletedTxFromSummary].sort((a, b) => {
           const dateA = parseTransactionDate(a.date).getTime()
           const dateB = parseTransactionDate(b.date).getTime()
           return dateB - dateA
         }))
       }
       showError(error, { component: 'FinancePage', action: 'deleteTransaction' })
+    } finally {
+      setIsDeletingTransaction(null)
     }
   }
 
@@ -1312,6 +1427,225 @@ export default function FinancePage() {
     }
   }
 
+  // Helper function to proceed with import after bill matching
+  const proceedWithImport = async (
+    transactionsToImport: any[],
+    enableDuplicateCheck: boolean,
+    skippedCount: number
+  ) => {
+    if (!user?.id) return
+
+    // Optimistically add transactions to summary immediately (before import completes)
+    // This makes UI updates instant instead of waiting for subscription reload
+    const optimisticTransactions = transactionsToImport.map((tx, idx) => ({
+      ...tx,
+      id: `optimistic-${Date.now()}-${idx}`, // Temporary ID until real import completes
+      date: tx.date instanceof Date ? tx.date : new Date(tx.date),
+    }))
+    
+    setAllTransactionsForSummary(prev => {
+      // Merge optimistic transactions, avoiding duplicates
+      const existingIds = new Set(prev.map(t => t.id))
+      const newTxs = optimisticTransactions.filter(t => !existingIds.has(t.id))
+      return [...prev, ...newTxs].sort((a, b) => {
+        const dateA = parseTransactionDate(a.date).getTime()
+        const dateB = parseTransactionDate(b.date).getTime()
+        return dateB - dateA
+      })
+    })
+
+    const result = await batchAddTransactions(
+      user.id,
+      transactionsToImport,
+      (current, total) => {
+        const progress = Math.round((current / total) * 100)
+        // Start progress from 20% if duplicate check was done, otherwise from 0%
+        const adjustedProgress = enableDuplicateCheck 
+          ? 20 + Math.round((progress * 0.8)) // 20-100% range
+          : progress
+        setCsvImportProgress(adjustedProgress)
+      },
+      { skipDuplicates: false } // Already filtered duplicates, don't check again
+    )
+    
+    // Add skipped count to result
+    result.skipped = skippedCount
+
+    const errorSuffix = result.errors > 0 ? ` (${result.errors} errors)` : ''
+    let skippedSuffix = ''
+    if (result.skipped > 0) {
+      skippedSuffix = ` ✅ ${result.skipped} duplicates skipped (already imported)`
+    }
+    const successMessage = `Successfully imported ${result.success} of ${transactionsToImport.length} transactions${skippedSuffix}${errorSuffix}`
+    
+    // Log duplicate detection results
+    if (result.skipped > 0) {
+      console.log(`✅ Duplicate detection: Skipped ${result.skipped} transactions that already exist (matched by archiveId)`)
+      console.log(`💡 Tip: You can safely re-import the same file - duplicates will be automatically skipped`)
+    }
+    
+    setCsvImportProgress(100)
+    
+    // Warn if not all transactions were imported
+    if (result.success < transactionsToImport.length - result.skipped) {
+      console.warn(`⚠️ Only imported ${result.success} out of ${transactionsToImport.length - result.skipped} new transactions`)
+    }
+    
+    // Special message if all were duplicates
+    if (result.skipped === transactionsToImport.length && result.success === 0) {
+      setCsvImportStatus(`✅ All ${result.skipped} transactions already exist - no duplicates imported. Safe to re-import anytime!`)
+    } else {
+      setCsvImportStatus(successMessage)
+    }
+    
+    // Refresh transactions in background (non-blocking)
+    // Optimistic update already applied, so UI is responsive
+    void (async () => {
+      try {
+        // Small delay to ensure server has processed all imports
+        await new Promise(resolve => setTimeout(resolve, 150))
+        const { getAllTransactionsForSummary } = await import('@/lib/financeApi')
+        // Bypass cache to ensure fresh data
+        const allTxs = await getAllTransactionsForSummary(user.id, true)
+        // Use requestAnimationFrame for smooth UI update
+        requestAnimationFrame(() => {
+          setAllTransactionsForSummary([...allTxs])
+          // Trigger debounced forecast refresh
+          triggerForecastRefresh()
+        })
+      } catch (refreshError) {
+        console.warn('Failed to refresh transactions after import:', refreshError)
+        // Still trigger forecast refresh with optimistic data
+        triggerForecastRefresh()
+      }
+    })()
+    
+    // Don't await - let it run in background
+    // UI is already updated optimistically
+    
+    // Reset after 3 seconds
+    setTimeout(() => {
+      setShowCsvMapping(false)
+      setCsvFile(null)
+      setCsvColumnMapping(null)
+      setCsvHeaders([])
+      setCsvParsedData([])
+      setCsvSelectedBank(null)
+      setCsvImportStatus('')
+      setCsvImportProgress(0)
+      setIsSubmitting(false)
+      setIsImportingCsv(false)
+    }, 3000)
+  }
+
+  // Handle bill matching confirmation
+  const handleBillMatchingConfirm = async (confirmedMatches: BillMatch[]) => {
+    if (!user?.id || !pendingTransactions.length) return
+
+    try {
+      setCsvImportStatus(`💰 Processing ${confirmedMatches.length} bill payment${confirmedMatches.length !== 1 ? 's' : ''}...`)
+      
+      // Update bills first
+      const billUpdatePromises = confirmedMatches.map(async (match) => {
+        const paymentDate = parseTransactionDate(match.transaction.date)
+        
+        const paymentAmount = Math.abs(match.transaction.amount)
+        const nextDueDate = calculateNextDueDate(match.bill, paymentDate)
+        
+        const paymentHistory = [
+          ...(match.bill.paymentHistory || []),
+          {
+            date: paymentDate,
+            amount: paymentAmount,
+            notes: 'Auto-matched from CSV import',
+          },
+        ]
+
+        return updateRecurringTransaction(user.id, match.bill.id, {
+          isPaid: true,
+          lastPaidDate: paymentDate,
+          paymentHistory,
+          dueDate: nextDueDate,
+          nextDate: nextDueDate,
+        })
+      })
+
+      // Update bills and wait for all to complete
+      const billUpdateResults = await Promise.allSettled(billUpdatePromises)
+      
+      // Check if any bill updates failed
+      const failedUpdates = billUpdateResults.filter(r => r.status === 'rejected')
+      if (failedUpdates.length > 0) {
+        console.error('Some bill updates failed:', failedUpdates)
+        // Continue anyway - transactions will still be imported
+      }
+      
+      // Refresh bills to ensure UI shows updated state
+      try {
+        await getRecurringTransactions(user.id)
+        // This will trigger the bills subscription to update
+        console.log(`✅ Successfully updated ${confirmedMatches.length} bills`)
+      } catch (error) {
+        console.warn('Failed to refresh bills after update:', error)
+        // Continue anyway
+      }
+      
+      // Link transactions to bills
+      // Create a map of transaction identifiers to bill IDs
+      const transactionToBillMap = new Map<string, string>()
+      confirmedMatches.forEach(match => {
+        // Create a unique key from transaction properties
+        const txDesc = match.transaction.description || ''
+        const txAmount = Math.abs(match.transaction.amount)
+        const txDate = typeof match.transaction.date === 'string' 
+          ? match.transaction.date.split('T')[0]
+          : parseTransactionDate(match.transaction.date).toISOString().split('T')[0]
+        const key = `${txDesc}|${txAmount}|${txDate}`
+        transactionToBillMap.set(key, match.bill.id)
+      })
+      
+      const transactionsWithBillLinks = pendingTransactions.map((tx) => {
+        const txDesc = tx.description || ''
+        const txAmount = Math.abs(tx.amount)
+        const txDate = typeof tx.date === 'string' 
+          ? tx.date.split('T')[0]
+          : new Date(tx.date).toISOString().split('T')[0]
+        const key = `${txDesc}|${txAmount}|${txDate}`
+        
+        const billId = transactionToBillMap.get(key)
+        if (billId) {
+          return {
+            ...tx,
+            recurringBillId: billId,
+          }
+        }
+        return tx
+      })
+
+      // Close preview
+      setShowBillMatchingPreview(false)
+      setBillMatches([])
+      
+      // Continue with import
+      const enableDuplicateCheck = pendingTransactions.some(tx => (tx as any).archiveId)
+      const skippedCount = 0 // Already handled in previous step
+      
+      await proceedWithImport(transactionsWithBillLinks, enableDuplicateCheck, skippedCount)
+      
+      // Show success message with bill matching info
+      if (confirmedMatches.length > 0) {
+        const billNames = confirmedMatches.map(m => m.bill.name || m.bill.description || 'Unnamed Bill').join(', ')
+        setCsvImportStatus(`✅ Imported ${pendingTransactions.length} transactions. ${confirmedMatches.length} bill${confirmedMatches.length !== 1 ? 's' : ''} marked as paid: ${billNames}`)
+      }
+    } catch (error) {
+      console.error('Error processing bill matches:', error)
+      setCsvImportStatus('⚠️ Error processing bill matches, but transactions will still be imported')
+      // Continue with import even if bill updates fail
+      const enableDuplicateCheck = pendingTransactions.some(tx => (tx as any).archiveId)
+      await proceedWithImport(pendingTransactions, enableDuplicateCheck, 0)
+    }
+  }
+
   const handleCsvImport = async () => {
     if (!user?.id || !csvFile || csvParsedData.length === 0) return
     
@@ -1419,67 +1753,43 @@ export default function FinancePage() {
       // Add a small delay to ensure UI updates
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      const result = await batchAddTransactions(
-        user.id,
-        finalTransactionsToImport,
-        (current, total) => {
-          const progress = Math.round((current / total) * 100)
-          // Start progress from 20% if duplicate check was done, otherwise from 0%
-          const adjustedProgress = enableDuplicateCheck 
-            ? 20 + Math.round((progress * 0.8)) // 20-100% range
-            : progress
-          setCsvImportProgress(adjustedProgress)
-        },
-        { skipDuplicates: false } // Already filtered duplicates, don't check again
-      )
-      
-      // Add skipped count to result
-      result.skipped = skippedCount
+      // Bill Matching: Find matches before importing
+      try {
+        setCsvImportStatus('🔍 Analyzing bills for auto-matching...')
+        const recurringBills = await getRecurringTransactions(user.id)
+        
+        if (recurringBills.length > 0 && finalTransactionsToImport.length > 0) {
+          // Convert transactions to FinanceTransaction format for matching
+          const transactionsForMatching: FinanceTransaction[] = finalTransactionsToImport.map((tx, idx) => ({
+            id: `temp-${idx}`,
+            date: tx.date,
+            amount: tx.amount,
+            category: tx.category,
+            description: tx.description,
+            type: tx.type,
+            recipientName: (tx as any).recipientName,
+            ...tx,
+          }))
+          
+          const matches = findBillMatches(transactionsForMatching, recurringBills, DEFAULT_MATCHING_SETTINGS)
+          
+          if (matches.length > 0) {
+            // Store matches and transactions for preview
+            setBillMatches(matches)
+            setPendingTransactions(finalTransactionsToImport)
+            setShowBillMatchingPreview(true)
+            
+            // Wait for user confirmation (handled in handleBillMatchingConfirm)
+            return // Exit early, will continue after confirmation
+          }
+        }
+      } catch (error) {
+        console.error('Error during bill matching:', error)
+        // Continue with import even if matching fails
+      }
 
-      const errorSuffix = result.errors > 0 ? ` (${result.errors} errors)` : ''
-      let skippedSuffix = ''
-      if (result.skipped > 0) {
-        skippedSuffix = ` ✅ ${result.skipped} duplicates skipped (already imported)`
-      }
-      const successMessage = `Successfully imported ${result.success} of ${transactionsToImport.length} transactions${skippedSuffix}${errorSuffix}`
-      
-      // Log duplicate detection results
-      if (result.skipped > 0) {
-        console.log(`✅ Duplicate detection: Skipped ${result.skipped} transactions that already exist (matched by archiveId)`)
-        console.log(`💡 Tip: You can safely re-import the same file - duplicates will be automatically skipped`)
-      }
-      
-      setCsvImportProgress(100)
-      
-      // Warn if not all transactions were imported
-      if (result.success < transactionsToImport.length - result.skipped) {
-        console.warn(`⚠️ Only imported ${result.success} out of ${transactionsToImport.length - result.skipped} new transactions`)
-      }
-      
-      // Special message if all were duplicates
-      if (result.skipped === transactionsToImport.length && result.success === 0) {
-        setCsvImportStatus(`✅ All ${result.skipped} transactions already exist - no duplicates imported. Safe to re-import anytime!`)
-      } else {
-        setCsvImportStatus(successMessage)
-      }
-      
-      // Force a small delay to ensure UI updates
-      await new Promise(resolve => setTimeout(resolve, 100))
-      
-      // Transactions will be reloaded automatically via the subscription
-      // No need to manually reload - the subscribeToTransactions will update
-      
-      // Reset after 3 seconds
-      setTimeout(() => {
-        setShowCsvMapping(false)
-        setCsvFile(null)
-        setCsvColumnMapping(null)
-        setCsvHeaders([])
-        setCsvParsedData([])
-        setCsvSelectedBank(null)
-        setCsvImportStatus('')
-        setCsvImportProgress(0)
-      }, 3000)
+      // If no matches or matching skipped, proceed with normal import
+      await proceedWithImport(finalTransactionsToImport, enableDuplicateCheck, skippedCount)
     } catch (error: unknown) {
       console.error('❌ CSV Import Error:', error)
       let errorMessage = error && typeof error === 'object' && 'message' in error && typeof error.message === 'string' ? error.message : 'Unknown error'
@@ -1713,7 +2023,7 @@ export default function FinancePage() {
                   {/* Expense Forecast */}
                   {summaryView === 'monthly' && (
                     <div className="mt-6 space-y-6">
-                      <ExpenseForecastComponent period="month" monthsOfHistory={6} />
+                      <ExpenseForecastComponent period="month" monthsOfHistory={6} refreshKey={forecastRefreshKey} />
                     </div>
                   )}
                 </div>
@@ -2703,11 +3013,22 @@ export default function FinancePage() {
                                             <button
                                               type="button"
                                               onClick={() => handleDelete(tx.id!)}
-                                              className="p-2 sm:px-3 sm:py-1.5 text-xs font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center"
+                                              disabled={isDeletingTransaction === tx.id}
+                                              className="p-2 sm:px-3 sm:py-1.5 text-xs font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                                               aria-label="Delete transaction"
                                             >
-                                              <Trash2 className="w-4 h-4 sm:hidden" />
-                                              <span className="hidden sm:inline">Delete</span>
+                                              {isDeletingTransaction === tx.id ? (
+                                                <>
+                                                  <Loader2 className="w-4 h-4 animate-spin sm:hidden" />
+                                                  <Loader2 className="w-4 h-4 animate-spin hidden sm:inline mr-1" />
+                                                  <span className="hidden sm:inline">Deleting...</span>
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <Trash2 className="w-4 h-4 sm:hidden" />
+                                                  <span className="hidden sm:inline">Delete</span>
+                                                </>
+                                              )}
                                             </button>
                                           </div>
                                         </div>
@@ -2874,11 +3195,22 @@ export default function FinancePage() {
                                           <button
                                             type="button"
                                             onClick={() => handleDelete(tx.id!)}
-                                            className="p-2 sm:px-3 sm:py-1.5 text-xs font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center"
+                                            disabled={isDeletingTransaction === tx.id}
+                                            className="p-2 sm:px-3 sm:py-1.5 text-xs font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                                             aria-label="Delete transaction"
                                           >
-                                            <Trash2 className="w-4 h-4 sm:hidden" />
-                                            <span className="hidden sm:inline">Delete</span>
+                                            {isDeletingTransaction === tx.id ? (
+                                              <>
+                                                <Loader2 className="w-4 h-4 animate-spin sm:hidden" />
+                                                <Loader2 className="w-4 h-4 animate-spin hidden sm:inline mr-1" />
+                                                <span className="hidden sm:inline">Deleting...</span>
+                                              </>
+                                            ) : (
+                                              <>
+                                                <Trash2 className="w-4 h-4 sm:hidden" />
+                                                <span className="hidden sm:inline">Delete</span>
+                                              </>
+                                            )}
                                           </button>
                                         </div>
                                       </div>
@@ -2901,6 +3233,24 @@ export default function FinancePage() {
           </div>
         </div>
       </div>
+      
+      {/* Bill Matching Preview Modal */}
+      {showBillMatchingPreview && billMatches.length > 0 && (
+        <BillMatchingPreview
+          matches={billMatches}
+          onConfirm={handleBillMatchingConfirm}
+          onCancel={() => {
+            setShowBillMatchingPreview(false)
+            setBillMatches([])
+            setPendingTransactions([])
+            setIsSubmitting(false)
+            setIsImportingCsv(false)
+            setCsvImportStatus('')
+            setCsvImportProgress(0)
+          }}
+          autoMatchHighConfidence={DEFAULT_MATCHING_SETTINGS.autoMatchHighConfidence}
+        />
+      )}
     </AuthGuard>
   )
 }

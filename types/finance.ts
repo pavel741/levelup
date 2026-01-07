@@ -12,6 +12,7 @@ export interface FinanceTransaction {
   type?: 'income' | 'expense' | 'transfer' | string
   currency?: string
   tags?: string[]
+  recurringBillId?: string // Link to recurring bill if auto-matched
   [key: string]: any
 }
 

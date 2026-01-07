@@ -44,7 +44,7 @@ export const dynamic = 'force-dynamic'
 
 export default function WorkoutsPage() {
   const { user } = useFirestoreStore()
-  const { subscribeRoutines, loadWorkoutLogs } = useWorkoutStore()
+  const { subscribeRoutines, loadWorkoutLogs, addRoutine, refreshRoutines } = useWorkoutStore()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [currentView, setCurrentView] = useState<WorkoutView>('routines')
   const [showRoutineBuilder, setShowRoutineBuilder] = useState(false)
@@ -108,15 +108,29 @@ export default function WorkoutsPage() {
         createdAt: editingRoutine?.createdAt || new Date(),
         updatedAt: new Date(),
       }
+      
+      // Optimistically add routine to UI immediately
+      addRoutine(routine)
+      
+      // Save to server
       await saveRoutine(routine)
+      
+      // Force refresh to ensure we have the latest data from server
+      // Small delay to ensure server has processed the save
+      setTimeout(() => {
+        refreshRoutines()
+      }, 500)
+      
       setShowRoutineBuilder(false)
       setSelectedTemplate(null)
       setEditingRoutine(null)
     } catch (error) {
       console.error('Error saving routine:', error)
       showError(error, { component: 'WorkoutsPage', action: 'saveRoutine' })
+      // Refresh on error to ensure UI is in sync
+      refreshRoutines()
     }
-  }, [user?.id, editingRoutine])
+  }, [user?.id, editingRoutine, addRoutine, refreshRoutines])
 
   const handleCancelRoutineBuilder = useCallback(() => {
     setShowRoutineBuilder(false)

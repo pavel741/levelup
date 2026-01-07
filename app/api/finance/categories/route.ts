@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCategories, saveCategories } from '@/lib/financeMongo'
+import { getUserIdFromRequest, validateUserId, errorResponse, handleApiError } from '@/lib/utils'
 
 // GET - Get categories
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const userId = searchParams.get('userId')
+    // Get userId from authenticated request (validates user is logged in)
+    const userId = getUserIdFromRequest(request)
     
     if (!userId) {
-      return NextResponse.json({ error: 'User ID is required' }, { status: 401 })
+      return errorResponse('Unauthorized', 401, 'User ID is required. Please log in.')
     }
+
+    const validationError = validateUserId(userId)
+    if (validationError) return validationError
 
     const categories = await getCategories(userId)
     return NextResponse.json({ categories })
@@ -23,24 +27,41 @@ export async function GET(request: NextRequest) {
       }, { status: 503 })
     }
     
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
+    return handleApiError(error, 'GET /api/finance/categories')
   }
 }
 
 // POST - Save categories
 export async function POST(request: NextRequest) {
   try {
+    // Get userId from authenticated request (validates user is logged in)
+    const authenticatedUserId = getUserIdFromRequest(request)
+    
+    if (!authenticatedUserId) {
+      return errorResponse('Unauthorized', 401, 'User ID is required. Please log in.')
+    }
+
+    const validationError = validateUserId(authenticatedUserId)
+    if (validationError) return validationError
+
     const { userId, categories } = await request.json()
     
-    if (!userId) {
-      return NextResponse.json({ error: 'User ID is required' }, { status: 401 })
+    // CRITICAL: Ensure userId in body matches authenticated user
+    // This prevents users from modifying other users' categories
+    if (!userId || userId !== authenticatedUserId) {
+      return errorResponse(
+        'Forbidden',
+        403,
+        'You can only modify your own categories',
+        'FORBIDDEN'
+      )
     }
 
     await saveCategories(userId, categories)
     return NextResponse.json({ success: true })
   } catch (error: any) {
     console.error('Error in POST /api/finance/categories:', error)
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
+    return handleApiError(error, 'POST /api/finance/categories')
   }
 }
 

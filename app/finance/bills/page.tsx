@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
-import { subscribeToRecurringTransactions, addRecurringTransaction, updateRecurringTransaction, deleteRecurringTransaction } from '@/lib/financeApi'
+import { subscribeToRecurringTransactions, addRecurringTransaction, updateRecurringTransaction, deleteRecurringTransaction, getRecurringTransactions } from '@/lib/financeApi'
 import AuthGuard from '@/components/common/AuthGuard'
 import Sidebar from '@/components/layout/Sidebar'
 import Header from '@/components/layout/Header'
-import { Bell, Plus, Edit2, Trash2, CheckCircle2, AlertCircle, Calendar, Clock, X, ArrowLeft } from 'lucide-react'
+import { Bell, Plus, Edit2, Trash2, CheckCircle2, AlertCircle, Calendar, Clock, X, ArrowLeft, XCircle } from 'lucide-react'
 import type { FinanceRecurringTransaction } from '@/types/finance'
 import { formatCurrency, parseTransactionDate } from '@/lib/utils'
 import { format, addDays, differenceInDays, isPast, isToday } from 'date-fns'
@@ -40,8 +40,46 @@ export default function BillsPage() {
   useEffect(() => {
     if (!user?.id) return
 
-    const unsubscribe = subscribeToRecurringTransactions(user.id, (billsList) => {
-      setBills(billsList)
+    const unsubscribe = subscribeToRecurringTransactions(user.id, async (billsList) => {
+      // Auto-reset bills to unpaid when their due date has passed
+      // This handles the case when a new billing period starts
+      const billsToUpdate: Array<{ id: string; updates: Partial<FinanceRecurringTransaction> }> = []
+      
+      for (const bill of billsList) {
+        if (bill.isPaid && bill.dueDate) {
+          const dueDate = parseTransactionDate(bill.dueDate)
+          // If due date has passed, automatically reset to unpaid for new billing period
+          if (isPast(dueDate) && !isToday(dueDate)) {
+            billsToUpdate.push({
+              id: bill.id,
+              updates: { isPaid: false }
+            })
+          }
+        }
+      }
+      
+      // Update bills that need to be reset
+      if (billsToUpdate.length > 0) {
+        try {
+          await Promise.all(
+            billsToUpdate.map(({ id, updates }) =>
+              updateRecurringTransaction(user.id, id, updates).catch(err => {
+                console.warn(`Failed to auto-reset bill ${id}:`, err)
+              })
+            )
+          )
+          // Refetch bills after updates
+          const updatedBills = await getRecurringTransactions(user.id)
+          setBills(updatedBills)
+        } catch (error) {
+          console.error('Error auto-resetting bills:', error)
+          // Still show bills even if reset fails
+          setBills(billsList)
+        }
+      } else {
+        setBills(billsList)
+      }
+      
       setIsLoading(false)
     })
 
@@ -140,7 +178,18 @@ export default function BillsPage() {
   const handleMarkPaid = async () => {
     if (!payingBill || !user?.id) return
 
-    const amount = parseFloat(paymentAmount) || payingBill.amount
+    // Always require amount to be entered manually (no default)
+    if (!paymentAmount || paymentAmount.trim() === '') {
+      alert('Please enter the payment amount')
+      return
+    }
+
+    const amount = parseFloat(paymentAmount)
+    if (isNaN(amount) || amount <= 0) {
+      alert('Please enter a valid payment amount')
+      return
+    }
+
     const paymentDate = new Date()
 
     try {
@@ -202,13 +251,65 @@ export default function BillsPage() {
     }
   }
 
+  const handleMarkUnpaid = async (bill: FinanceRecurringTransaction) => {
+    if (!user?.id || !confirm(`Mark "${bill.name || 'this bill'}" as unpaid?`)) return
+
+    const previousBill = bill
+
+    try {
+      // Optimistically update the local state immediately
+      setBills(prevBills => 
+        prevBills.map(b => 
+          b.id === bill.id
+            ? {
+                ...b,
+                isPaid: false,
+                // Keep payment history and lastPaidDate for reference
+              }
+            : b
+        )
+      )
+
+      await updateRecurringTransaction(user.id, bill.id, {
+        isPaid: false,
+      })
+    } catch (error) {
+      console.error('Failed to mark bill as unpaid:', error)
+      // Revert optimistic update on error
+      setBills(prevBills => 
+        prevBills.map(b => 
+          b.id === bill.id ? previousBill : b
+        )
+      )
+    }
+  }
+
   const handleDeleteBill = async (billId: string) => {
     if (!user?.id || !confirm('Are you sure you want to delete this bill?')) return
 
+    // Store previous state for rollback
+    const previousBills = bills
+
     try {
+      // Optimistically remove from UI immediately
+      setBills(prevBills => prevBills.filter(bill => bill.id !== billId))
+      
+      // Also clear editing/paying bill if it's the one being deleted
+      if (editingBill?.id === billId) {
+        setEditingBill(null)
+        setShowEditModal(false)
+      }
+      if (payingBill?.id === billId) {
+        setPayingBill(null)
+        setShowPaymentModal(false)
+      }
+      
+      // Then delete from database
       await deleteRecurringTransaction(user.id, billId)
     } catch (error) {
       console.error('Failed to delete bill:', error)
+      // Restore previous state if deletion failed
+      setBills(previousBills)
     }
   }
 
@@ -258,17 +359,25 @@ export default function BillsPage() {
             )}
           </div>
           <div className="flex gap-2">
-            {!bill.isPaid && (
+            {!bill.isPaid ? (
               <button
                 onClick={() => {
                   setPayingBill(bill)
-                  setPaymentAmount(bill.amount.toString())
+                  setPaymentAmount('') // Always start with empty amount - user must enter it
                   setShowPaymentModal(true)
                 }}
                 className="p-2 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
                 title="Mark as paid"
               >
                 <CheckCircle2 className="w-5 h-5" />
+              </button>
+            ) : (
+              <button
+                onClick={() => handleMarkUnpaid(bill)}
+                className="p-2 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-lg transition-colors"
+                title="Mark as unpaid"
+              >
+                <XCircle className="w-5 h-5" />
               </button>
             )}
             <button
@@ -607,15 +716,21 @@ export default function BillsPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Amount Paid
+                    Amount Paid <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
                     value={paymentAmount}
                     onChange={(e) => setPaymentAmount(e.target.value)}
-                    placeholder={payingBill.amount.toString()}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    placeholder="Enter amount (e.g., 65.50)"
+                    step="0.01"
+                    min="0.01"
+                    required
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Base amount: {formatCurrency(payingBill.amount)} • Amounts may vary each month
+                  </p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -632,7 +747,8 @@ export default function BillsPage() {
                 <div className="flex gap-3">
                   <button
                     onClick={handleMarkPaid}
-                    className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+                    disabled={!paymentAmount || paymentAmount.trim() === '' || isNaN(parseFloat(paymentAmount)) || parseFloat(paymentAmount) <= 0}
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Mark as Paid
                   </button>
@@ -640,6 +756,8 @@ export default function BillsPage() {
                     onClick={() => {
                       setShowPaymentModal(false)
                       setPayingBill(null)
+                      setPaymentAmount('')
+                      setPaymentNotes('')
                     }}
                     className="flex-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-semibold py-2 px-4 rounded-lg transition-colors"
                   >

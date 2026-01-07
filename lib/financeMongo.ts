@@ -707,10 +707,9 @@ export const saveCategories = async (
 ): Promise<void> => {
   try {
     const collection = await getCategoriesCollection(userId)
-    // MongoDB allows custom _id values, but TypeScript types are strict - use type assertion
-    // Try to match by _id first (in case document exists without userId field)
-    // Then update with userId to ensure consistency
-    const filter = { _id: 'categories' as any }
+    // CRITICAL: Always filter by userId to ensure users can only update their own categories
+    // This prevents one user from overwriting another user's categories
+    const filter = { userId, _id: 'categories' as any }
     const update = { 
       $set: { 
         _id: 'categories' as any,
@@ -725,8 +724,8 @@ export const saveCategories = async (
     // If upsert created a new document but we got a duplicate key error,
     // it means another request created it simultaneously - just update it
     if (result.upsertedCount === 0 && result.matchedCount === 0) {
-      // Document might have been created by another request, try update again
-      await collection.updateOne(filter, update)
+      // Document might have been created by another request, try update again with userId filter
+      await collection.updateOne({ userId, _id: 'categories' as any }, update)
     }
     
     // Invalidate categories cache
@@ -735,11 +734,11 @@ export const saveCategories = async (
   } catch (error: any) {
     // Handle duplicate key errors gracefully (race condition)
     if (error.code === 11000 || error.message?.includes('duplicate key')) {
-      // Document was created by another request, just update it
+      // Document was created by another request, just update it with userId filter
       try {
         const collection = await getCategoriesCollection(userId)
         await collection.updateOne(
-          { _id: 'categories' as any },
+          { userId, _id: 'categories' as any },
           { $set: { userId, ...categories, updatedAt: new Date() } }
         )
         const cacheKey = createQueryCacheKey('categories', userId)

@@ -370,8 +370,9 @@ export const subscribeToCategories = (
 
 // Internal fetch function (without cache)
 const _getCategories = async (userId: string): Promise<FinanceCategories> => {
+  const { authenticatedFetch } = await import('@/lib/utils')
   const params = new URLSearchParams({ userId })
-  const response = await fetch(`/api/finance/categories?${params}`)
+  const response = await authenticatedFetch(`/api/finance/categories?${params}`)
   
   if (!response.ok) {
     const error = await response.json()
@@ -395,7 +396,8 @@ export const saveCategories = async (
   userId: string,
   categories: FinanceCategories
 ): Promise<void> => {
-  const response = await fetch('/api/finance/categories', {
+  const { authenticatedFetch } = await import('@/lib/utils')
+  const response = await authenticatedFetch('/api/finance/categories', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userId, categories }),
@@ -499,9 +501,14 @@ export const getTransactions = async (
 
 // Helper for getting all transactions for summary
 export const getAllTransactionsForSummary = async (
-  userId: string
+  userId: string,
+  bypassCache?: boolean
 ): Promise<FinanceTransaction[]> => {
   const params = new URLSearchParams({ userId, forSummary: 'true' })
+  // Add cache-busting parameter if bypassCache is true
+  if (bypassCache) {
+    params.append('_t', Date.now().toString())
+  }
   const response = await fetch(`/api/finance/transactions?${params}`)
   
   if (!response.ok) {

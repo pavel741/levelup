@@ -10,12 +10,18 @@ async function authenticatedFetch(url: string, options?: RequestInit): Promise<R
 export const getExpenseForecast = async (
   _userId: string,
   period: 'month' | 'quarter' | 'year' = 'month',
-  monthsOfHistory: number = 6
+  monthsOfHistory: number = 6,
+  bypassCache?: boolean
 ): Promise<ExpenseForecast> => {
   const params = new URLSearchParams({
     period,
     months: monthsOfHistory.toString(),
   })
+  
+  // Add cache-busting parameter if bypassCache is true
+  if (bypassCache) {
+    params.append('_t', Date.now().toString())
+  }
   
   const response = await authenticatedFetch(`/api/finance/forecast?${params}`)
   
