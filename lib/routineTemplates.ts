@@ -5,6 +5,38 @@
 
 import type { Routine } from '@/types/workout'
 
+// Helper function to create sets from rep scheme
+// e.g., "4 x 15,12,10,8 reps" -> 4 sets with reps [15, 12, 10, 8]
+function createSets(repScheme: string): Array<{ setType: 'working', targetReps: number, restAfter: number }> {
+  // Parse patterns like "4 x 15,12,10,8 reps" or "3 x 8 reps"
+  const match = repScheme.match(/(\d+)\s*x\s*(.+?)\s*reps/i)
+  if (!match) {
+    throw new Error(`Invalid rep scheme: ${repScheme}`)
+  }
+  
+  const numSets = parseInt(match[1])
+  const repsStr = match[2].trim()
+  
+  // Check if it's a single rep count or multiple
+  if (repsStr.includes(',')) {
+    // Multiple rep counts: "15,12,10,8"
+    const reps = repsStr.split(',').map(r => parseInt(r.trim()))
+    return reps.map((reps) => ({
+      setType: 'working' as const,
+      targetReps: reps,
+      restAfter: 90 // Default 90 seconds rest
+    }))
+  } else {
+    // Single rep count: "8"
+    const reps = parseInt(repsStr)
+    return Array(numSets).fill(null).map(() => ({
+      setType: 'working' as const,
+      targetReps: reps,
+      restAfter: 90
+    }))
+  }
+}
+
 export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'createdBy' | 'isTemplate' | 'isPublic' | 'rating' | 'timesUsed'>[] = [
   // Morning Stretch Routines
   {
@@ -2306,6 +2338,257 @@ export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'u
     estimatedDuration: 15,
     difficulty: 'medium',
     tags: ['cardio', 'quick', 'circuit', 'full-body', 'fat-burning']
+  },
+
+  // Muscle Building Plan (3-Days) - From JEFIT
+  {
+    name: 'Muscle Building Plan - Day 1: Chest/Shoulders/Tricep',
+    description: 'Push day focusing on chest, shoulders, and triceps. 9 exercises targeting upper body pushing muscles. Estimated duration: ~1h39m.',
+    goal: 'bulking',
+    exercises: [],
+    sessions: [
+      {
+        id: 'muscle-building-day1',
+        name: 'Chest/Shoulders/Tricep',
+        order: 0,
+        estimatedDuration: 99,
+        exercises: [
+          {
+            exerciseId: 'bench-press',
+            order: 0,
+            sets: createSets('4 x 15,12,10,8 reps'),
+            restTime: 90,
+            notes: 'Barbell bench press'
+          },
+          {
+            exerciseId: 'push-ups',
+            order: 1,
+            sets: createSets('4 x 10 reps'),
+            restTime: 60,
+            notes: 'Bodyweight push-ups'
+          },
+          {
+            exerciseId: 'overhead-press',
+            order: 2,
+            sets: createSets('4 x 12,10,8,6 reps'),
+            restTime: 90,
+            notes: 'Barbell military press (seated)'
+          },
+          {
+            exerciseId: 'lateral-raises',
+            order: 3,
+            sets: createSets('4 x 15,12,10,8 reps'),
+            restTime: 60,
+            notes: 'Dumbbell lateral raise'
+          },
+          {
+            exerciseId: 'overhead-tricep-extension',
+            order: 4,
+            sets: createSets('4 x 14,12,10,8 reps'),
+            restTime: 60,
+            notes: 'Dumbbell tricep extension'
+          },
+          {
+            exerciseId: 'tricep-dips',
+            order: 5,
+            sets: createSets('3 x 12,10,8 reps'),
+            restTime: 60,
+            notes: 'Bench dip'
+          },
+          {
+            exerciseId: 'dumbbell-press-shoulders',
+            order: 6,
+            sets: createSets('4 x 12,10,8,6 reps'),
+            restTime: 90,
+            notes: 'Dumbbell seated shoulder press'
+          },
+          {
+            exerciseId: 'dumbbell-flyes',
+            order: 7,
+            sets: createSets('4 x 12,10,8,6 reps'),
+            restTime: 60,
+            notes: 'Dumbbell fly'
+          },
+          {
+            exerciseId: 'tricep-kickbacks',
+            order: 8,
+            sets: createSets('3 x 8 reps'),
+            restTime: 60,
+            notes: 'Dumbbell one-arm tricep kickback'
+          }
+        ]
+      }
+    ],
+    estimatedDuration: 99,
+    difficulty: 'medium',
+    tags: ['muscle-building', 'push-day', 'chest', 'shoulders', 'triceps', 'bulking']
+  },
+
+  {
+    name: 'Muscle Building Plan - Day 2: Back/Bicep',
+    description: 'Pull day focusing on back and biceps. 8 exercises targeting upper body pulling muscles. Estimated duration: ~1h28m.',
+    goal: 'bulking',
+    exercises: [],
+    sessions: [
+      {
+        id: 'muscle-building-day2',
+        name: 'Back/Bicep',
+        order: 0,
+        estimatedDuration: 88,
+        exercises: [
+          {
+            exerciseId: 'barbell-row',
+            order: 0,
+            sets: createSets('4 x 15,12,10,8 reps'),
+            restTime: 90,
+            notes: 'Barbell bent-over row'
+          },
+          {
+            exerciseId: 'bicep-curls',
+            order: 1,
+            sets: createSets('4 x 12,10,8,6 reps'),
+            restTime: 60,
+            notes: 'Barbell curl'
+          },
+          {
+            exerciseId: 'reverse-curls',
+            order: 2,
+            sets: createSets('3 x 8 reps'),
+            restTime: 60,
+            notes: 'Barbell reverse curl'
+          },
+          {
+            exerciseId: 'deadlift',
+            order: 3,
+            sets: createSets('3 x 15 reps'),
+            restTime: 120,
+            notes: 'Barbell deadlift'
+          },
+          {
+            exerciseId: 'shrugs',
+            order: 4,
+            sets: createSets('4 x 15,12,10,8 reps'),
+            restTime: 60,
+            notes: 'Dumbbell shoulder shrug'
+          }
+          // Note: 3 more exercises not visible in screenshot (total 8 exercises)
+        ]
+      }
+    ],
+    estimatedDuration: 88,
+    difficulty: 'medium',
+    tags: ['muscle-building', 'pull-day', 'back', 'biceps', 'bulking']
+  },
+
+  {
+    name: 'Muscle Building Plan - Day 3: Legs/Core',
+    description: 'Legs and core day. 7 exercises targeting lower body and core muscles. Estimated duration: ~1h27m.',
+    goal: 'bulking',
+    exercises: [],
+    sessions: [
+      {
+        id: 'muscle-building-day3',
+        name: 'Legs/Core',
+        order: 0,
+        estimatedDuration: 87,
+        exercises: [
+          {
+            exerciseId: 'squat',
+            order: 0,
+            sets: createSets('4 x 12,10,8,6 reps'),
+            restTime: 120,
+            notes: 'Barbell squat'
+          },
+          {
+            exerciseId: 'standing-calf-raise',
+            order: 1,
+            sets: createSets('4 x 15,12,10,8 reps'),
+            restTime: 60,
+            notes: 'Barbell standing calf raise'
+          },
+          {
+            exerciseId: 'glute-bridge',
+            order: 2,
+            sets: createSets('4 x 15,12,10,8 reps'),
+            restTime: 90,
+            notes: 'Barbell glute bridge'
+          },
+          {
+            exerciseId: 'crunches',
+            order: 3,
+            sets: createSets('4 x 24,20,18,14 reps'),
+            restTime: 60,
+            notes: 'Dumbbell side bend (oblique exercise)'
+          },
+          {
+            exerciseId: 'crunches',
+            order: 4,
+            sets: createSets('4 x 20 reps'),
+            restTime: 45,
+            notes: 'Weighted crunch'
+          },
+          {
+            exerciseId: 'russian-twists',
+            order: 5,
+            sets: createSets('4 x 16 reps'),
+            restTime: 45,
+            notes: 'Weight plate Russian twist'
+          }
+          // Note: 1 more exercise not visible in screenshot (total 7 exercises)
+        ]
+      }
+    ],
+    estimatedDuration: 87,
+    difficulty: 'medium',
+    tags: ['muscle-building', 'legs', 'core', 'bulking']
+  },
+
+  {
+    name: 'Muscle Building Plan - Day 4: Arms Focus',
+    description: 'Arm-focused day with bicep variations. 4 exercises targeting biceps with different angles and grips. Estimated duration: ~41m.',
+    goal: 'bulking',
+    exercises: [],
+    sessions: [
+      {
+        id: 'muscle-building-day4',
+        name: 'Arms Focus',
+        order: 0,
+        estimatedDuration: 41,
+        exercises: [
+          {
+            exerciseId: 'bicep-curls',
+            order: 0,
+            sets: createSets('4 x 12,10,8,8 reps'),
+            restTime: 60,
+            notes: 'Dumbbell alternating seated curl'
+          },
+          {
+            exerciseId: 'hammer-curls',
+            order: 1,
+            sets: createSets('3 x 12,10,8 reps'),
+            restTime: 60,
+            notes: 'Dumbbell alternating hammer curl'
+          },
+          {
+            exerciseId: 'hammer-curls',
+            order: 2,
+            sets: createSets('4 x 12,10,8,8 reps'),
+            restTime: 60,
+            notes: 'Dumbbell hammer curl (cross body)'
+          },
+          {
+            exerciseId: 'concentration-curls',
+            order: 3,
+            sets: createSets('3 x 12,10,8 reps'),
+            restTime: 60,
+            notes: 'Dumbbell concentration curl'
+          }
+        ]
+      }
+    ],
+    estimatedDuration: 41,
+    difficulty: 'medium',
+    tags: ['muscle-building', 'arms', 'biceps', 'bulking']
   }
 ]
 

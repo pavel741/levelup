@@ -137,13 +137,32 @@ export default function WorkoutsPage() {
   const handleDeleteRoutine = useCallback(async (routineId: string) => {
     if (!user?.id) return
 
+    // Store previous state for rollback
+    const previousRoutines = routines
+
     try {
+      // Optimistically remove from UI immediately
+      setRoutines((prevRoutines) => prevRoutines.filter((r) => r.id !== routineId))
+      
+      // Also clear active routine if it's the one being deleted
+      if (activeRoutine?.id === routineId) {
+        setActiveRoutine(null)
+      }
+      
+      // Also clear editing routine if it's the one being deleted
+      if (editingRoutine?.id === routineId) {
+        setEditingRoutine(null)
+      }
+      
+      // Then delete from database
       await deleteRoutine(routineId, user.id)
     } catch (error) {
       console.error('Error deleting routine:', error)
+      // Restore previous state if deletion failed
+      setRoutines(previousRoutines)
       showError(error, { component: 'WorkoutsPage', action: 'deleteRoutine' })
     }
-  }, [user?.id])
+  }, [user?.id, routines, activeRoutine, editingRoutine])
 
   const handleSelectTemplate = useCallback((template: Partial<Routine>) => {
     setSelectedTemplate(template)
