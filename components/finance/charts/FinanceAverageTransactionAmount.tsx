@@ -50,14 +50,10 @@ export function FinanceAverageTransactionAmount({ transactions, months = 12 }: P
       monthlyData[key] = { total: 0, count: 0 }
     })
 
-    // Process all transactions (already filtered by timeRange)
+    // Process all transactions (already filtered by view type and timeRange)
     transactions.forEach((tx) => {
       const amount = Number(tx.amount) || 0
-      const type = (tx.type || '').toLowerCase()
-      
-      // Focus on expenses
-      const isExpense = type === 'expense' || amount < 0
-      if (!isExpense) return
+      // Use absolute value - transactions are already filtered by view type
 
       const absAmount = Math.abs(amount)
       const txDate = typeof tx.date === 'string' ? new Date(tx.date) : (tx.date as Date)

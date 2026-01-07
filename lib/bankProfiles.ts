@@ -32,6 +32,31 @@ export interface BankProfile {
 
 export const ESTONIAN_BANK_PROFILES: BankProfile[] = [
   {
+    id: 'coop',
+    name: 'Coop',
+    displayName: 'Coop Pank',
+    columnMapping: {
+      date: ['kuupäev', 'date', 'kuupaev'],
+      amount: ['summa', 'amount', 'summa eur', 'summa (eur)'],
+      description: ['selgitus', 'description', 'kirjeldus', 'märkused'],
+      type: ['deebet/kreedit (d/c)', 'deebet/kreedit', 'd/k', 'debit/credit', 'd c', 'dc', 'tüüp', 'type', 'd', 'k', 'deebet', 'kreedit'],
+      recipientName: ['saaja/maksja nimi', 'saaja/maksja', 'saaja', 'recipient', 'saaja nimi', 'vastaspool'],
+      recipientAccount: ['saaja/maksja konto', 'saaja konto', 'maksja konto'],
+      referenceNumber: ['viitenumber', 'reference', 'viitenr', 'ref'],
+      archiveId: ['arhiveerimistunnus', 'archive id', 'archiveid'],
+      selgitus: ['selgitus', 'details'],
+      documentNumber: ['dokumendi number', 'document number'],
+      clientAccount: ['kliendi konto', 'client account'],
+      serviceFee: ['teenustasu', 'service fee'],
+      currency: ['valuuta', 'currency'],
+      personalId: ['isikukood või registrikood', 'isikukood', 'registrikood', 'personal id'],
+    },
+    delimiter: ';',
+    dateFormat: 'DD.MM.YYYY',
+    amountFormat: 'comma',
+    // Coop Pank already has negative amounts in CSV, so no D/C indicator needed
+  },
+  {
     id: 'seb',
     name: 'SEB',
     displayName: 'SEB Pank',
@@ -39,7 +64,7 @@ export const ESTONIAN_BANK_PROFILES: BankProfile[] = [
       date: ['kuupäev', 'date', 'kuupaev'],
       amount: ['summa', 'amount', 'summa eur', 'summa (eur)'],
       description: ['selgitus', 'description', 'kirjeldus', 'märkused'],
-      type: ['deebet/kreedit (d/c)', 'deebet/kreedit', 'd/k', 'debit/credit', 'd c', 'dc', 'tüüp', 'type', 'd', 'k', 'deebet', 'kreedit'],
+      type: ['deebet/kreedit (d/c)', 'deebet/kreedit', 'd/k', 'debit/credit', 'd c', 'dc', 'deebet', 'kreedit'],
       recipientName: ['saaja/maksja nimi', 'saaja/maksja', 'saaja', 'recipient', 'saaja nimi', 'vastaspool'],
       recipientAccount: ['saaja/maksja konto', 'saaja konto', 'maksja konto'],
       referenceNumber: ['viitenumber', 'reference', 'viitenr', 'ref'],
@@ -100,31 +125,6 @@ export const ESTONIAN_BANK_PROFILES: BankProfile[] = [
     // D/C column exists but amounts are already signed, so we can use it for validation
   },
   {
-    id: 'coop',
-    name: 'Coop',
-    displayName: 'Coop Pank',
-    columnMapping: {
-      date: ['kuupäev', 'date', 'kuupaev'],
-      amount: ['summa', 'amount', 'summa eur', 'summa (eur)'],
-      description: ['selgitus', 'description', 'kirjeldus', 'märkused'],
-      type: ['deebet/kreedit (d/c)', 'deebet/kreedit', 'd/k', 'debit/credit', 'd c', 'dc', 'tüüp', 'type', 'd', 'k', 'deebet', 'kreedit'],
-      recipientName: ['saaja/maksja nimi', 'saaja/maksja', 'saaja', 'recipient', 'saaja nimi', 'vastaspool'],
-      recipientAccount: ['saaja/maksja konto', 'saaja konto', 'maksja konto'],
-      referenceNumber: ['viitenumber', 'reference', 'viitenr', 'ref'],
-      archiveId: ['arhiveerimistunnus', 'archive id', 'archiveid'],
-      selgitus: ['selgitus', 'details'],
-      documentNumber: ['dokumendi number', 'document number'],
-      clientAccount: ['kliendi konto', 'client account'],
-      serviceFee: ['teenustasu', 'service fee'],
-      currency: ['valuuta', 'currency'],
-      personalId: ['isikukood või registrikood', 'isikukood', 'registrikood', 'personal id'],
-    },
-    delimiter: ';',
-    dateFormat: 'DD.MM.YYYY',
-    amountFormat: 'comma',
-    // Coop Pank already has negative amounts in CSV, so no D/C indicator needed
-  },
-  {
     id: 'luminor',
     name: 'Luminor',
     displayName: 'Luminor',
@@ -175,11 +175,97 @@ export const ESTONIAN_BANK_PROFILES: BankProfile[] = [
 ]
 
 /**
- * Detect which bank profile matches the CSV headers
+ * Detect which bank profile matches the CSV headers and sample data
  */
-export function detectBankProfile(headers: string[]): BankProfile | null {
+export function detectBankProfile(headers: string[], sampleData?: string[]): BankProfile | null {
   const normalizedHeaders = headers.map(h => h.trim().toLowerCase().replace(/^["']+/, '').replace(/["']+$/, ''))
+  const allHeadersText = normalizedHeaders.join(' ')
   
+  // Pattern 1: Check for unique column combinations (highest priority)
+  
+  // LHV: Has "Kande viide" or "Konto teenusepakkuja viide" columns
+  if (normalizedHeaders.includes('kande viide') || normalizedHeaders.includes('konto teenusepakkuja viide')) {
+    const lhvProfile = ESTONIAN_BANK_PROFILES.find(p => p.id === 'lhv')
+    if (lhvProfile) return lhvProfile
+  }
+  
+  // COOP: Has "Kliendi nimi" column (unique to Coop)
+  if (normalizedHeaders.includes('kliendi nimi')) {
+    const coopProfile = ESTONIAN_BANK_PROFILES.find(p => p.id === 'coop')
+    if (coopProfile) return coopProfile
+  }
+  
+  // SEB: Has "Saaja panga kood" AND "Tüüp" columns (unique combination)
+  if (normalizedHeaders.includes('saaja panga kood') && normalizedHeaders.includes('tüüp')) {
+    const sebProfile = ESTONIAN_BANK_PROFILES.find(p => p.id === 'seb')
+    if (sebProfile) return sebProfile
+  }
+  
+  // Pattern 2: Check D/C column name differences
+  // COOP uses "Deebet/Kreedit" (without "(D/C)")
+  // SEB/LHV use "Deebet/Kreedit (D/C)" (with "(D/C)")
+  const hasDcColumn = normalizedHeaders.some(h => h.includes('deebet/kreedit'))
+  const hasDcWithParentheses = normalizedHeaders.some(h => h.includes('deebet/kreedit (d/c)'))
+  
+  if (hasDcColumn && !hasDcWithParentheses) {
+    // Only "Deebet/Kreedit" without "(D/C)" - likely Coop
+    const coopProfile = ESTONIAN_BANK_PROFILES.find(p => p.id === 'coop')
+    if (coopProfile) return coopProfile
+  }
+  
+  // Pattern 3: Check for explicit bank name matches
+  // Check Coop first since it has similar column names to SEB
+  const coopProfile = ESTONIAN_BANK_PROFILES.find(p => p.id === 'coop')
+  if (coopProfile && (allHeadersText.includes('coop') || allHeadersText.includes('coop pank'))) {
+    return coopProfile
+  }
+  
+  // Check other banks by name
+  for (const profile of ESTONIAN_BANK_PROFILES) {
+    const bankNameLower = profile.name.toLowerCase()
+    const bankDisplayNameLower = profile.displayName.toLowerCase()
+    if (allHeadersText.includes(bankNameLower) || allHeadersText.includes(bankDisplayNameLower)) {
+      return profile
+    }
+  }
+  
+  // Pattern 4: Analyze sample data if available (date format, amount format, archive ID format)
+  if (sampleData && sampleData.length > 0) {
+    const sampleRow = sampleData[0]
+    
+    // Check date format: LHV uses ISO format (YYYY-MM-DD), others use DD.MM.YYYY
+    const isoDatePattern = /\d{4}-\d{2}-\d{2}/
+    const dotDatePattern = /\d{2}\.\d{2}\.\d{4}/
+    
+    if (sampleRow.match(isoDatePattern) && !sampleRow.match(dotDatePattern)) {
+      const lhvProfile = ESTONIAN_BANK_PROFILES.find(p => p.id === 'lhv')
+      if (lhvProfile) return lhvProfile
+    }
+    
+    // Check archive ID format: LHV uses long numeric (e.g., "2025010849780888")
+    // SEB uses alphanumeric starting with "RO" (e.g., "RO4034453419L02")
+    // Coop uses shorter alphanumeric (e.g., "1838A355")
+    const lhvArchivePattern = /"\d{16}"/ // 16-digit numeric archive ID
+    const sebArchivePattern = /"RO\d+[A-Z0-9]+"/ // Starts with RO
+    const coopArchivePattern = /"[A-Z0-9]{8,10}"/ // 8-10 char alphanumeric
+    
+    if (sampleRow.match(lhvArchivePattern)) {
+      const lhvProfile = ESTONIAN_BANK_PROFILES.find(p => p.id === 'lhv')
+      if (lhvProfile) return lhvProfile
+    }
+    
+    if (sampleRow.match(sebArchivePattern)) {
+      const sebProfile = ESTONIAN_BANK_PROFILES.find(p => p.id === 'seb')
+      if (sebProfile) return sebProfile
+    }
+    
+    if (sampleRow.match(coopArchivePattern)) {
+      const coopProfile = ESTONIAN_BANK_PROFILES.find(p => p.id === 'coop')
+      if (coopProfile) return coopProfile
+    }
+  }
+  
+  // Pattern 5: Use scoring system as fallback
   let bestMatch: { profile: BankProfile; score: number } | null = null
 
   for (const profile of ESTONIAN_BANK_PROFILES) {
@@ -197,10 +283,10 @@ export function detectBankProfile(headers: string[]): BankProfile | null {
       }
     })
 
-    // Bonus points for exact bank name matches in headers
+    // Bonus points for bank name matches in headers
     const bankNameLower = profile.name.toLowerCase()
     if (normalizedHeaders.some(h => h.includes(bankNameLower))) {
-      score += 5
+      score += 10
     }
 
     if (!bestMatch || score > bestMatch.score) {
@@ -227,10 +313,21 @@ export function getColumnIndexFromProfile(
   const normalizedHeaders = headers.map(h => h.trim().toLowerCase().replace(/^["']+/, '').replace(/["']+$/, ''))
   const possibleNames = profile.columnMapping[columnType] || []
 
+  // First pass: try exact matches (more specific)
   for (let i = 0; i < normalizedHeaders.length; i++) {
     const header = normalizedHeaders[i]
     for (const possibleName of possibleNames) {
-      if (header === possibleName || header.includes(possibleName) || possibleName.includes(header)) {
+      if (header === possibleName) {
+        return i
+      }
+    }
+  }
+
+  // Second pass: try partial matches (less specific)
+  for (let i = 0; i < normalizedHeaders.length; i++) {
+    const header = normalizedHeaders[i]
+    for (const possibleName of possibleNames) {
+      if (header.includes(possibleName) || possibleName.includes(header)) {
         return i
       }
     }
@@ -254,7 +351,11 @@ export function createColumnMappingFromProfile(
     date: null,
     _foundColumns: [],
     _allHeaders: headers,
-    _normalizedHeaders: headers.map(h => h.trim().toLowerCase()),
+    _normalizedHeaders: headers.map(h => {
+      let header = h.trim()
+      header = header.replace(/^["']+/, '').replace(/["']+$/, '')
+      return header.toLowerCase()
+    }),
   }
 
   // Map each column type

@@ -1229,13 +1229,15 @@ export default function FinancePage() {
       
       const csvService = new CSVImportService()
       
-      // Try to auto-detect bank from headers before parsing
+      // Try to auto-detect bank from headers and sample data before parsing
       const lines = text.split('\n').filter((line) => line.trim())
       let detectedBankId: string | null = null
       if (lines.length > 0) {
         const delimiter = csvService.detectDelimiter(lines[0])
         const headers = lines[0].split(delimiter).map(h => h.trim().replace(/^["']+/, '').replace(/["']+$/, ''))
-        const detectedBank = detectBankProfile(headers)
+        // Get sample data rows (first 3 rows after header) for pattern analysis
+        const sampleData = lines.slice(1, 4).filter(line => line.trim().length > 0)
+        const detectedBank = detectBankProfile(headers, sampleData)
         if (detectedBank) {
           detectedBankId = detectedBank.id
           setCsvSelectedBank(detectedBank.id)

@@ -111,7 +111,7 @@ import { startOfMonth, endOfMonth } from 'date-fns'
 import { subscribeToSavingsGoals } from '@/lib/savingsGoalsApi'
 import { parseTransactionDate } from '@/lib/financeDateUtils'
 import type { FinanceTransaction, FinanceSettings, FinanceRecurringTransaction, BudgetCategoryLimit, FinanceCategories } from '@/types/finance'
-import { BarChart3, ArrowLeft, TrendingDown, DollarSign, Percent, Loader2 } from 'lucide-react'
+import { BarChart3, ArrowLeft, TrendingUp, TrendingDown, DollarSign, Percent, Loader2 } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -129,6 +129,7 @@ export default function FinanceAnalyticsPage() {
   const [customDateFrom, setCustomDateFrom] = useState('')
   const [customDateTo, setCustomDateTo] = useState('')
   const [showCustomDateRange, setShowCustomDateRange] = useState(false)
+  const [viewType, setViewType] = useState<'expense' | 'income'>('expense')
   
   // Stable reference date to prevent flickering in BudgetVsActualDashboard
   const referenceDate = useMemo(() => new Date(), [])
@@ -340,6 +341,23 @@ export default function FinanceAnalyticsPage() {
     })
   }, [transactions, timeRange, customDateFrom, customDateTo, financeSettings])
 
+  // Filter transactions by view type (expense/income)
+  const transactionsByViewType = useMemo(() => {
+    return filteredTransactions.filter((tx) => {
+      const amount = Number(tx.amount) || 0
+      const type = (tx.type || '').toLowerCase()
+      
+      const isIncome = type === 'income' || (type !== 'expense' && amount > 0)
+      const isExpense = type === 'expense' || amount < 0
+      
+      if (viewType === 'income') {
+        return isIncome
+      } else {
+        return isExpense
+      }
+    })
+  }, [filteredTransactions, viewType])
+
   // Calculate date range info
   const dateRangeInfo = useMemo(() => {
     const now = new Date()
@@ -422,21 +440,12 @@ export default function FinanceAnalyticsPage() {
     return { start: startDate, end: endDate, label }
   }, [timeRange, customDateFrom, customDateTo, financeSettings, transactions])
 
-  // Filter to only expenses
-  const expenseTransactions = useMemo(() => {
-    return filteredTransactions.filter((tx) => {
-      const amount = Number(tx.amount) || 0
-      const type = (tx.type || '').toLowerCase()
-      return type === 'expense' || amount < 0
-    })
-  }, [filteredTransactions])
-
   // Calculate summary stats based on filtered transactions
   const summaryStats = useMemo(() => {
     let totalAmount = 0
     let categoryCount = new Set<string>()
 
-    expenseTransactions.forEach((tx) => {
+    transactionsByViewType.forEach((tx) => {
       const amount = Number(tx.amount) || 0
       const absAmount = Math.abs(amount)
       totalAmount += absAmount
@@ -447,17 +456,17 @@ export default function FinanceAnalyticsPage() {
     })
 
     // Calculate average per transaction
-    const averageAmount = expenseTransactions.length > 0 
-      ? totalAmount / expenseTransactions.length 
+    const averageAmount = transactionsByViewType.length > 0 
+      ? totalAmount / transactionsByViewType.length 
       : 0
 
     return {
       totalAmount,
       averageAmount,
       categoryCount: categoryCount.size,
-      transactionCount: expenseTransactions.length,
+      transactionCount: transactionsByViewType.length,
     }
-  }, [expenseTransactions])
+  }, [transactionsByViewType])
 
   return (
     <AuthGuard>
@@ -512,10 +521,25 @@ export default function FinanceAnalyticsPage() {
                 {!isLoading || transactions.length > 0 ? (
                 <>
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6">
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                    Time Period:
-                  </label>
-                  <div className="flex gap-2 flex-wrap mb-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                        View Type:
+                      </label>
+                      <select
+                        value={viewType}
+                        onChange={(e) => setViewType(e.target.value as 'expense' | 'income')}
+                        className="px-4 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm font-medium text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="expense">Expenses</option>
+                        <option value="income">Income</option>
+                      </select>
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                        Time Period:
+                      </label>
+                      <div className="flex gap-2 flex-wrap mb-3">
                     {(['today', 'week', 'month', 'year', '6months', '12months', 'all'] as const).map((range) => (
                       <button
                         key={range}
@@ -553,6 +577,8 @@ export default function FinanceAnalyticsPage() {
                     >
                       Custom
                     </button>
+                  </div>
+                    </div>
                   </div>
                   
                   {/* Quick Filter Presets */}
@@ -652,8 +678,8 @@ export default function FinanceAnalyticsPage() {
                   
                   {/* Active Filter Info */}
                   <div className="mt-3 text-xs text-gray-600 dark:text-gray-400">
-                    Showing {expenseTransactions.length.toLocaleString()} expense transactions
-                    {expenseTransactions.length !== filteredTransactions.length && (
+                    Showing {transactionsByViewType.length.toLocaleString()} {viewType === 'expense' ? 'expense' : 'income'} transactions
+                    {transactionsByViewType.length !== filteredTransactions.length && (
                       <span> (filtered from {filteredTransactions.length.toLocaleString()} total transactions)</span>
                     )}
                   </div>
@@ -664,11 +690,19 @@ export default function FinanceAnalyticsPage() {
                   <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm text-gray-600 dark:text-gray-400">
-                        Total Expenses
+                        Total {viewType === 'expense' ? 'Expenses' : 'Income'}
                       </span>
-                      <TrendingDown className="w-5 h-5 text-red-600 dark:text-red-400" />
+                      {viewType === 'expense' ? (
+                        <TrendingDown className="w-5 h-5 text-red-600 dark:text-red-400" />
+                      ) : (
+                        <TrendingUp className="w-5 h-5 text-green-600 dark:text-green-400" />
+                      )}
                     </div>
-                    <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                    <p className={`text-2xl font-bold ${
+                      viewType === 'expense' 
+                        ? 'text-red-600 dark:text-red-400' 
+                        : 'text-green-600 dark:text-green-400'
+                    }`}>
                       {new Intl.NumberFormat('et-EE', { style: 'currency', currency: 'EUR' }).format(summaryStats.totalAmount)}
                     </p>
                   </div>
@@ -696,14 +730,14 @@ export default function FinanceAnalyticsPage() {
                   <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm text-gray-600 dark:text-gray-400">
-                        Top Spending Category
+                        Top {viewType === 'expense' ? 'Spending' : 'Income'} Category
                       </span>
                       <Percent className="w-5 h-5 text-purple-600 dark:text-purple-400" />
                     </div>
                     <p className="text-lg font-bold text-gray-900 dark:text-white">
                       {(() => {
                         const categoryTotals: Record<string, number> = {}
-                        expenseTransactions.forEach((tx) => {
+                        transactionsByViewType.forEach((tx) => {
                           const amount = Math.abs(Number(tx.amount) || 0)
                           const category = tx.category || 'Other'
                           categoryTotals[category] = (categoryTotals[category] || 0) + amount
@@ -720,7 +754,7 @@ export default function FinanceAnalyticsPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                   {/* Financial Health Score */}
                   <FinancialHealthScore
-                    transactions={expenseTransactions}
+                    transactions={transactionsByViewType}
                     periodMonths={
                       timeRange === 'month' ? 3 :
                       timeRange === '6months' ? 6 :
@@ -729,23 +763,27 @@ export default function FinanceAnalyticsPage() {
                     }
                   />
 
-                  {/* Budget vs Actual */}
+                  {/* Budget vs Actual - Only show for expenses */}
+                  {viewType === 'expense' && (
                   <BudgetVsActualDashboard
-                    transactions={expenseTransactions}
+                    transactions={transactionsByViewType}
                     budgetGoals={budgetGoals}
                     period="monthly"
                     referenceDate={referenceDate}
                   />
+                  )}
                 </div>
 
                 {/* Spending Personality & Milestones */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                  {/* Spending Personality */}
-                  <SpendingPersonality transactions={expenseTransactions} />
+                <div className={`grid grid-cols-1 ${viewType === 'expense' ? 'lg:grid-cols-2' : ''} gap-6 mb-6`}>
+                  {/* Spending Personality - Only show for expenses */}
+                  {viewType === 'expense' && (
+                    <SpendingPersonality transactions={transactionsByViewType} />
+                  )}
 
                   {/* Money Milestones */}
                   <MoneyMilestones
-                    transactions={expenseTransactions}
+                    transactions={transactionsByViewType}
                     periodMonths={
                       timeRange === 'month' ? 1 :
                       timeRange === '6months' ? 6 :
@@ -756,18 +794,21 @@ export default function FinanceAnalyticsPage() {
                 </div>
 
                 {/* Gamification Section */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <div className={`grid grid-cols-1 ${viewType === 'expense' ? 'lg:grid-cols-2' : ''} gap-6 mb-6`}>
                   {/* Savings Streaks */}
-                  <SavingsStreaks transactions={expenseTransactions} />
+                  <SavingsStreaks transactions={transactionsByViewType} />
 
-                  {/* Budget Challenges */}
-                  <BudgetChallenges transactions={expenseTransactions} />
+                  {/* Budget Challenges - Only show for expenses */}
+                  {viewType === 'expense' && (
+                  <BudgetChallenges transactions={transactionsByViewType} />
+                  )}
                 </div>
 
-                {/* Spending Heatmap */}
+                {/* Spending Heatmap - Only show for expenses */}
+                {viewType === 'expense' && (
                 <div className="mb-6">
                   <SpendingHeatmap
-                    transactions={expenseTransactions}
+                    transactions={transactionsByViewType}
                     months={
                       timeRange === 'today' || timeRange === 'week' ? 1 :
                       timeRange === 'month' ? 3 :
@@ -779,11 +820,14 @@ export default function FinanceAnalyticsPage() {
                     }
                   />
                 </div>
+                )}
 
+                {/* Merchant Analysis & Subscription Cost Analysis - Only show for expenses */}
+                {viewType === 'expense' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                   {/* Merchant Analysis */}
                   <MerchantAnalysis
-                    transactions={expenseTransactions}
+                    transactions={transactionsByViewType}
                     topN={10}
                     months={
                       timeRange === 'month' ? 3 :
@@ -796,23 +840,24 @@ export default function FinanceAnalyticsPage() {
                   {/* Subscription Cost Analysis */}
                   <SubscriptionCostAnalysis
                     recurringTransactions={recurringTransactions}
-                    transactions={expenseTransactions}
+                    transactions={transactionsByViewType}
                     months={12}
                   />
                 </div>
+                )}
 
                 {/* Charts Grid */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                   {/* Spending Trends */}
                   <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
                     <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                      Spending Trends
+                      {viewType === 'expense' ? 'Spending' : 'Income'} Trends
                     </h2>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-                      Expenses over time
+                      {viewType === 'expense' ? 'Expenses' : 'Income'} over time
                     </p>
                     <FinanceTrendChart 
-                      transactions={expenseTransactions} 
+                      transactions={transactionsByViewType} 
                       months={
                         timeRange === 'today' || timeRange === 'week' ? 1 :
                         timeRange === 'month' ? 3 :
@@ -828,12 +873,12 @@ export default function FinanceAnalyticsPage() {
                   {/* Category Breakdown */}
                   <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
                     <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                      Spending by Category
+                      {viewType === 'expense' ? 'Spending' : 'Income'} by Category
                     </h2>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-                      Visual breakdown of your expenses
+                      Visual breakdown of your {viewType === 'expense' ? 'expenses' : 'income'}
                     </p>
-                    <FinanceCategoryChart transactions={expenseTransactions} />
+                    <FinanceCategoryChart transactions={transactionsByViewType} />
                   </div>
                 </div>
 
@@ -844,10 +889,10 @@ export default function FinanceAnalyticsPage() {
                       Monthly Comparison
                     </h2>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-                      Expenses by month
+                      {viewType === 'expense' ? 'Expenses' : 'Income'} by month
                     </p>
                     <FinanceMonthlyComparison 
-                      transactions={expenseTransactions} 
+                      transactions={transactionsByViewType} 
                       months={
                         timeRange === 'today' || timeRange === 'week' ? 1 :
                         timeRange === 'month' ? 3 :
@@ -863,15 +908,17 @@ export default function FinanceAnalyticsPage() {
                   {/* Top Categories */}
                   <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
                     <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                      Top Spending Categories
+                      Top {viewType === 'expense' ? 'Spending' : 'Income'} Categories
                     </h2>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-                      Your biggest expense categories
+                      Your biggest {viewType === 'expense' ? 'expense' : 'income'} categories
                     </p>
-                    <FinanceCategoryBarChart transactions={expenseTransactions} limit={10} />
+                    <FinanceCategoryBarChart transactions={transactionsByViewType} limit={10} />
                   </div>
                 </div>
 
+                {/* Spending by Day of Week & Payment Method - Only show for expenses */}
+                {viewType === 'expense' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                   {/* Spending by Day of Week */}
                   <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
@@ -881,7 +928,7 @@ export default function FinanceAnalyticsPage() {
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
                       See which days you spend the most
                     </p>
-                    <FinanceSpendingByDayOfWeek transactions={expenseTransactions} />
+                    <FinanceSpendingByDayOfWeek transactions={transactionsByViewType} />
                   </div>
 
                   {/* Payment Method Breakdown */}
@@ -892,9 +939,10 @@ export default function FinanceAnalyticsPage() {
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
                       How you pay for expenses
                     </p>
-                    <FinancePaymentMethodBreakdown transactions={expenseTransactions} />
+                    <FinancePaymentMethodBreakdown transactions={transactionsByViewType} />
                   </div>
                 </div>
+                )}
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                   {/* Category Trends Over Time */}
@@ -906,7 +954,7 @@ export default function FinanceAnalyticsPage() {
                       How your top categories change month-over-month
                     </p>
                     <FinanceCategoryTrends 
-                      transactions={expenseTransactions} 
+                      transactions={transactionsByViewType} 
                       months={
                         timeRange === 'today' || timeRange === 'week' ? 1 :
                         timeRange === 'month' ? 3 :
@@ -929,7 +977,7 @@ export default function FinanceAnalyticsPage() {
                       Compare current period to same period last year
                     </p>
                     <FinanceYearOverYear 
-                      transactions={expenseTransactions} 
+                      transactions={transactionsByViewType} 
                       months={
                         timeRange === 'today' || timeRange === 'week' ? 1 :
                         timeRange === 'month' ? 3 :
@@ -950,10 +998,10 @@ export default function FinanceAnalyticsPage() {
                       Average Transaction Amount
                     </h2>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-                      Average expense per transaction over time
+                      Average {viewType === 'expense' ? 'expense' : 'income'} per transaction over time
                     </p>
                     <FinanceAverageTransactionAmount 
-                      transactions={expenseTransactions} 
+                      transactions={transactionsByViewType} 
                       months={
                         timeRange === 'today' || timeRange === 'week' ? 1 :
                         timeRange === 'month' ? 3 :
@@ -966,7 +1014,8 @@ export default function FinanceAnalyticsPage() {
                     />
                   </div>
 
-                  {/* Spending Velocity */}
+                  {/* Spending Velocity - Only show for expenses */}
+                  {viewType === 'expense' && (
                   <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
                     <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                       Spending Velocity
@@ -975,7 +1024,7 @@ export default function FinanceAnalyticsPage() {
                       Daily/weekly average spending rate
                     </p>
                     <FinanceSpendingVelocity 
-                      transactions={expenseTransactions} 
+                      transactions={transactionsByViewType} 
                       view={timeRange === 'today' || timeRange === 'week' ? 'daily' : 'weekly'}
                       days={30}
                       weeks={
@@ -988,9 +1037,11 @@ export default function FinanceAnalyticsPage() {
                       }
                     />
                   </div>
+                  )}
                 </div>
 
-                {/* Expense Distribution */}
+                {/* Expense Distribution - Only show for expenses */}
+                {viewType === 'expense' && (
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 mb-6">
                   <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                     Expense Distribution
@@ -998,8 +1049,9 @@ export default function FinanceAnalyticsPage() {
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
                     Histogram showing transaction amount distribution
                   </p>
-                  <FinanceExpenseDistribution transactions={expenseTransactions} bins={20} />
+                  <FinanceExpenseDistribution transactions={transactionsByViewType} bins={20} />
                 </div>
+                )}
 
                 {/* Cash Flow Calendar */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 mb-6">
@@ -1010,7 +1062,7 @@ export default function FinanceAnalyticsPage() {
                     Net cash flow by day (Income - Expenses). Green = positive, Red = negative
                   </p>
                   <FinanceCashFlowCalendar 
-                    transactions={expenseTransactions} 
+                    transactions={transactionsByViewType} 
                     months={
                       timeRange === 'today' || timeRange === 'week' ? 1 :
                       timeRange === 'month' ? 1 :
@@ -1024,6 +1076,8 @@ export default function FinanceAnalyticsPage() {
                   />
                 </div>
 
+                {/* Category Forecast & Spending Alerts - Only show for expenses */}
+                {viewType === 'expense' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                   {/* Category Forecast */}
                   <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
@@ -1034,7 +1088,7 @@ export default function FinanceAnalyticsPage() {
                       Predict next month's spending per category
                     </p>
                     <FinanceCategoryForecast 
-                      transactions={expenseTransactions} 
+                      transactions={transactionsByViewType} 
                       months={
                         timeRange === 'today' || timeRange === 'week' ? 3 :
                         timeRange === 'month' ? 6 :
@@ -1056,7 +1110,7 @@ export default function FinanceAnalyticsPage() {
                       Unusual spending patterns and trends
                     </p>
                     <FinanceSpendingAlerts 
-                      transactions={expenseTransactions} 
+                      transactions={transactionsByViewType} 
                       months={
                         timeRange === 'today' || timeRange === 'week' ? 3 :
                         timeRange === 'month' ? 6 :
@@ -1069,8 +1123,10 @@ export default function FinanceAnalyticsPage() {
                     />
                   </div>
                 </div>
+                )}
 
-                {/* Recurring Expenses Detection */}
+                {/* Recurring Expenses Detection - Only show for expenses */}
+                {viewType === 'expense' && (
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 mb-6">
                   <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                     Recurring Expenses Detection
@@ -1079,7 +1135,7 @@ export default function FinanceAnalyticsPage() {
                     Identify and highlight recurring transactions
                   </p>
                   <FinanceRecurringExpenses 
-                    transactions={expenseTransactions} 
+                    transactions={transactionsByViewType} 
                     months={
                       timeRange === 'today' || timeRange === 'week' ? 3 :
                       timeRange === 'month' ? 6 :
@@ -1091,10 +1147,11 @@ export default function FinanceAnalyticsPage() {
                     }
                   />
                 </div>
+                )}
 
                 {/* Duplicate Detection */}
                 <div className="mb-6">
-                  <DuplicateDetection transactions={expenseTransactions} />
+                  <DuplicateDetection transactions={transactionsByViewType} />
                 </div>
 
                 {/* Visual & Fun Section */}
@@ -1103,20 +1160,25 @@ export default function FinanceAnalyticsPage() {
                     Visual & Fun
                   </h2>
                   
-                  {/* Spending Mood Board */}
+                  {/* Spending Mood Board - Only show for expenses */}
+                  {viewType === 'expense' && (
                   <div className="mb-6">
-                    <SpendingMoodBoard transactions={expenseTransactions} />
+                    <SpendingMoodBoard transactions={transactionsByViewType} />
                   </div>
+                  )}
 
-                  {/* Category Emoji Map */}
+                  {/* Category Emoji Map - Only show for expenses */}
+                  {viewType === 'expense' && (
                   <div className="mb-6">
-                    <CategoryEmojiMap transactions={expenseTransactions} />
+                    <CategoryEmojiMap transactions={transactionsByViewType} />
                   </div>
+                  )}
 
-                  {/* Spending Story */}
+                  {/* Spending Story - Only show for expenses */}
+                  {viewType === 'expense' && (
                   <div className="mb-6">
                     <SpendingStory 
-                      transactions={expenseTransactions}
+                      transactions={transactionsByViewType}
                       periodStart={
                         timeRange === 'month' ? startOfMonth(new Date()) :
                         timeRange === 'year' ? new Date(new Date().getFullYear(), 0, 1) :
@@ -1129,10 +1191,11 @@ export default function FinanceAnalyticsPage() {
                       }
                     />
                   </div>
+                  )}
 
                   {/* Financial Timeline */}
                   <div className="mb-6">
-                    <FinancialTimeline transactions={expenseTransactions} />
+                    <FinancialTimeline transactions={transactionsByViewType} />
                   </div>
                 </div>
 
@@ -1145,7 +1208,7 @@ export default function FinanceAnalyticsPage() {
                   {/* PDF Export */}
                   <div className="mb-6">
                     <PDFExport 
-                      transactions={expenseTransactions}
+                      transactions={transactionsByViewType}
                       periodStart={
                         timeRange === 'month' ? startOfMonth(new Date()) :
                         timeRange === 'year' ? new Date(new Date().getFullYear(), 0, 1) :
@@ -1163,7 +1226,7 @@ export default function FinanceAnalyticsPage() {
                   {/* Multi-Currency Support */}
                   <div className="mb-6">
                     <MultiCurrencySupport 
-                      transactions={expenseTransactions}
+                      transactions={transactionsByViewType}
                       baseCurrency="EUR"
                     />
                   </div>

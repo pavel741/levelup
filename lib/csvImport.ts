@@ -351,14 +351,28 @@ export class CSVImportService {
       ) {
         type = 'expense'
       } else {
-        // If type column exists but value doesn't match known patterns, infer from amount
+        // If type column exists but value doesn't match known patterns
+        // For banks with D/C indicator, we MUST have a valid D/C value
+        if (usesDebitCreditIndicator) {
+          console.warn(`⚠️ Unknown D/C value "${type}" for bank with D/C indicator. Defaulting to expense.`)
+          type = 'expense' // Default to expense if D/C value is unknown
+        } else {
+          // For other banks, infer from amount sign
+          const amountNum = parseFloat(amount || '0')
+          type = amountNum >= 0 ? 'income' : 'expense'
+        }
+      }
+    } else {
+      // No type column found
+      if (usesDebitCreditIndicator) {
+        // For banks with D/C indicator, we MUST have a type column
+        console.warn(`⚠️ No D/C column found for bank with D/C indicator. Defaulting to expense.`)
+        type = 'expense' // Default to expense if D/C column is missing
+      } else {
+        // For other banks, infer from amount sign
         const amountNum = parseFloat(amount || '0')
         type = amountNum >= 0 ? 'income' : 'expense'
       }
-    } else {
-      // No type column - infer from amount sign
-      const amountNum = parseFloat(amount || '0')
-      type = amountNum >= 0 ? 'income' : 'expense'
     }
 
     // Use default description if not found
@@ -370,22 +384,8 @@ export class CSVImportService {
       }
     }
 
-    // Category handling - ALWAYS use smart categorization, even if category is provided
-    // This ensures we don't use descriptions as categories
-    const { getSuggestedCategory } = require('./transactionCategorizer')
-    
-    // Check if the provided category looks like a description (should be recategorized)
-    const providedCategory = category && category.trim().length > 0 ? category.trim() : ''
-    const looksLikeDescription = 
-      providedCategory.includes('POS:') ||
-      providedCategory.match(/\d{4}\s+\d{2}\*+/) ||
-      providedCategory.includes('/') ||
-      providedCategory.includes('\\') ||
-      providedCategory.length > 50 ||
-      providedCategory.match(/^[A-Z0-9\s#\/\\-]+$/) && providedCategory.length > 20 // Long alphanumeric strings
-    
-    // Always try to get a smart category
-    // Include selgitus and archiveId in description if they exist (for PSD2-KLIX detection, LHV card payment pattern, etc.)
+    // Category handling - Handle income transactions first, then expenses
+    // Include selgitus and archiveId in description if they exist
     const parts = [description]
     if (selgitus && selgitus.trim().length > 0) {
       parts.push(selgitus.trim())
@@ -394,31 +394,56 @@ export class CSVImportService {
       parts.push(archiveId.trim())
     }
     const fullDescription = parts.join(' ').trim() || description
+    const descriptionLower = fullDescription.toLowerCase()
     
-    const suggestedCategory = getSuggestedCategory(
-      fullDescription,
-      referenceNumber || undefined,
-      recipientName || undefined,
-      parseFloat(amount || '0')
-    )
-    
-    if (suggestedCategory) {
-      // Use suggested category if available
-      category = suggestedCategory
-    } else if (!looksLikeDescription && providedCategory && providedCategory !== 'Other') {
-      // Use provided category only if it doesn't look like a description
-      category = providedCategory
-    } else {
-      // Fallback to old logic for backward compatibility
-      const descriptionLower = (description || '').toLowerCase()
-      if (descriptionLower.includes('iseteenindus.energia')) {
-        category = 'Bills'
-      } else if (descriptionLower.includes('makse') || descriptionLower.includes('payment')) {
-        category = 'Bills'
-      } else if (recipientName && recipientName.trim().toLowerCase().startsWith('kaart')) {
-        category = 'Card Payment'
+    // Handle income transactions first
+    if (type === 'income') {
+      // Check for salary/payroll keywords
+      if (descriptionLower.includes('töötasu') || descriptionLower.includes('payroll')) {
+        category = 'Palk'
       } else {
-        category = 'Other'
+        // Other positive amounts go to Income category
+        category = 'Income'
+      }
+    } else {
+      // For expenses, use smart categorization
+      const { getSuggestedCategory } = require('./transactionCategorizer')
+      
+      // Check if the provided category looks like a description (should be recategorized)
+      const providedCategory = category && category.trim().length > 0 ? category.trim() : ''
+      const looksLikeDescription = 
+        providedCategory.includes('POS:') ||
+        providedCategory.match(/\d{4}\s+\d{2}\*+/) ||
+        providedCategory.includes('/') ||
+        providedCategory.includes('\\') ||
+        providedCategory.length > 50 ||
+        providedCategory.match(/^[A-Z0-9\s#\/\\-]+$/) && providedCategory.length > 20 // Long alphanumeric strings
+      
+      // Always try to get a smart category for expenses
+      const suggestedCategory = getSuggestedCategory(
+        fullDescription,
+        referenceNumber || undefined,
+        recipientName || undefined,
+        parseFloat(amount || '0')
+      )
+      
+      if (suggestedCategory) {
+        // Use suggested category if available
+        category = suggestedCategory
+      } else if (!looksLikeDescription && providedCategory && providedCategory !== 'Other') {
+        // Use provided category only if it doesn't look like a description
+        category = providedCategory
+      } else {
+        // Fallback to old logic for backward compatibility
+        if (descriptionLower.includes('iseteenindus.energia')) {
+          category = 'Bills'
+        } else if (descriptionLower.includes('makse') || descriptionLower.includes('payment')) {
+          category = 'Bills'
+        } else if (recipientName && recipientName.trim().toLowerCase().startsWith('kaart')) {
+          category = 'Card Payment'
+        } else {
+          category = 'Other'
+        }
       }
     }
 

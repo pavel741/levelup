@@ -13,7 +13,6 @@
 export { useFirestoreStore } from './useFirestoreStore'
 
 // Feature stores
-export { useFinanceStore } from './useFinanceStore'
 export { useWorkoutStore } from './useWorkoutStore'
 export { useTodosStore } from './useTodosStore'
 export { useFocusStore } from './useFocusStore'

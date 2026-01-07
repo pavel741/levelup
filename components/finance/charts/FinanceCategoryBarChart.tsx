@@ -29,13 +29,12 @@ export function FinanceCategoryBarChart({ transactions, limit = 10 }: Props) {
 
     for (const tx of transactions) {
       const amount = Number(tx.amount) || 0
-      const type = (tx.type || '').toLowerCase()
-
-      // Focus on expenses
-      const isExpense = type === 'expense' || amount < 0
-      if (!isExpense) continue
-
+      // Use absolute value - transactions are already filtered by view type
       const absAmount = Math.abs(amount)
+      
+      // Check if this is an income transaction
+      const type = (tx.type || '').toLowerCase()
+      const isIncome = type === 'income' || (type !== 'expense' && amount > 0)
       
       // Check for LHV card payment pattern in description or archiveId
       const description = tx.description || ''
@@ -47,34 +46,48 @@ export function FinanceCategoryBarChart({ transactions, limit = 10 }: Props) {
       // Normalize category: if category looks like a description (contains POS pattern), recategorize it
       let category = tx.category || 'Other'
       
-      // Always try to recategorize if:
-      // 1. Category looks like a description (contains POS:, card numbers, etc.)
-      // 2. Category is empty or "Other"
-      // 3. Category contains card number patterns
-      // 4. LHV card payment pattern detected
-      const needsRecategorization = 
-        !category || 
-        category === 'Other' ||
-        category.includes('POS:') ||
-        category.match(/\d{4}\s+\d{2}\*+/) ||
-        category.toLowerCase().includes('pos') ||
-        category.match(/^\d{4}\s+\d{2}\*+/) ||
-        hasLhvCardPattern // Always recategorize if LHV pattern detected
-      
-      if (needsRecategorization) {
-        // Include archiveId in description for LHV pattern detection
-        const fullDescription = archiveId && archiveId.trim().length > 0
-          ? `${description} ${archiveId}`.trim()
-          : description
+      // For income transactions, always use "Income" category (override any expense categories)
+      if (isIncome) {
+        // Override expense categories like "Bills", "Card Payment", etc. with "Income"
+        const expenseCategories = ['Bills', 'Card Payment', 'ATM Withdrawal', 'Other', 'Kommunaalid', 'Kodulaen', 'ESTO']
+        const validIncomeCategories = ['Income', 'Palk', 'Salary', 'Freelance', 'Investment', 'Gift', 'Refund', 'Bonus']
+        // Set to "Income" if: empty, expense category, looks like description, or not a valid income category
+        const isExpenseCategory = expenseCategories.some(exp => category.toLowerCase() === exp.toLowerCase())
+        const isValidIncomeCategory = validIncomeCategories.some(valid => category.toLowerCase() === valid.toLowerCase())
+        if (!category || isExpenseCategory || category.includes('POS:') || category.match(/\d{4}\s+\d{2}\*+/) || !isValidIncomeCategory) {
+          category = 'Income'
+        }
+      } else {
+        // For expenses, use the expense categorizer
+        // Always try to recategorize if:
+        // 1. Category looks like a description (contains POS:, card numbers, etc.)
+        // 2. Category is empty or "Other"
+        // 3. Category contains card number patterns
+        // 4. LHV card payment pattern detected
+        const needsRecategorization = 
+          !category || 
+          category === 'Other' ||
+          category.includes('POS:') ||
+          category.match(/\d{4}\s+\d{2}\*+/) ||
+          category.toLowerCase().includes('pos') ||
+          category.match(/^\d{4}\s+\d{2}\*+/) ||
+          hasLhvCardPattern // Always recategorize if LHV pattern detected
         
-        const suggestedCategory = getSuggestedCategory(
-          fullDescription || category,
-          tx.referenceNumber,
-          tx.recipientName,
-          amount
-        )
-        if (suggestedCategory) {
-          category = suggestedCategory
+        if (needsRecategorization) {
+          // Include archiveId in description for LHV pattern detection
+          const fullDescription = archiveId && archiveId.trim().length > 0
+            ? `${description} ${archiveId}`.trim()
+            : description
+          
+          const suggestedCategory = getSuggestedCategory(
+            fullDescription || category,
+            tx.referenceNumber,
+            tx.recipientName,
+            amount
+          )
+          if (suggestedCategory) {
+            category = suggestedCategory
+          }
         }
       }
       

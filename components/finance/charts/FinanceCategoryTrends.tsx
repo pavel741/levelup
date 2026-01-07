@@ -62,30 +62,39 @@ export function FinanceCategoryTrends({ transactions, months = 12, topCategories
     
     for (const tx of transactions) {
       const amount = Number(tx.amount) || 0
-      const type = (tx.type || '').toLowerCase()
-      
-      const isExpense = type === 'expense' || amount < 0
-      if (!isExpense) continue
-
+      // Use absolute value - transactions are already filtered by view type
       const absAmount = Math.abs(amount)
+      
+      // Check if this is an income transaction
+      const type = (tx.type || '').toLowerCase()
+      const isIncome = type === 'income' || (type !== 'expense' && amount > 0)
+      
       let category = tx.category || 'Other'
       
-      // Normalize category
-      const needsRecategorization = 
-        !category || 
-        category === 'Other' ||
-        category.includes('POS:') ||
-        category.match(/\d{4}\s+\d{2}\*+/)
-      
-      if (needsRecategorization) {
-        const suggestedCategory = getSuggestedCategory(
-          tx.description || category,
-          tx.referenceNumber,
-          tx.recipientName,
-          amount
-        )
-        if (suggestedCategory) {
-          category = suggestedCategory
+      // For income transactions, use "Income" category instead of expense categorizer
+      if (isIncome) {
+        if (!category || category === 'Other' || category.includes('POS:') || category.match(/\d{4}\s+\d{2}\*+/)) {
+          category = 'Income'
+        }
+      } else {
+        // For expenses, use the expense categorizer
+        // Normalize category
+        const needsRecategorization = 
+          !category || 
+          category === 'Other' ||
+          category.includes('POS:') ||
+          category.match(/\d{4}\s+\d{2}\*+/)
+        
+        if (needsRecategorization) {
+          const suggestedCategory = getSuggestedCategory(
+            tx.description || category,
+            tx.referenceNumber,
+            tx.recipientName,
+            amount
+          )
+          if (suggestedCategory) {
+            category = suggestedCategory
+          }
         }
       }
       
@@ -111,35 +120,49 @@ export function FinanceCategoryTrends({ transactions, months = 12, topCategories
     // Process transactions and group by month and category
     for (const tx of transactions) {
       const amount = Number(tx.amount) || 0
-      const type = (tx.type || '').toLowerCase()
-      
-      const isExpense = type === 'expense' || amount < 0
-      if (!isExpense) continue
-
+      // Use absolute value - transactions are already filtered by view type
       const absAmount = Math.abs(amount)
       const txDate = typeof tx.date === 'string' ? new Date(tx.date) : (tx.date as Date)
       const monthKey = format(txDate, 'yyyy-MM')
       
       if (!monthDates.some(d => format(d, 'yyyy-MM') === monthKey)) continue
 
+      // Check if this is an income transaction
+      const type = (tx.type || '').toLowerCase()
+      const isIncome = type === 'income' || (type !== 'expense' && amount > 0)
+
       let category = tx.category || 'Other'
       
-      // Normalize category
-      const needsRecategorization = 
-        !category || 
-        category === 'Other' ||
-        category.includes('POS:') ||
-        category.match(/\d{4}\s+\d{2}\*+/)
-      
-      if (needsRecategorization) {
-        const suggestedCategory = getSuggestedCategory(
-          tx.description || category,
-          tx.referenceNumber,
-          tx.recipientName,
-          amount
-        )
-        if (suggestedCategory) {
-          category = suggestedCategory
+      // For income transactions, always use "Income" category (override any expense categories)
+      if (isIncome) {
+        // Override expense categories like "Bills", "Card Payment", etc. with "Income"
+        const expenseCategories = ['Bills', 'Card Payment', 'ATM Withdrawal', 'Other', 'Kommunaalid', 'Kodulaen', 'ESTO']
+        const validIncomeCategories = ['Income', 'Palk', 'Salary', 'Freelance', 'Investment', 'Gift', 'Refund', 'Bonus']
+        // Set to "Income" if: empty, expense category, looks like description, or not a valid income category
+        const isExpenseCategory = expenseCategories.some(exp => category.toLowerCase() === exp.toLowerCase())
+        const isValidIncomeCategory = validIncomeCategories.some(valid => category.toLowerCase() === valid.toLowerCase())
+        if (!category || isExpenseCategory || category.includes('POS:') || category.match(/\d{4}\s+\d{2}\*+/) || !isValidIncomeCategory) {
+          category = 'Income'
+        }
+      } else {
+        // For expenses, use the expense categorizer
+        // Normalize category
+        const needsRecategorization = 
+          !category || 
+          category === 'Other' ||
+          category.includes('POS:') ||
+          category.match(/\d{4}\s+\d{2}\*+/)
+        
+        if (needsRecategorization) {
+          const suggestedCategory = getSuggestedCategory(
+            tx.description || category,
+            tx.referenceNumber,
+            tx.recipientName,
+            amount
+          )
+          if (suggestedCategory) {
+            category = suggestedCategory
+          }
         }
       }
 
