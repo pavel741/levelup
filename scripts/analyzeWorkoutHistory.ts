@@ -1,11 +1,11 @@
 /**
- * Workout History Analysis
- * Analyzes workout logs to provide deeper insights
+ * Workout History Analysis - IMPROVED VERSION
+ * Analyzes workout logs with more accurate calculations and better insights
  */
 
 import type { WorkoutLog } from '@/types/workout'
 import { getExerciseById } from '@/lib/exerciseDatabase'
-import { format, subDays } from 'date-fns'
+import { format, subDays, startOfWeek, differenceInDays } from 'date-fns'
 
 export interface WorkoutHistoryInsights {
   totalWorkouts: number
@@ -35,6 +35,102 @@ export interface WorkoutHistoryInsights {
     frequencyTrend: 'increasing' | 'stable' | 'decreasing'
     strengthProgression: Array<{ exerciseId: string; name: string; progression: string }>
   }
+}
+
+/**
+ * Estimate 1RM from weight and reps using Epley formula
+ * 1RM = weight × (1 + reps/30)
+ */
+function estimate1RM(weight: number, reps: number): number {
+  if (reps <= 0 || weight <= 0) return 0
+  if (reps === 1) return weight
+  return weight * (1 + reps / 30)
+}
+
+/**
+ * Calculate normalized volume load accounting for rep ranges
+ * Uses relative intensity (percentage of estimated 1RM)
+ */
+function calculateNormalizedVolume(sets: Array<{ weight?: number; reps?: number }>): number {
+  let totalVolume = 0
+  let totalSets = 0
+  
+  sets.forEach(set => {
+    const weight = set.weight || 0
+    const reps = set.reps || 0
+    
+    if (weight > 0 && reps > 0) {
+      const estimated1RM = estimate1RM(weight, reps)
+      const relativeIntensity = weight / estimated1RM // Percentage of 1RM
+      
+      // Normalize volume: higher rep sets contribute less per rep
+      // This accounts for the fact that 10 reps at 70% 1RM is different stimulus than 1 rep at 100%
+      const normalizedReps = reps * relativeIntensity
+      totalVolume += weight * normalizedReps
+      totalSets++
+    }
+  })
+  
+  return totalVolume
+}
+
+/**
+ * Calculate linear regression trend for volume progression
+ * Returns slope (positive = increasing, negative = decreasing, near zero = stable)
+ */
+function calculateTrend(values: number[]): { slope: number; trend: 'increasing' | 'stable' | 'decreasing' } {
+  if (values.length < 3) {
+    return { slope: 0, trend: 'stable' }
+  }
+  
+  const n = values.length
+  const x = Array.from({ length: n }, (_, i) => i)
+  const sumX = x.reduce((a, b) => a + b, 0)
+  const sumY = values.reduce((a, b) => a + b, 0)
+  const sumXY = x.reduce((sum, xi, i) => sum + xi * values[i], 0)
+  const sumXX = x.reduce((sum, xi) => sum + xi * xi, 0)
+  
+  const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX)
+  const avgY = sumY / n
+  
+  // Normalize slope by average to get percentage change per period
+  const normalizedSlope = slope / avgY
+  
+  let trend: 'increasing' | 'stable' | 'decreasing'
+  if (normalizedSlope > 0.05) {
+    trend = 'increasing'
+  } else if (normalizedSlope < -0.05) {
+    trend = 'decreasing'
+  } else {
+    trend = 'stable'
+  }
+  
+  return { slope: normalizedSlope, trend }
+}
+
+/**
+ * Calculate workouts per week using actual week boundaries
+ */
+function calculateWorkoutsPerWeek(logs: WorkoutLog[]): number {
+  if (logs.length === 0) return 0
+  
+  // Group workouts by week
+  const weekMap = new Map<string, number>()
+  
+  logs.forEach(log => {
+    const logDate = log.endTime ? new Date(log.endTime) : new Date(log.date)
+    const weekStart = startOfWeek(logDate, { weekStartsOn: 1 }) // Monday
+    const weekKey = format(weekStart, 'yyyy-MM-dd')
+    weekMap.set(weekKey, (weekMap.get(weekKey) || 0) + 1)
+  })
+  
+  if (weekMap.size === 0) return 0
+  
+  // Calculate average workouts per week
+  const totalWorkouts = Array.from(weekMap.values()).reduce((a, b) => a + b, 0)
+  const totalWeeks = weekMap.size
+  
+  return totalWorkouts / totalWeeks
 }
 
 /**
@@ -73,24 +169,42 @@ export function analyzeWorkoutHistory(logs: WorkoutLog[]): WorkoutHistoryInsight
     }
   }
 
-  // Basic stats
+  // Sort logs by date (oldest first)
+  const sortedLogs = [...logs].sort((a, b) => {
+    const dateA = a.endTime ? new Date(a.endTime) : new Date(a.date)
+    const dateB = b.endTime ? new Date(b.endTime) : new Date(b.date)
+    return dateA.getTime() - dateB.getTime()
+  })
+
+  // Basic stats with improved volume calculation
   const totalWorkouts = logs.length
-  const totalVolume = logs.reduce((sum, log) => sum + (log.totalVolume || 0), 0)
-  const totalDuration = logs.reduce((sum, log) => sum + log.duration, 0)
+  const totalVolume = sortedLogs.reduce((sum, log) => {
+    // Use normalized volume if available, otherwise fall back to totalVolume
+    if (log.totalVolume) {
+      return sum + log.totalVolume
+    }
+    // Calculate volume from exercises
+    const workoutVolume = log.exercises.reduce((exSum, ex) => {
+      return exSum + calculateNormalizedVolume(ex.sets)
+    }, 0)
+    return sum + workoutVolume
+  }, 0)
+  
+  const totalDuration = sortedLogs.reduce((sum, log) => sum + log.duration, 0)
   const averageWorkoutDuration = Math.round(totalDuration / totalWorkouts / 60) // Convert to minutes
   const averageVolumePerWorkout = Math.round(totalVolume / totalWorkouts)
 
-  // Exercise frequency
+  // Exercise frequency with improved volume calculation
   const exerciseCounts = new Map<string, { count: number; totalVolume: number }>()
   const muscleGroupCounts = new Map<string, number>()
   const uniqueExerciseIds = new Set<string>()
 
-  logs.forEach(log => {
+  sortedLogs.forEach(log => {
     log.exercises.forEach(ex => {
       uniqueExerciseIds.add(ex.exerciseId)
       
       const current = exerciseCounts.get(ex.exerciseId) || { count: 0, totalVolume: 0 }
-      const exerciseVolume = ex.sets.reduce((sum, set) => sum + ((set.weight || 0) * (set.reps || 0)), 0)
+      const exerciseVolume = calculateNormalizedVolume(ex.sets)
       exerciseCounts.set(ex.exerciseId, {
         count: current.count + 1,
         totalVolume: current.totalVolume + exerciseVolume
@@ -118,31 +232,38 @@ export function analyzeWorkoutHistory(logs: WorkoutLog[]): WorkoutHistoryInsight
     .sort((a, b) => b.count - a.count)
     .slice(0, 10)
 
-  // Training frequency
+  // Improved training frequency calculation using actual weeks
   const last30Days = subDays(new Date(), 30)
-  const recentLogs = logs.filter(log => {
+  const recentLogs = sortedLogs.filter(log => {
     const logDate = log.endTime ? new Date(log.endTime) : new Date(log.date)
     return logDate >= last30Days
   })
 
-  const workoutDates = new Set(
-    recentLogs.map(log => {
-      const logDate = log.endTime ? new Date(log.endTime) : new Date(log.date)
-      return format(logDate, 'yyyy-MM-dd')
-    })
-  )
-
-  const daysPerWeek = (workoutDates.size / 30) * 7
+  // Calculate workouts per week using week boundaries
+  const workoutsPerWeek = calculateWorkoutsPerWeek(recentLogs)
+  
+  // Also calculate consistency based on recent weeks
+  const recentWeeks = new Set<string>()
+  recentLogs.forEach(log => {
+    const logDate = log.endTime ? new Date(log.endTime) : new Date(log.date)
+    const weekStart = startOfWeek(logDate, { weekStartsOn: 1 })
+    recentWeeks.add(format(weekStart, 'yyyy-MM-dd'))
+  })
+  
+  const weeksWithWorkouts = recentWeeks.size
+  const expectedWeeks = Math.ceil(differenceInDays(new Date(), last30Days) / 7)
+  const consistencyRatio = expectedWeeks > 0 ? weeksWithWorkouts / expectedWeeks : 0
+  
   let consistency: 'excellent' | 'good' | 'moderate' | 'low'
   let frequencyRecommendation: string
 
-  if (daysPerWeek >= 4) {
+  if (workoutsPerWeek >= 4 && consistencyRatio >= 0.8) {
     consistency = 'excellent'
-    frequencyRecommendation = 'Excellent training frequency! You\'re working out 4+ times per week.'
-  } else if (daysPerWeek >= 3) {
+    frequencyRecommendation = 'Excellent training frequency! You\'re working out 4+ times per week consistently.'
+  } else if (workoutsPerWeek >= 3 && consistencyRatio >= 0.7) {
     consistency = 'good'
     frequencyRecommendation = 'Good training frequency. Consider adding 1 more day per week for optimal results.'
-  } else if (daysPerWeek >= 2) {
+  } else if (workoutsPerWeek >= 2) {
     consistency = 'moderate'
     frequencyRecommendation = 'Moderate training frequency. Aim for 3-4 workouts per week for better progress.'
   } else {
@@ -150,113 +271,212 @@ export function analyzeWorkoutHistory(logs: WorkoutLog[]): WorkoutHistoryInsight
     frequencyRecommendation = 'Low training frequency. Try to work out at least 3 times per week for consistent progress.'
   }
 
-  // Volume progression (last 10 workouts)
-  const sortedLogs = [...logs].sort((a, b) => {
-    const dateA = a.endTime ? new Date(a.endTime) : new Date(a.date)
-    const dateB = b.endTime ? new Date(b.endTime) : new Date(b.date)
-    return dateA.getTime() - dateB.getTime()
+  // Volume progression (last 12 workouts for better trend analysis)
+  const volumeProgression = sortedLogs.slice(-12).map(log => {
+    const logDate = log.endTime ? new Date(log.endTime) : new Date(log.date)
+    return {
+      date: format(logDate, 'MMM d'),
+      volume: log.totalVolume || log.exercises.reduce((sum, ex) => sum + calculateNormalizedVolume(ex.sets), 0)
+    }
   })
 
-  const volumeProgression = sortedLogs.slice(-10).map(log => ({
-    date: format(log.endTime ? new Date(log.endTime) : new Date(log.date), 'MMM d'),
-    volume: log.totalVolume || 0
-  }))
+  // Improved volume trend using linear regression
+  const recentVolumes = sortedLogs.slice(-8).map(log => 
+    log.totalVolume || log.exercises.reduce((sum, ex) => sum + calculateNormalizedVolume(ex.sets), 0)
+  )
+  const { trend: volumeTrend } = calculateTrend(recentVolumes)
 
-  // Volume trend
-  const recentVolume = sortedLogs.slice(-5).reduce((sum, log) => sum + (log.totalVolume || 0), 0) / 5
-  const olderVolume = sortedLogs.slice(-10, -5).reduce((sum, log) => sum + (log.totalVolume || 0), 0) / 5
-  const volumeTrend = recentVolume > olderVolume * 1.1 ? 'increasing' : 
-                     recentVolume < olderVolume * 0.9 ? 'decreasing' : 'stable'
+  // Improved frequency trend using week-based comparison
+  const now = new Date()
+  const fourWeeksAgo = subDays(now, 28)
+  const eightWeeksAgo = subDays(now, 56)
+  
+  const recent4Weeks = sortedLogs.filter(log => {
+    const logDate = log.endTime ? new Date(log.endTime) : new Date(log.date)
+    return logDate >= fourWeeksAgo
+  }).length
+  
+  const previous4Weeks = sortedLogs.filter(log => {
+    const logDate = log.endTime ? new Date(log.endTime) : new Date(log.date)
+    return logDate >= eightWeeksAgo && logDate < fourWeeksAgo
+  }).length
+  
+  const frequencyTrend = recent4Weeks > previous4Weeks * 1.1 ? 'increasing' :
+                        recent4Weeks < previous4Weeks * 0.9 ? 'decreasing' : 'stable'
 
-  // Frequency trend
-  const recentWeeks = sortedLogs.slice(-14).length
-  const olderWeeks = sortedLogs.slice(-28, -14).length
-  const frequencyTrend = recentWeeks > olderWeeks ? 'increasing' :
-                        recentWeeks < olderWeeks ? 'decreasing' : 'stable'
-
-  // Muscle group balance
+  // Improved muscle group balance with normalized calculations
   const muscleGroupSets = new Map<string, number>()
-  logs.forEach(log => {
+  const muscleGroupVolume = new Map<string, number>()
+  
+  // Normalize by muscle group size (larger groups need more volume)
+  const muscleGroupSizeMultipliers: Record<string, number> = {
+    legs: 1.5,
+    glutes: 1.3,
+    quadriceps: 1.2,
+    hamstrings: 1.2,
+    back: 1.4,
+    lats: 1.3,
+    chest: 1.2,
+    shoulders: 1.0,
+    triceps: 0.8,
+    biceps: 0.7,
+    calves: 0.6,
+    core: 0.9,
+  }
+  
+  sortedLogs.forEach(log => {
     log.exercises.forEach(ex => {
       const exercise = getExerciseById(ex.exerciseId)
       if (exercise) {
+        const exerciseVolume = calculateNormalizedVolume(ex.sets)
         exercise.muscleGroups.primary.forEach(mg => {
+          const multiplier = muscleGroupSizeMultipliers[mg.toLowerCase()] || 1.0
           muscleGroupSets.set(mg, (muscleGroupSets.get(mg) || 0) + ex.sets.length)
+          muscleGroupVolume.set(mg, (muscleGroupVolume.get(mg) || 0) + exerciseVolume / multiplier)
         })
       }
     })
   })
 
-  const allSets = Array.from(muscleGroupSets.values())
-  const averageSets = allSets.reduce((sum, val) => sum + val, 0) / allSets.length
+  // Calculate normalized averages
+  const normalizedVolumes = Array.from(muscleGroupVolume.values())
+  const averageNormalizedVolume = normalizedVolumes.length > 0
+    ? normalizedVolumes.reduce((sum, val) => sum + val, 0) / normalizedVolumes.length
+    : 0
+
   const imbalances: Array<{ muscleGroup: string; sets: number; recommendation: string }> = []
 
-  muscleGroupSets.forEach((sets, mg) => {
-    const deviation = Math.abs(sets - averageSets) / averageSets
-    if (deviation > 0.5) { // More than 50% deviation
-      const recommendation = sets < averageSets * 0.5
-        ? `Add more ${mg} exercises. Currently ${sets} sets vs average ${Math.round(averageSets)} sets.`
-        : `You're training ${mg} a lot (${sets} sets). Consider balancing with other muscle groups.`
-      imbalances.push({ muscleGroup: mg, sets, recommendation })
+  muscleGroupVolume.forEach((normalizedVol, mg) => {
+    const sets = muscleGroupSets.get(mg) || 0
+    if (averageNormalizedVolume > 0) {
+      const deviation = Math.abs(normalizedVol - averageNormalizedVolume) / averageNormalizedVolume
+      if (deviation > 0.4) { // More than 40% deviation from normalized average
+        const recommendation = normalizedVol < averageNormalizedVolume * 0.6
+          ? `Add more ${mg} exercises. Currently ${sets} sets vs normalized average.`
+          : `You're training ${mg} extensively (${sets} sets). Consider balancing with other muscle groups.`
+        imbalances.push({ muscleGroup: mg, sets, recommendation })
+      }
     }
   })
 
-  // Exercise variety
-  const varietyScore = Math.min(100, (uniqueExerciseIds.size / 20) * 100)
-  const varietyRecommendation = varietyScore >= 70
-    ? 'Great exercise variety! You\'re using many different exercises.'
-    : varietyScore >= 40
-    ? 'Good variety. Consider adding more exercise variations to target muscles from different angles.'
-    : 'Low exercise variety. Try incorporating more different exercises to prevent plateaus and overuse injuries.'
-
-  // Strength progression
-  const strengthProgression: Array<{ exerciseId: string; name: string; progression: string }> = []
-  const exerciseWeights = new Map<string, number[]>()
-
-  sortedLogs.slice(-5).forEach(log => {
+  // Improved exercise variety - consider movement patterns
+  const movementPatterns = new Set<string>()
+  sortedLogs.forEach(log => {
     log.exercises.forEach(ex => {
-      const weights = ex.sets
-        .filter(set => set.weight && set.weight > 0)
-        .map(set => set.weight!)
-      
-      if (weights.length > 0) {
-        const avgWeight = weights.reduce((sum, w) => sum + w, 0) / weights.length
-        const current = exerciseWeights.get(ex.exerciseId) || []
-        exerciseWeights.set(ex.exerciseId, [...current, avgWeight])
+      const exercise = getExerciseById(ex.exerciseId)
+      if (exercise) {
+        // Categorize by movement pattern
+        const name = exercise.name.toLowerCase()
+        if (name.includes('squat') || name.includes('leg press')) movementPatterns.add('squat')
+        if (name.includes('deadlift') || name.includes('hip hinge')) movementPatterns.add('hip hinge')
+        if (name.includes('press') || name.includes('push')) movementPatterns.add('push')
+        if (name.includes('pull') || name.includes('row')) movementPatterns.add('pull')
+        if (name.includes('curl')) movementPatterns.add('curl')
+        if (name.includes('extension') || name.includes('tricep')) movementPatterns.add('extension')
       }
     })
   })
+  
+  // Variety score based on both unique exercises and movement patterns
+  const exerciseVarietyScore = Math.min(50, (uniqueExerciseIds.size / 15) * 50)
+  const movementVarietyScore = Math.min(50, (movementPatterns.size / 6) * 50)
+  const varietyScore = exerciseVarietyScore + movementVarietyScore
+  
+  const varietyRecommendation = varietyScore >= 70
+    ? 'Great exercise variety! You\'re using many different exercises and movement patterns.'
+    : varietyScore >= 40
+    ? 'Good variety. Consider adding more exercise variations to target muscles from different angles.'
+    : 'Low exercise variety. Try incorporating more different exercises and movement patterns to prevent plateaus.'
 
-  exerciseWeights.forEach((weights, exerciseId) => {
-    if (weights.length >= 3) {
-      const first = weights[0]
-      const last = weights[weights.length - 1]
-      const change = ((last - first) / first) * 100
+  // Improved strength progression with 1RM estimation and longer window
+  const strengthProgression: Array<{ exerciseId: string; name: string; progression: string }> = []
+  const exerciseData = new Map<string, Array<{ date: Date; estimated1RM: number; reps: number; weight: number }>>()
+
+  // Collect data from last 10 workouts (longer window)
+  sortedLogs.slice(-10).forEach(log => {
+    const logDate = log.endTime ? new Date(log.endTime) : new Date(log.date)
+    log.exercises.forEach(ex => {
+      ex.sets.forEach(set => {
+        if (set.weight && set.weight > 0 && set.reps && set.reps > 0) {
+          const estimated1RM = estimate1RM(set.weight, set.reps)
+          const current = exerciseData.get(ex.exerciseId) || []
+          exerciseData.set(ex.exerciseId, [
+            ...current,
+            { date: logDate, estimated1RM, reps: set.reps, weight: set.weight }
+          ])
+        }
+      })
+    })
+  })
+
+  exerciseData.forEach((dataPoints, exerciseId) => {
+    if (dataPoints.length >= 4) {
+      // Group by similar rep ranges to compare apples to apples
+      const repRangeGroups = new Map<string, typeof dataPoints>()
       
-      if (Math.abs(change) > 5) {
-        const exercise = getExerciseById(exerciseId)
-        strengthProgression.push({
-          exerciseId,
-          name: exercise?.name || 'Unknown',
-          progression: change > 0 
-            ? `+${change.toFixed(1)}% increase (${first.toFixed(1)}kg → ${last.toFixed(1)}kg)`
-            : `${change.toFixed(1)}% decrease (${first.toFixed(1)}kg → ${last.toFixed(1)}kg)`
-        })
-      }
+      dataPoints.forEach(point => {
+        let range: string
+        if (point.reps <= 3) range = '1-3'
+        else if (point.reps <= 6) range = '4-6'
+        else if (point.reps <= 10) range = '7-10'
+        else range = '11+'
+        
+        const group = repRangeGroups.get(range) || []
+        group.push(point)
+        repRangeGroups.set(range, group)
+      })
+      
+      // Analyze each rep range separately
+      repRangeGroups.forEach((group, range) => {
+        if (group.length >= 3) {
+          // Sort by date
+          group.sort((a, b) => a.date.getTime() - b.date.getTime())
+          
+          const first = group[0]
+          const last = group[group.length - 1]
+          
+          // Compare estimated 1RM (more accurate than raw weight)
+          const change = ((last.estimated1RM - first.estimated1RM) / first.estimated1RM) * 100
+          
+          if (Math.abs(change) > 3) { // 3% threshold for meaningful change
+            const exercise = getExerciseById(exerciseId)
+            const progression = change > 0
+              ? `+${change.toFixed(1)}% 1RM increase (${first.estimated1RM.toFixed(1)}kg → ${last.estimated1RM.toFixed(1)}kg) @ ${range} reps`
+              : `${change.toFixed(1)}% 1RM decrease (${first.estimated1RM.toFixed(1)}kg → ${last.estimated1RM.toFixed(1)}kg) @ ${range} reps`
+            
+            strengthProgression.push({
+              exerciseId,
+              name: exercise?.name || 'Unknown',
+              progression
+            })
+          }
+        }
+      })
     }
   })
+
+  // Remove duplicates and sort by absolute change
+  const uniqueProgression = Array.from(
+    new Map(strengthProgression.map(item => [item.exerciseId, item])).values()
+  )
+    .sort((a, b) => {
+      const changeA = parseFloat(a.progression.match(/[+-]?[\d.]+/)?.[0] || '0')
+      const changeB = parseFloat(b.progression.match(/[+-]?[\d.]+/)?.[0] || '0')
+      return Math.abs(changeB) - Math.abs(changeA)
+    })
+    .slice(0, 5)
 
   return {
     totalWorkouts,
     totalVolume,
     averageWorkoutDuration,
     averageVolumePerWorkout,
-    workoutsPerWeek: Math.round(daysPerWeek * 10) / 10,
+    workoutsPerWeek: Math.round(workoutsPerWeek * 10) / 10,
     mostFrequentExercises,
     muscleGroupFrequency: Object.fromEntries(muscleGroupCounts),
     volumeProgression,
     trainingFrequency: {
-      daysPerWeek: Math.round(daysPerWeek * 10) / 10,
+      daysPerWeek: Math.round(workoutsPerWeek * 10) / 10,
       consistency,
       recommendation: frequencyRecommendation
     },
@@ -272,8 +492,7 @@ export function analyzeWorkoutHistory(logs: WorkoutLog[]): WorkoutHistoryInsight
     progressIndicators: {
       volumeTrend,
       frequencyTrend,
-      strengthProgression: strengthProgression.slice(0, 5)
+      strengthProgression: uniqueProgression
     }
   }
 }
-
