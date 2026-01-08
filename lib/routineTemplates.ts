@@ -2558,7 +2558,7 @@ export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'u
   // Optimal Routine for Skinny Build (65kg, 176cm) - Muscle Building Focus
   {
     name: 'Skinny to Strong: Complete Muscle Builder',
-    description: 'Optimized 4-day routine for building muscle mass. Perfect for skinny individuals (65kg, 176cm) looking to gain size and strength. Focuses on compound movements with barbell, dumbbell, and bodyweight exercises. Progressive overload structure.',
+    description: 'Optimized 4-day routine for building muscle mass. Perfect for skinny individuals (65kg, 176cm) looking to gain size and strength. Designed for home workouts with bench, barbell, and dumbbells only - no pull-up bar needed! Focuses on compound movements with progressive overload structure.',
     goal: 'bulking',
     exercises: [],
     sessions: [
@@ -2602,7 +2602,7 @@ export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'u
             notes: 'Greater range of motion than barbell'
           },
           {
-            exerciseId: 'pull-ups',
+            exerciseId: 'renegade-rows',
             order: 3,
             sets: [
               { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 90 },
@@ -2610,7 +2610,7 @@ export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'u
               { setType: 'working', targetReps: 6, targetWeight: undefined, restAfter: 90 }
             ],
             restTime: 90,
-            notes: 'Use assistance if needed - aim for 3 sets of 8+'
+            notes: 'Each arm - great back and core builder, no pull-up bar needed. If too challenging, substitute with regular dumbbell rows'
           },
           {
             exerciseId: 'dumbbell-flyes',
@@ -2741,7 +2741,7 @@ export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'u
             notes: 'Seated or standing - full range'
           },
           {
-            exerciseId: 'chin-ups',
+            exerciseId: 'barbell-row',
             order: 2,
             sets: [
               { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 90 },
@@ -2749,7 +2749,7 @@ export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'u
               { setType: 'working', targetReps: 6, targetWeight: undefined, restAfter: 90 }
             ],
             restTime: 90,
-            notes: 'Bicep and back - underhand grip'
+            notes: 'Use underhand grip for bicep emphasis - great chin-up replacement'
           },
           {
             exerciseId: 'barbell-curl',
