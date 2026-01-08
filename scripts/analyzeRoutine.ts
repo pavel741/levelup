@@ -435,34 +435,62 @@ export function analyzeRoutine(routine: Routine): RoutineAnalysis {
   }
 
   // 7. Check for missing essential movements
-  const essentialMovements = {
-    'squat': ['legs', 'quadriceps', 'glutes'],
-    'deadlift': ['back', 'hamstrings', 'glutes'],
-    'bench-press': ['chest'],
-    'overhead-press': ['shoulders'],
-    'pull-ups': ['back'],
-    'rows': ['back']
-  }
-
-  // const exerciseIds = new Set(exerciseAnalysis.map(ex => ex.exerciseId)) // Unused
-  const missingMovements: string[] = []
-
-  Object.entries(essentialMovements).forEach(([movement, muscleGroups]) => {
-    const hasMovement = exerciseAnalysis.some(ex => {
-      const exercise = getExerciseById(ex.exerciseId)
-      if (!exercise) return false
-      return exercise.id.includes(movement) || 
-             exercise.name.toLowerCase().includes(movement) ||
-             muscleGroups.some(mg => 
-               exercise.muscleGroups.primary.includes(mg) || 
-               exercise.muscleGroups.secondary.includes(mg)
-             )
-    })
-    
-    if (!hasMovement) {
-      missingMovements.push(movement)
-    }
+  // Check for movement patterns (not specific exercises)
+  const hasSquat = exerciseAnalysis.some(ex => {
+    const exercise = getExerciseById(ex.exerciseId)
+    if (!exercise) return false
+    return exercise.id.includes('squat') || 
+           exercise.name.toLowerCase().includes('squat') ||
+           (exercise.muscleGroups.primary.includes('quadriceps') && 
+            exercise.muscleGroups.primary.includes('glutes'))
   })
+
+  const hasDeadlift = exerciseAnalysis.some(ex => {
+    const exercise = getExerciseById(ex.exerciseId)
+    if (!exercise) return false
+    return exercise.id.includes('deadlift') || 
+           exercise.name.toLowerCase().includes('deadlift') ||
+           (exercise.muscleGroups.primary.includes('back') && 
+            exercise.muscleGroups.primary.includes('hamstrings'))
+  })
+
+  const hasBenchPress = exerciseAnalysis.some(ex => {
+    const exercise = getExerciseById(ex.exerciseId)
+    if (!exercise) return false
+    return exercise.id.includes('bench') || 
+           exercise.name.toLowerCase().includes('bench') ||
+           exercise.muscleGroups.primary.includes('chest')
+  })
+
+  const hasOverheadPress = exerciseAnalysis.some(ex => {
+    const exercise = getExerciseById(ex.exerciseId)
+    if (!exercise) return false
+    return exercise.id.includes('overhead') || 
+           exercise.name.toLowerCase().includes('overhead') ||
+           exercise.name.toLowerCase().includes('shoulder press') ||
+           (exercise.muscleGroups.primary.includes('shoulders') && 
+            exercise.id.includes('press'))
+  })
+
+  // Check for pull movements (pull-ups OR rows - both fulfill the pull pattern)
+  const hasPullMovement = exerciseAnalysis.some(ex => {
+    const exercise = getExerciseById(ex.exerciseId)
+    if (!exercise) return false
+    return exercise.id.includes('pull-up') || 
+           exercise.id.includes('chin-up') ||
+           exercise.id.includes('row') ||
+           exercise.name.toLowerCase().includes('row') ||
+           exercise.name.toLowerCase().includes('pull') ||
+           (exercise.muscleGroups.primary.includes('back') && 
+            (exercise.id.includes('row') || exercise.id.includes('pull')))
+  })
+
+  const missingMovements: string[] = []
+  if (!hasSquat) missingMovements.push('squat')
+  if (!hasDeadlift) missingMovements.push('deadlift')
+  if (!hasBenchPress) missingMovements.push('bench press')
+  if (!hasOverheadPress) missingMovements.push('overhead press')
+  if (!hasPullMovement) missingMovements.push('pull movement (rows or pull-ups)')
 
   if (missingMovements.length > 0) {
     score -= 8
