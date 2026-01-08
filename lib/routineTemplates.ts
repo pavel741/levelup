@@ -2553,6 +2553,341 @@ export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'u
     estimatedDuration: 315, // Total duration for all 4 days
     difficulty: 'medium',
     tags: ['muscle-building', '4-day-split', 'bulking', 'chest', 'back', 'legs', 'arms']
+  },
+
+  // Optimal Routine for Skinny Build (65kg, 176cm) - Muscle Building Focus
+  {
+    name: 'Skinny to Strong: Complete Muscle Builder',
+    description: 'Optimized 4-day routine for building muscle mass. Perfect for skinny individuals (65kg, 176cm) looking to gain size and strength. Focuses on compound movements with barbell, dumbbell, and bodyweight exercises. Progressive overload structure.',
+    goal: 'bulking',
+    exercises: [],
+    sessions: [
+      {
+        id: 'skinny-upper-1',
+        name: 'Upper Body Day 1: Chest & Back Focus',
+        order: 0,
+        exercises: [
+          {
+            exerciseId: 'bench-press',
+            order: 0,
+            sets: [
+              { setType: 'warmup', targetReps: 10, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 6, targetWeight: undefined, restAfter: 90 }
+            ],
+            restTime: 90,
+            notes: 'Main compound movement - focus on form'
+          },
+          {
+            exerciseId: 'barbell-row',
+            order: 1,
+            sets: [
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 6, targetWeight: undefined, restAfter: 90 }
+            ],
+            restTime: 90,
+            notes: 'Build back thickness'
+          },
+          {
+            exerciseId: 'dumbbell-press',
+            order: 2,
+            sets: [
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 90 }
+            ],
+            restTime: 90,
+            notes: 'Greater range of motion than barbell'
+          },
+          {
+            exerciseId: 'pull-ups',
+            order: 3,
+            sets: [
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 6, targetWeight: undefined, restAfter: 90 }
+            ],
+            restTime: 90,
+            notes: 'Use assistance if needed - aim for 3 sets of 8+'
+          },
+          {
+            exerciseId: 'dumbbell-flyes',
+            order: 4,
+            sets: [
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 60 }
+            ],
+            restTime: 60,
+            notes: 'Chest stretch and pump'
+          },
+          {
+            exerciseId: 'dumbbell-row',
+            order: 5,
+            sets: [
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 60 }
+            ],
+            restTime: 60,
+            notes: 'Each arm - focus on lat contraction'
+          }
+        ],
+        estimatedDuration: 75
+      },
+      {
+        id: 'skinny-lower-1',
+        name: 'Lower Body Day 1: Legs & Glutes',
+        order: 1,
+        exercises: [
+          {
+            exerciseId: 'squat',
+            order: 0,
+            sets: [
+              { setType: 'warmup', targetReps: 10, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 120 },
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 120 },
+              { setType: 'working', targetReps: 6, targetWeight: undefined, restAfter: 120 }
+            ],
+            restTime: 120,
+            notes: 'King of leg exercises - go below parallel'
+          },
+          {
+            exerciseId: 'romanian-deadlift',
+            order: 1,
+            sets: [
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 120 },
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 120 },
+              { setType: 'working', targetReps: 6, targetWeight: undefined, restAfter: 120 }
+            ],
+            restTime: 120,
+            notes: 'Hamstring and glute focus - feel the stretch'
+          },
+          {
+            exerciseId: 'dumbbell-lunges',
+            order: 2,
+            sets: [
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 90 }
+            ],
+            restTime: 90,
+            notes: 'Each leg - unilateral strength'
+          },
+          {
+            exerciseId: 'barbell-hip-thrust',
+            order: 3,
+            sets: [
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 90 }
+            ],
+            restTime: 90,
+            notes: 'Glute builder - use padding on bar'
+          },
+          {
+            exerciseId: 'standing-calf-raise',
+            order: 4,
+            sets: [
+              { setType: 'working', targetReps: 15, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 15, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 60 }
+            ],
+            restTime: 60,
+            notes: 'Full range of motion - stretch at bottom'
+          },
+          {
+            exerciseId: 'plank',
+            order: 5,
+            sets: [
+              { setType: 'working', targetDuration: 60, restAfter: 60 },
+              { setType: 'working', targetDuration: 60, restAfter: 60 },
+              { setType: 'working', targetDuration: 45, restAfter: 60 }
+            ],
+            restTime: 60,
+            notes: 'Core stability'
+          }
+        ],
+        estimatedDuration: 80
+      },
+      {
+        id: 'skinny-upper-2',
+        name: 'Upper Body Day 2: Shoulders & Arms',
+        order: 2,
+        exercises: [
+          {
+            exerciseId: 'overhead-press',
+            order: 0,
+            sets: [
+              { setType: 'warmup', targetReps: 10, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 6, targetWeight: undefined, restAfter: 90 }
+            ],
+            restTime: 90,
+            notes: 'Standing overhead press - core stability'
+          },
+          {
+            exerciseId: 'dumbbell-press-shoulders',
+            order: 1,
+            sets: [
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 90 }
+            ],
+            restTime: 90,
+            notes: 'Seated or standing - full range'
+          },
+          {
+            exerciseId: 'chin-ups',
+            order: 2,
+            sets: [
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 6, targetWeight: undefined, restAfter: 90 }
+            ],
+            restTime: 90,
+            notes: 'Bicep and back - underhand grip'
+          },
+          {
+            exerciseId: 'barbell-curl',
+            order: 3,
+            sets: [
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 60 }
+            ],
+            restTime: 60,
+            notes: 'Bicep builder'
+          },
+          {
+            exerciseId: 'lateral-raises',
+            order: 4,
+            sets: [
+              { setType: 'working', targetReps: 15, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 15, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 60 }
+            ],
+            restTime: 60,
+            notes: 'Side delts - control the weight'
+          },
+          {
+            exerciseId: 'close-grip-bench-press',
+            order: 5,
+            sets: [
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 90 }
+            ],
+            restTime: 90,
+            notes: 'Tricep focus - narrow grip'
+          },
+          {
+            exerciseId: 'overhead-tricep-extension',
+            order: 6,
+            sets: [
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 60 }
+            ],
+            restTime: 60,
+            notes: 'Tricep isolation'
+          },
+          {
+            exerciseId: 'rear-delt-flyes',
+            order: 7,
+            sets: [
+              { setType: 'working', targetReps: 15, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 15, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 60 }
+            ],
+            restTime: 60,
+            notes: 'Posture and rear delts'
+          }
+        ],
+        estimatedDuration: 85
+      },
+      {
+        id: 'skinny-lower-2',
+        name: 'Lower Body Day 2: Power & Hypertrophy',
+        order: 3,
+        exercises: [
+          {
+            exerciseId: 'deadlift',
+            order: 0,
+            sets: [
+              { setType: 'warmup', targetReps: 8, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 5, targetWeight: undefined, restAfter: 180 },
+              { setType: 'working', targetReps: 5, targetWeight: undefined, restAfter: 180 },
+              { setType: 'working', targetReps: 5, targetWeight: undefined, restAfter: 180 }
+            ],
+            restTime: 180,
+            notes: 'Full body strength - focus on form'
+          },
+          {
+            exerciseId: 'front-squat',
+            order: 1,
+            sets: [
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 120 },
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 120 },
+              { setType: 'working', targetReps: 6, targetWeight: undefined, restAfter: 120 }
+            ],
+            restTime: 120,
+            notes: 'Quad and core focus - upright torso'
+          },
+          {
+            exerciseId: 'bulgarian-split-squat',
+            order: 2,
+            sets: [
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 90 }
+            ],
+            restTime: 90,
+            notes: 'Each leg - can add dumbbells'
+          },
+          {
+            exerciseId: 'goblet-squat',
+            order: 3,
+            sets: [
+              { setType: 'working', targetReps: 15, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 15, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 90 }
+            ],
+            restTime: 90,
+            notes: 'Form and pump - hold dumbbell at chest'
+          },
+          {
+            exerciseId: 'glute-bridge',
+            order: 4,
+            sets: [
+              { setType: 'working', targetReps: 15, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 15, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 60 }
+            ],
+            restTime: 60,
+            notes: 'Glute activation - can add weight'
+          },
+          {
+            exerciseId: 'russian-twists',
+            order: 5,
+            sets: [
+              { setType: 'working', targetReps: 20, targetWeight: undefined, restAfter: 45 },
+              { setType: 'working', targetReps: 20, targetWeight: undefined, restAfter: 45 },
+              { setType: 'working', targetReps: 15, targetWeight: undefined, restAfter: 45 }
+            ],
+            restTime: 45,
+            notes: 'Core rotation - can hold weight'
+          }
+        ],
+        estimatedDuration: 85
+      }
+    ],
+    estimatedDuration: 80,
+    difficulty: 'medium',
+    tags: ['skinny-to-strong', 'muscle-building', 'bulking', 'beginner-friendly', '4-day', 'barbell', 'dumbbell', 'bodyweight', 'compound-movements', 'progressive-overload']
   }
 ]
 

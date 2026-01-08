@@ -3539,6 +3539,982 @@ export const EXERCISE_DATABASE: Exercise[] = [
       'Feel stretch in forearm'
     ],
     videoUrl: 'https://www.youtube.com/embed/2NOsE-VPpkE'
+  },
+
+  // Additional Barbell Exercises
+  {
+    id: 'front-squat',
+    name: 'Front Squat',
+    description: 'Barbell squat with bar in front position, emphasizing quads and core.',
+    category: 'strength',
+    muscleGroups: {
+      primary: ['quadriceps', 'glutes'],
+      secondary: ['core', 'shoulders']
+    },
+    equipment: ['barbell'],
+    difficulty: 'intermediate',
+    instructions: [
+      'Rest bar on front deltoids',
+      'Cross arms or use clean grip',
+      'Keep elbows high',
+      'Squat down keeping torso upright',
+      'Drive through heels to stand'
+    ],
+    tips: [
+      'Keep core tight',
+      'Maintain upright torso',
+      'Full depth for maximum benefit'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/v-mQm_droHg'
+  },
+  {
+    id: 'romanian-deadlift',
+    name: 'Romanian Deadlift',
+    description: 'Hip-hinge movement targeting hamstrings and glutes.',
+    category: 'strength',
+    muscleGroups: {
+      primary: ['hamstrings', 'glutes'],
+      secondary: ['back', 'core']
+    },
+    equipment: ['barbell', 'dumbbells'],
+    difficulty: 'intermediate',
+    instructions: [
+      'Hold bar with feet hip-width',
+      'Hinge at hips, slight knee bend',
+      'Lower bar along legs',
+      'Feel stretch in hamstrings',
+      'Drive hips forward to return'
+    ],
+    tips: [
+      'Keep back straight',
+      'Don\'t round lower back',
+      'Feel stretch in hamstrings'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/_oyxCn2iSjU'
+  },
+  {
+    id: 'close-grip-bench-press',
+    name: 'Close-Grip Bench Press',
+    description: 'Bench press with narrow grip, emphasizing triceps.',
+    category: 'strength',
+    muscleGroups: {
+      primary: ['triceps'],
+      secondary: ['chest', 'shoulders']
+    },
+    equipment: ['barbell', 'bench'],
+    difficulty: 'intermediate',
+    instructions: [
+      'Grip bar narrower than shoulder-width',
+      'Lower to lower chest',
+      'Press up focusing on triceps',
+      'Keep elbows close to body'
+    ],
+    tips: [
+      'Hands shoulder-width or closer',
+      'Focus on tricep contraction',
+      'Control the weight'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/nEF0bv2FW94'
+  },
+  {
+    id: 'barbell-shrugs',
+    name: 'Barbell Shrugs',
+    description: 'Isolation exercise for trapezius muscles.',
+    category: 'strength',
+    muscleGroups: {
+      primary: ['traps'],
+      secondary: ['shoulders']
+    },
+    equipment: ['barbell'],
+    difficulty: 'beginner',
+    instructions: [
+      'Hold bar with overhand grip',
+      'Stand straight, arms extended',
+      'Shrug shoulders up',
+      'Hold briefly at top',
+      'Lower with control'
+    ],
+    tips: [
+      'Don\'t roll shoulders',
+      'Straight up and down movement',
+      'Squeeze at top'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/NAqCVe2mwzM'
+  },
+  {
+    id: 'barbell-curl',
+    name: 'Barbell Curl',
+    description: 'Bicep exercise using barbell.',
+    category: 'strength',
+    muscleGroups: {
+      primary: ['biceps'],
+      secondary: ['forearms']
+    },
+    equipment: ['barbell'],
+    difficulty: 'beginner',
+    instructions: [
+      'Stand holding bar with underhand grip',
+      'Keep elbows at sides',
+      'Curl bar to shoulders',
+      'Lower with control',
+      'Don\'t swing'
+    ],
+    tips: [
+      'Control the negative',
+      'Full range of motion',
+      'Keep core engaged'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/ykJmrZ5v0Oo'
+  },
+  {
+    id: 'barbell-hip-thrust',
+    name: 'Barbell Hip Thrust',
+    description: 'Glute-focused exercise performed with barbell.',
+    category: 'strength',
+    muscleGroups: {
+      primary: ['glutes'],
+      secondary: ['hamstrings', 'core']
+    },
+    equipment: ['barbell', 'bench'],
+    difficulty: 'intermediate',
+    instructions: [
+      'Sit with upper back against bench',
+      'Place bar across hips',
+      'Drive hips up to full extension',
+      'Squeeze glutes at top',
+      'Lower with control'
+    ],
+    tips: [
+      'Keep chin tucked',
+      'Full hip extension',
+      'Protect hips with padding'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/xDmFkJxPzeM'
+  },
+  {
+    id: 'standing-calf-raise',
+    name: 'Standing Calf Raise',
+    description: 'Calf exercise using barbell or machine.',
+    category: 'strength',
+    muscleGroups: {
+      primary: ['calves'],
+      secondary: []
+    },
+    equipment: ['barbell', 'machine'],
+    difficulty: 'beginner',
+    instructions: [
+      'Stand with bar on shoulders',
+      'Rise onto toes',
+      'Hold briefly at top',
+      'Lower slowly',
+      'Full range of motion'
+    ],
+    tips: [
+      'Control the movement',
+      'Stretch at bottom',
+      'Squeeze at top'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/3VcKaXpzqRo'
+  },
+
+  // Additional Dumbbell Exercises
+  {
+    id: 'dumbbell-press',
+    name: 'Dumbbell Bench Press',
+    description: 'Chest exercise with dumbbells allowing greater range of motion.',
+    category: 'strength',
+    muscleGroups: {
+      primary: ['chest'],
+      secondary: ['shoulders', 'triceps']
+    },
+    equipment: ['dumbbells', 'bench'],
+    difficulty: 'intermediate',
+    instructions: [
+      'Lie on bench holding dumbbells',
+      'Lower weights to chest level',
+      'Press up until arms extended',
+      'Control the descent',
+      'Slight arch in back'
+    ],
+    tips: [
+      'Full range of motion',
+      'Control the weight',
+      'Don\'t bounce at bottom'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/VmB1G1K7v94'
+  },
+  {
+    id: 'incline-dumbbell-press',
+    name: 'Incline Dumbbell Press',
+    description: 'Upper chest exercise on inclined bench.',
+    category: 'strength',
+    muscleGroups: {
+      primary: ['chest'],
+      secondary: ['shoulders', 'triceps']
+    },
+    equipment: ['dumbbells', 'bench'],
+    difficulty: 'intermediate',
+    instructions: [
+      'Set bench to 30-45 degree angle',
+      'Press dumbbells up and slightly forward',
+      'Lower to upper chest',
+      'Control throughout movement'
+    ],
+    tips: [
+      'Targets upper chest',
+      'Slight forward press',
+      'Full range of motion'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/8iPEnov-lmU'
+  },
+  {
+    id: 'dumbbell-press-shoulders',
+    name: 'Dumbbell Shoulder Press',
+    description: 'Overhead press with dumbbells, seated or standing.',
+    category: 'strength',
+    muscleGroups: {
+      primary: ['shoulders'],
+      secondary: ['triceps', 'core']
+    },
+    equipment: ['dumbbells', 'bench'],
+    difficulty: 'intermediate',
+    instructions: [
+      'Hold dumbbells at shoulder height',
+      'Press overhead until arms extended',
+      'Lower with control',
+      'Keep core engaged'
+    ],
+    tips: [
+      'Don\'t arch back excessively',
+      'Control the weight',
+      'Full extension at top'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/qEwKCR5JCok'
+  },
+  {
+    id: 'goblet-squat',
+    name: 'Goblet Squat',
+    description: 'Squat holding dumbbell at chest, great for form.',
+    category: 'strength',
+    muscleGroups: {
+      primary: ['quadriceps', 'glutes'],
+      secondary: ['core']
+    },
+    equipment: ['dumbbells'],
+    difficulty: 'beginner',
+    instructions: [
+      'Hold dumbbell vertically at chest',
+      'Squat down keeping torso upright',
+      'Go below parallel',
+      'Drive through heels to stand'
+    ],
+    tips: [
+      'Great for beginners',
+      'Teaches proper form',
+      'Keep weight close to body'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/MWUcI3T_3MQ'
+  },
+  {
+    id: 'dumbbell-lunges',
+    name: 'Dumbbell Lunges',
+    description: 'Lunges holding dumbbells for added resistance.',
+    category: 'strength',
+    muscleGroups: {
+      primary: ['quadriceps', 'glutes'],
+      secondary: ['hamstrings', 'calves']
+    },
+    equipment: ['dumbbells'],
+    difficulty: 'intermediate',
+    instructions: [
+      'Hold dumbbells at sides',
+      'Step forward into lunge',
+      'Lower back knee toward ground',
+      'Push through front heel to return',
+      'Alternate legs'
+    ],
+    tips: [
+      'Keep torso upright',
+      'Front knee over ankle',
+      'Full range of motion'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/3XDriUn0udo'
+  },
+  {
+    id: 'dumbbell-row',
+    name: 'Dumbbell Row',
+    description: 'Single-arm rowing movement for back.',
+    category: 'strength',
+    muscleGroups: {
+      primary: ['back'],
+      secondary: ['biceps', 'shoulders']
+    },
+    equipment: ['dumbbells', 'bench'],
+    difficulty: 'intermediate',
+    instructions: [
+      'Place knee and hand on bench',
+      'Hold dumbbell in other hand',
+      'Pull weight to hip',
+      'Squeeze back muscles',
+      'Lower with control'
+    ],
+    tips: [
+      'Keep back straight',
+      'Pull to hip, not chest',
+      'Feel lat contraction'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/roCP6wCXPqo'
+  },
+  {
+    id: 'renegade-rows',
+    name: 'Renegade Rows',
+    description: 'Plank position rowing exercise for core and back.',
+    category: 'strength',
+    muscleGroups: {
+      primary: ['back', 'core'],
+      secondary: ['shoulders', 'biceps']
+    },
+    equipment: ['dumbbells'],
+    difficulty: 'advanced',
+    instructions: [
+      'Start in plank with dumbbells',
+      'Row one weight to hip',
+      'Return to plank',
+      'Alternate sides',
+      'Keep hips level'
+    ],
+    tips: [
+      'Core stability is key',
+      'Don\'t let hips rotate',
+      'Control the movement'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/kB0k7ZJXH8Y'
+  },
+  {
+    id: 'hammer-curls',
+    name: 'Hammer Curls',
+    description: 'Bicep exercise with neutral grip.',
+    category: 'strength',
+    muscleGroups: {
+      primary: ['biceps'],
+      secondary: ['forearms']
+    },
+    equipment: ['dumbbells'],
+    difficulty: 'beginner',
+    instructions: [
+      'Hold dumbbells with neutral grip',
+      'Curl weights up',
+      'Keep elbows at sides',
+      'Lower with control'
+    ],
+    tips: [
+      'Targets brachialis',
+      'Less wrist strain',
+      'Full range of motion'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/zC3nBnE3B-4'
+  },
+  {
+    id: 'concentration-curls',
+    name: 'Concentration Curls',
+    description: 'Isolated bicep exercise seated.',
+    category: 'strength',
+    muscleGroups: {
+      primary: ['biceps'],
+      secondary: []
+    },
+    equipment: ['dumbbells', 'bench'],
+    difficulty: 'beginner',
+    instructions: [
+      'Sit with leg spread',
+      'Rest elbow on inner thigh',
+      'Curl weight up',
+      'Squeeze at top',
+      'Lower slowly'
+    ],
+    tips: [
+      'Great isolation',
+      'Focus on contraction',
+      'No swinging'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/Jvj2wV0vOYs'
+  },
+  {
+    id: 'overhead-tricep-extension',
+    name: 'Overhead Tricep Extension',
+    description: 'Tricep exercise with dumbbell overhead.',
+    category: 'strength',
+    muscleGroups: {
+      primary: ['triceps'],
+      secondary: []
+    },
+    equipment: ['dumbbells'],
+    difficulty: 'intermediate',
+    instructions: [
+      'Hold dumbbell overhead',
+      'Lower behind head',
+      'Extend back up',
+      'Keep elbows in',
+      'Control the movement'
+    ],
+    tips: [
+      'Don\'t flare elbows',
+      'Full stretch at bottom',
+      'Squeeze at top'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/ns-RGbz4YYk'
+  },
+  {
+    id: 'tricep-kickbacks',
+    name: 'Tricep Kickbacks',
+    description: 'Isolation tricep exercise.',
+    category: 'strength',
+    muscleGroups: {
+      primary: ['triceps'],
+      secondary: []
+    },
+    equipment: ['dumbbells'],
+    difficulty: 'beginner',
+    instructions: [
+      'Bend forward, support on bench',
+      'Hold dumbbell, arm at 90 degrees',
+      'Extend arm back',
+      'Squeeze tricep',
+      'Return to start'
+    ],
+    tips: [
+      'Keep upper arm still',
+      'Full extension',
+      'Control the weight'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/6gL1gWXl3bY'
+  },
+  {
+    id: 'rear-delt-flyes',
+    name: 'Rear Delt Flyes',
+    description: 'Targets rear deltoids.',
+    category: 'strength',
+    muscleGroups: {
+      primary: ['shoulders'],
+      secondary: ['back']
+    },
+    equipment: ['dumbbells'],
+    difficulty: 'intermediate',
+    instructions: [
+      'Bend forward slightly',
+      'Hold dumbbells with slight bend',
+      'Raise arms out to sides',
+      'Squeeze rear delts',
+      'Lower with control'
+    ],
+    tips: [
+      'Slight bend in elbows',
+      'Focus on rear delts',
+      'Don\'t use momentum'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/eaQ4s2Wq8yE'
+  },
+  {
+    id: 'dumbbell-side-bend',
+    name: 'Dumbbell Side Bend',
+    description: 'Oblique exercise with dumbbell.',
+    category: 'strength',
+    muscleGroups: {
+      primary: ['core'],
+      secondary: ['obliques']
+    },
+    equipment: ['dumbbells'],
+    difficulty: 'beginner',
+    instructions: [
+      'Stand holding dumbbell at side',
+      'Bend to that side',
+      'Return to center',
+      'Feel stretch in opposite side',
+      'Repeat both sides'
+    ],
+    tips: [
+      'Don\'t lean forward',
+      'Controlled movement',
+      'Feel the stretch'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/2NOsE-VPpkE'
+  },
+
+  // Additional Bodyweight Exercises
+  {
+    id: 'chin-ups',
+    name: 'Chin-Ups',
+    description: 'Pull-up variation with underhand grip, emphasizing biceps.',
+    category: 'strength',
+    muscleGroups: {
+      primary: ['back', 'biceps'],
+      secondary: ['shoulders']
+    },
+    equipment: ['bodyweight', 'pull-up-bar'],
+    difficulty: 'intermediate',
+    instructions: [
+      'Grip bar with underhand grip',
+      'Hang with arms extended',
+      'Pull body up until chin over bar',
+      'Lower with control',
+      'Full range of motion'
+    ],
+    tips: [
+      'Easier than pull-ups',
+      'More bicep emphasis',
+      'Use assistance if needed'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/mRy9m2Q7_3w'
+  },
+  {
+    id: 'dips',
+    name: 'Dips',
+    description: 'Bodyweight exercise for triceps and chest.',
+    category: 'strength',
+    muscleGroups: {
+      primary: ['triceps', 'chest'],
+      secondary: ['shoulders']
+    },
+    equipment: ['bodyweight'],
+    difficulty: 'intermediate',
+    instructions: [
+      'Support body on parallel bars',
+      'Lower body by bending arms',
+      'Go down until shoulders below elbows',
+      'Push back up',
+      'Keep body upright'
+    ],
+    tips: [
+      'Full range of motion',
+      'Don\'t swing',
+      'Use assistance if needed'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/2z8JDMcr5EE'
+  },
+  {
+    id: 'pike-push-ups',
+    name: 'Pike Push-Ups',
+    description: 'Bodyweight shoulder exercise in pike position.',
+    category: 'strength',
+    muscleGroups: {
+      primary: ['shoulders'],
+      secondary: ['triceps', 'core']
+    },
+    equipment: ['bodyweight'],
+    difficulty: 'intermediate',
+    instructions: [
+      'Start in downward dog position',
+      'Bend arms to lower head toward ground',
+      'Push back up',
+      'Keep legs straight',
+      'Feel shoulder work'
+    ],
+    tips: [
+      'Great shoulder builder',
+      'Progress to handstand push-ups',
+      'Keep core engaged'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/3R14MnZbcpw'
+  },
+  {
+    id: 'decline-push-ups',
+    name: 'Decline Push-Ups',
+    description: 'Push-up variation with feet elevated.',
+    category: 'strength',
+    muscleGroups: {
+      primary: ['chest', 'shoulders'],
+      secondary: ['triceps', 'core']
+    },
+    equipment: ['bodyweight'],
+    difficulty: 'intermediate',
+    instructions: [
+      'Place feet on elevated surface',
+      'Hands on ground in push-up position',
+      'Lower body to ground',
+      'Push back up',
+      'Keep body straight'
+    ],
+    tips: [
+      'More challenging than regular',
+      'Targets upper chest',
+      'Increase elevation for difficulty'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/8iPEnov-lmU'
+  },
+  {
+    id: 'incline-push-ups',
+    name: 'Incline Push-Ups',
+    description: 'Easier push-up variation with hands elevated.',
+    category: 'strength',
+    muscleGroups: {
+      primary: ['chest'],
+      secondary: ['shoulders', 'triceps']
+    },
+    equipment: ['bodyweight'],
+    difficulty: 'beginner',
+    instructions: [
+      'Place hands on elevated surface',
+      'Feet on ground',
+      'Lower body to surface',
+      'Push back up',
+      'Keep body straight'
+    ],
+    tips: [
+      'Great for beginners',
+      'Lower surface = easier',
+      'Progress to regular push-ups'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/8iPEnov-lmU'
+  },
+  {
+    id: 'bulgarian-split-squat',
+    name: 'Bulgarian Split Squat',
+    description: 'Single-leg squat with rear foot elevated.',
+    category: 'strength',
+    muscleGroups: {
+      primary: ['quadriceps', 'glutes'],
+      secondary: ['hamstrings', 'core']
+    },
+    equipment: ['bodyweight', 'dumbbells'],
+    difficulty: 'intermediate',
+    instructions: [
+      'Place rear foot on bench',
+      'Front foot forward',
+      'Lower body down',
+      'Front knee over ankle',
+      'Drive through front heel to stand'
+    ],
+    tips: [
+      'Great unilateral exercise',
+      'Can add weight',
+      'Focus on front leg'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/2C-uNgKwPLE'
+  },
+  {
+    id: 'glute-bridge',
+    name: 'Glute Bridge',
+    description: 'Hip thrust exercise targeting glutes.',
+    category: 'strength',
+    muscleGroups: {
+      primary: ['glutes'],
+      secondary: ['hamstrings', 'core']
+    },
+    equipment: ['bodyweight'],
+    difficulty: 'beginner',
+    instructions: [
+      'Lie on back, knees bent',
+      'Feet flat on ground',
+      'Drive hips up',
+      'Squeeze glutes at top',
+      'Lower with control'
+    ],
+    tips: [
+      'Great glute activator',
+      'Can add weight',
+      'Full hip extension'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/OUgsJ8-Vi0E'
+  },
+  {
+    id: 'hip-thrust',
+    name: 'Hip Thrust',
+    description: 'Glute exercise with upper back on bench.',
+    category: 'strength',
+    muscleGroups: {
+      primary: ['glutes'],
+      secondary: ['hamstrings', 'core']
+    },
+    equipment: ['bodyweight', 'barbell', 'dumbbells'],
+    difficulty: 'intermediate',
+    instructions: [
+      'Sit with upper back on bench',
+      'Knees bent, feet flat',
+      'Drive hips up',
+      'Squeeze glutes at top',
+      'Lower with control'
+    ],
+    tips: [
+      'Can add weight',
+      'Full hip extension',
+      'Protect hips if using bar'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/xDmFkJxPzeM'
+  },
+  {
+    id: 'russian-twists',
+    name: 'Russian Twists',
+    description: 'Rotational core exercise.',
+    category: 'strength',
+    muscleGroups: {
+      primary: ['core'],
+      secondary: ['obliques']
+    },
+    equipment: ['bodyweight'],
+    difficulty: 'intermediate',
+    instructions: [
+      'Sit with knees bent',
+      'Lean back slightly',
+      'Rotate torso side to side',
+      'Keep core engaged',
+      'Can hold weight'
+    ],
+    tips: [
+      'Control the rotation',
+      'Don\'t rush',
+      'Feel the burn'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/wkD8rjkodUI'
+  },
+  {
+    id: 'mountain-climbers',
+    name: 'Mountain Climbers',
+    description: 'Cardio and core exercise.',
+    category: 'cardio',
+    muscleGroups: {
+      primary: ['core'],
+      secondary: ['shoulders', 'legs']
+    },
+    equipment: ['bodyweight'],
+    difficulty: 'intermediate',
+    instructions: [
+      'Start in plank position',
+      'Alternate bringing knees to chest',
+      'Keep hips level',
+      'Fast pace for cardio',
+      'Controlled for core'
+    ],
+    tips: [
+      'Great cardio finisher',
+      'Keep core tight',
+      'Don\'t let hips rise'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/cnyTQDSE884'
+  },
+  {
+    id: 'burpees',
+    name: 'Burpees',
+    description: 'Full-body explosive exercise.',
+    category: 'cardio',
+    muscleGroups: {
+      primary: ['legs', 'chest'],
+      secondary: ['shoulders', 'core']
+    },
+    equipment: ['bodyweight'],
+    difficulty: 'intermediate',
+    instructions: [
+      'Start standing',
+      'Squat down, hands to ground',
+      'Jump feet back to plank',
+      'Do push-up (optional)',
+      'Jump feet forward, jump up'
+    ],
+    tips: [
+      'Full body workout',
+      'Great for conditioning',
+      'Modify as needed'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/auBLPXO8Fww'
+  },
+  {
+    id: 'high-knees',
+    name: 'High Knees',
+    description: 'Cardio exercise bringing knees up high.',
+    category: 'cardio',
+    muscleGroups: {
+      primary: ['legs'],
+      secondary: ['core']
+    },
+    equipment: ['bodyweight'],
+    difficulty: 'beginner',
+    instructions: [
+      'Stand in place',
+      'Alternate bringing knees up',
+      'Pump arms',
+      'Fast pace',
+      'Stay on balls of feet'
+    ],
+    tips: [
+      'Great warm-up',
+      'Cardio finisher',
+      'Keep core engaged'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/1fbU_MkV7NE'
+  },
+  {
+    id: 'jump-rope',
+    name: 'Jump Rope',
+    description: 'Cardiovascular exercise with rope.',
+    category: 'cardio',
+    muscleGroups: {
+      primary: ['legs'],
+      secondary: ['shoulders', 'core']
+    },
+    equipment: ['jump-rope'],
+    difficulty: 'beginner',
+    instructions: [
+      'Hold rope handles',
+      'Jump over rope',
+      'Land on balls of feet',
+      'Keep rhythm',
+      'Stay light on feet'
+    ],
+    tips: [
+      'Great cardio',
+      'Improves coordination',
+      'Start slow'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/u3zgHI8QnqQ'
+  },
+  {
+    id: 'reverse-curls',
+    name: 'Reverse Curls',
+    description: 'Forearm and bicep exercise with overhand grip.',
+    category: 'strength',
+    muscleGroups: {
+      primary: ['forearms'],
+      secondary: ['biceps']
+    },
+    equipment: ['barbell', 'dumbbells'],
+    difficulty: 'intermediate',
+    instructions: [
+      'Hold bar with overhand grip',
+      'Curl bar up',
+      'Focus on forearms',
+      'Lower with control',
+      'Keep wrists straight'
+    ],
+    tips: [
+      'Targets forearms',
+      'Less bicep than regular curls',
+      'Control the weight'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/n3g4B5Qr8yM'
+  },
+  {
+    id: 'tricep-pushdown',
+    name: 'Tricep Pushdown',
+    description: 'Cable machine tricep exercise.',
+    category: 'strength',
+    muscleGroups: {
+      primary: ['triceps'],
+      secondary: []
+    },
+    equipment: ['machine'],
+    difficulty: 'beginner',
+    instructions: [
+      'Stand at cable machine',
+      'Grip handle, elbows at sides',
+      'Push down until arms extended',
+      'Return slowly',
+      'Keep elbows still'
+    ],
+    tips: [
+      'Great isolation',
+      'Control the negative',
+      'Full extension'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/2-LAMcpzODU'
+  },
+  {
+    id: 'face-pulls',
+    name: 'Face Pulls',
+    description: 'Rear delt and upper back exercise.',
+    category: 'strength',
+    muscleGroups: {
+      primary: ['shoulders', 'back'],
+      secondary: ['traps']
+    },
+    equipment: ['machine'],
+    difficulty: 'intermediate',
+    instructions: [
+      'Use cable machine at face height',
+      'Pull rope to face',
+      'Separate handles at end',
+      'Squeeze rear delts',
+      'Return slowly'
+    ],
+    tips: [
+      'Great for posture',
+      'Prevents shoulder issues',
+      'Control the movement'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/rep-qVOkqgk'
+  },
+  {
+    id: 't-bar-row',
+    name: 'T-Bar Row',
+    description: 'Back exercise using T-bar or landmine setup.',
+    category: 'strength',
+    muscleGroups: {
+      primary: ['back'],
+      secondary: ['biceps', 'shoulders']
+    },
+    equipment: ['barbell', 'machine'],
+    difficulty: 'intermediate',
+    instructions: [
+      'Straddle bar with weight',
+      'Bend forward, grip handle',
+      'Pull weight to chest',
+      'Squeeze back muscles',
+      'Lower with control'
+    ],
+    tips: [
+      'Great back builder',
+      'Can use heavy weight',
+      'Keep back straight'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/j3Igk5nyZE4'
+  },
+  {
+    id: 'preacher-curls',
+    name: 'Preacher Curls',
+    description: 'Isolated bicep exercise on preacher bench.',
+    category: 'strength',
+    muscleGroups: {
+      primary: ['biceps'],
+      secondary: []
+    },
+    equipment: ['barbell', 'dumbbells', 'bench'],
+    difficulty: 'intermediate',
+    instructions: [
+      'Rest arm on preacher bench',
+      'Curl weight up',
+      'Squeeze bicep at top',
+      'Lower slowly',
+      'Full range of motion'
+    ],
+    tips: [
+      'Great isolation',
+      'Prevents cheating',
+      'Control the negative'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/fIWP-FRF9ef'
+  },
+  {
+    id: 'battle-ropes',
+    name: 'Battle Ropes',
+    description: 'High-intensity cardio exercise with heavy ropes.',
+    category: 'cardio',
+    muscleGroups: {
+      primary: ['shoulders', 'core'],
+      secondary: ['legs', 'back']
+    },
+    equipment: ['battle-ropes'],
+    difficulty: 'intermediate',
+    instructions: [
+      'Hold rope ends',
+      'Alternate slamming ropes',
+      'Keep core engaged',
+      'Fast pace',
+      'Full body movement'
+    ],
+    tips: [
+      'Great HIIT exercise',
+      'Full body workout',
+      'High intensity'
+    ],
+    videoUrl: 'https://www.youtube.com/embed/3VcKaXpzqRo'
   }
 ]
 
