@@ -2763,8 +2763,19 @@ export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'u
             notes: 'Bicep builder'
           },
           {
-            exerciseId: 'lateral-raises',
+            exerciseId: 'hammer-curls',
             order: 4,
+            sets: [
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 60 }
+            ],
+            restTime: 60,
+            notes: 'Neutral grip - hits brachialis and forearms, complements regular curls'
+          },
+          {
+            exerciseId: 'lateral-raises',
+            order: 5,
             sets: [
               { setType: 'working', targetReps: 15, targetWeight: undefined, restAfter: 60 },
               { setType: 'working', targetReps: 15, targetWeight: undefined, restAfter: 60 },
@@ -2775,7 +2786,7 @@ export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'u
           },
           {
             exerciseId: 'close-grip-bench-press',
-            order: 5,
+            order: 6,
             sets: [
               { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 90 },
               { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 90 },
@@ -2786,7 +2797,7 @@ export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'u
           },
           {
             exerciseId: 'overhead-tricep-extension',
-            order: 6,
+            order: 7,
             sets: [
               { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 60 },
               { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 60 },
@@ -2797,7 +2808,7 @@ export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'u
           },
           {
             exerciseId: 'rear-delt-flyes',
-            order: 7,
+            order: 8,
             sets: [
               { setType: 'working', targetReps: 15, targetWeight: undefined, restAfter: 60 },
               { setType: 'working', targetReps: 15, targetWeight: undefined, restAfter: 60 },
