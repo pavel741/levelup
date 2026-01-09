@@ -2602,7 +2602,7 @@ export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'u
             notes: 'Greater range of motion than barbell'
           },
           {
-            exerciseId: 'renegade-rows',
+            exerciseId: 'chest-supported-row',
             order: 3,
             sets: [
               { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 90 },
@@ -2610,7 +2610,7 @@ export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'u
               { setType: 'working', targetReps: 6, targetWeight: undefined, restAfter: 90 }
             ],
             restTime: 90,
-            notes: 'Each arm - great back and core builder, no pull-up bar needed. If too challenging, substitute with regular dumbbell rows'
+            notes: 'Easier alternative to renegade rows - chest support eliminates core stability challenge while still targeting back and lats'
           },
           {
             exerciseId: 'dumbbell-flyes',
