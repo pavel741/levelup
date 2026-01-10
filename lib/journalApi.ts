@@ -39,7 +39,8 @@ const _getJournalEntries = async (
     throw new Error(error.error || 'Failed to get journal entries')
   }
   const data = await response.json()
-  return data.entries || []
+  // Handle both wrapped response format { data: { entries: ... } } and direct { entries: ... }
+  return data.data?.entries || data.entries || []
 }
 
 // GET - Get journal entry by date
@@ -58,7 +59,8 @@ export const getJournalEntryByDate = async (
     throw new Error(error.error || 'Failed to get journal entry')
   }
   const data = await response.json()
-  return data.entry || null
+  // Handle both wrapped response format { data: { entry: ... } } and direct { entry: ... }
+  return data.data?.entry || data.entry || null
 }
 
 // GET - Get journal entry by ID
@@ -71,7 +73,8 @@ export const getJournalEntryById = async (userId: string, entryId: string): Prom
     throw new Error(error.error || 'Failed to get journal entry')
   }
   const data = await response.json()
-  return data.entry || null
+  // Handle both wrapped response format { data: { entry: ... } } and direct { entry: ... }
+  return data.data?.entry || data.entry || null
 }
 
 // GET - Get mood statistics
@@ -95,7 +98,8 @@ export const getMoodStatistics = async (
     throw new Error(error.error || 'Failed to get mood statistics')
   }
   const data = await response.json()
-  return data.stats || { moodCounts: {}, averageMoodRating: 0, moodTrend: [] }
+  // Handle both wrapped response format { data: { stats: ... } } and direct { stats: ... }
+  return data.data?.stats || data.stats || { moodCounts: {}, averageMoodRating: 0, moodTrend: [] }
 }
 
 // POST - Add a journal entry
