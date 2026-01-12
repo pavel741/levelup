@@ -9,65 +9,11 @@ import Header from '@/components/layout/Header'
 import { BookOpen, Plus, Search, Download, Heart, Smile, Edit, Trash2, X, Filter } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import type { JournalEntry } from '@/types'
-
-const JOURNAL_PROMPTS: Record<JournalEntry['type'], string[]> = {
-  daily: [
-    "What are three things you're grateful for today?",
-    "What was the highlight of your day?",
-    "What challenged you today and how did you handle it?",
-    "What did you learn today?",
-    "How did you grow today?",
-    "What made you smile today?",
-    "What would you do differently if you could relive today?",
-  ],
-  gratitude: [
-    "What are you grateful for right now?",
-    "Who are you grateful for and why?",
-    "What experience are you grateful for?",
-    "What opportunity are you grateful for?",
-    "What lesson are you grateful for?",
-  ],
-  reflection: [
-    "What are your thoughts and feelings right now?",
-    "What patterns do you notice in your life?",
-    "What are you proud of yourself for?",
-    "What do you need to let go of?",
-    "What are you looking forward to?",
-  ],
-  weekly: [
-    "What were the highlights of this week?",
-    "What challenges did you overcome this week?",
-    "What did you learn this week?",
-    "How did you grow this week?",
-    "What are you grateful for this week?",
-    "What would you do differently next week?",
-    "What are your goals for next week?",
-  ],
-  monthly: [
-    "What were the major accomplishments this month?",
-    "What challenges did you face and overcome?",
-    "What did you learn about yourself this month?",
-    "How have you grown this month?",
-    "What are you most grateful for this month?",
-    "What would you do differently next month?",
-    "What are your goals for next month?",
-  ],
-}
-
-const MOOD_OPTIONS: Array<{ value: JournalEntry['mood']; label: string; emoji: string }> = [
-  { value: 'very-happy', label: 'Very Happy', emoji: '😄' },
-  { value: 'happy', label: 'Happy', emoji: '😊' },
-  { value: 'neutral', label: 'Neutral', emoji: '😐' },
-  { value: 'sad', label: 'Sad', emoji: '😢' },
-  { value: 'very-sad', label: 'Very Sad', emoji: '😭' },
-  { value: 'anxious', label: 'Anxious', emoji: '😰' },
-  { value: 'calm', label: 'Calm', emoji: '😌' },
-  { value: 'energetic', label: 'Energetic', emoji: '⚡' },
-  { value: 'tired', label: 'Tired', emoji: '😴' },
-]
+import { useLanguage } from '@/components/common/LanguageProvider'
 
 export default function JournalPage() {
   const { user, habits } = useFirestoreStore()
+  const { t } = useLanguage()
   const {
     entries,
     isLoadingEntries,
@@ -90,6 +36,31 @@ export default function JournalPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showFilters, setShowFilters] = useState(false)
   const [validationError, setValidationError] = useState<string>('')
+
+  // Get prompts based on language
+  const getJournalPrompts = (type: JournalEntry['type']): string[] => {
+    const promptKeys = {
+      daily: ['grateful', 'highlight', 'challenge', 'learned', 'grow', 'smile', 'differently'],
+      gratitude: ['grateful', 'who', 'experience', 'opportunity', 'lesson'],
+      reflection: ['thoughts', 'patterns', 'proud', 'letGo', 'forward'],
+      weekly: ['highlights', 'challenges', 'learned', 'grow', 'grateful', 'differently', 'goals'],
+      monthly: ['accomplishments', 'challenges', 'learned', 'grow', 'grateful', 'differently', 'goals'],
+    }
+    return promptKeys[type].map(key => t(`journal.prompts.${type}.${key}`))
+  }
+
+  // Get mood options based on language
+  const getMoodOptions = (): Array<{ value: JournalEntry['mood']; label: string; emoji: string }> => [
+    { value: 'very-happy', label: t('journal.veryHappy'), emoji: '😄' },
+    { value: 'happy', label: t('journal.happy'), emoji: '😊' },
+    { value: 'neutral', label: t('journal.neutral'), emoji: '😐' },
+    { value: 'sad', label: t('journal.sad'), emoji: '😢' },
+    { value: 'very-sad', label: t('journal.verySad'), emoji: '😭' },
+    { value: 'anxious', label: t('journal.anxious'), emoji: '😰' },
+    { value: 'calm', label: t('journal.calm'), emoji: '😌' },
+    { value: 'energetic', label: t('journal.energetic'), emoji: '⚡' },
+    { value: 'tired', label: t('journal.tired'), emoji: '😴' },
+  ]
 
   const [newEntry, setNewEntry] = useState<{
     date: string
@@ -152,8 +123,8 @@ export default function JournalPage() {
       if (!hasContent) {
         setValidationError(
           newEntry.type === 'gratitude' 
-            ? 'Please add at least one gratitude item'
-            : 'Please enter some content'
+            ? t('journal.addGratitudeItem')
+            : t('journal.enterContent')
         )
         setTimeout(() => setValidationError(''), 3000)
       }
@@ -229,7 +200,7 @@ export default function JournalPage() {
   }
 
   const handleDeleteEntry = async (entryId: string) => {
-    if (!user || !confirm('Are you sure you want to delete this journal entry?')) return
+    if (!user || !confirm(t('journal.deleteEntryConfirm'))) return
 
     try {
       await deleteEntry(user.id, entryId)
@@ -280,7 +251,7 @@ export default function JournalPage() {
   })
 
   const getMoodEmoji = (mood?: JournalEntry['mood']) => {
-    const moodOption = MOOD_OPTIONS.find((m) => m.value === mood)
+    const moodOption = getMoodOptions().find((m) => m.value === mood)
     return moodOption?.emoji || '😐'
   }
 
@@ -298,10 +269,10 @@ export default function JournalPage() {
               <div>
                 <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
                   <BookOpen className="w-8 h-8 text-blue-600 dark:text-blue-400" />
-                  Journal & Reflection
+                  {t('journal.journalReflection')}
                 </h1>
                 <p className="text-gray-600 dark:text-gray-400">
-                  Track your thoughts, moods, and gratitude
+                  {t('journal.trackThoughts')}
                 </p>
               </div>
               <div className="flex gap-2 mt-4 md:mt-0">
@@ -310,14 +281,14 @@ export default function JournalPage() {
                   className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors flex items-center gap-2"
                 >
                   <Download className="w-4 h-4" />
-                  Export JSON
+                  {t('journal.exportJSON')}
                 </button>
                 <button
                   onClick={() => handleExport('csv')}
                   className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors flex items-center gap-2"
                 >
                   <Download className="w-4 h-4" />
-                  Export CSV
+                  {t('journal.exportCSV')}
                 </button>
                 <button
                   onClick={() => {
@@ -327,7 +298,7 @@ export default function JournalPage() {
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
-                  New Entry
+                  {t('journal.newEntry')}
                 </button>
               </div>
             </div>
@@ -339,7 +310,7 @@ export default function JournalPage() {
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   <input
                     type="text"
-                    placeholder="Search journal entries..."
+                    placeholder={t('journal.searchEntries')}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -350,7 +321,7 @@ export default function JournalPage() {
                   className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
                 >
                   <Filter className="w-4 h-4" />
-                  Filters
+                  {t('todos.filter')}
                 </button>
               </div>
 
@@ -358,24 +329,24 @@ export default function JournalPage() {
                 <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex flex-wrap gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Type
+                      {t('journal.type')}
                     </label>
                     <select
                       value={filters.type || ''}
                       onChange={(e) => setFilters({ type: e.target.value as JournalEntry['type'] || undefined })}
                       className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     >
-                      <option value="">All Types</option>
-                      <option value="daily">Daily</option>
-                      <option value="gratitude">Gratitude</option>
-                      <option value="reflection">Reflection</option>
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
+                      <option value="">{t('journal.allTypes')}</option>
+                      <option value="daily">{t('journal.daily')}</option>
+                      <option value="gratitude">{t('journal.gratitude')}</option>
+                      <option value="reflection">{t('journal.reflection')}</option>
+                      <option value="weekly">{t('journal.weekly')}</option>
+                      <option value="monthly">{t('journal.monthly')}</option>
                     </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Date From
+                      {t('journal.dateFrom')}
                     </label>
                     <input
                       type="date"
@@ -386,7 +357,7 @@ export default function JournalPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Date To
+                      {t('journal.dateTo')}
                     </label>
                     <input
                       type="date"
@@ -400,7 +371,7 @@ export default function JournalPage() {
                       onClick={() => setFilters({})}
                       className="px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:underline self-end"
                     >
-                      Clear Filters
+                      {t('journal.clearFilters')}
                     </button>
                   )}
                 </div>
@@ -412,17 +383,17 @@ export default function JournalPage() {
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 mb-6">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                   <Smile className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                  Mood Overview
+                  {t('journal.moodOverview')}
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Average Mood Rating</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{t('journal.averageMoodRating')}</p>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">
                       {moodStats.averageMoodRating.toFixed(1)}/10
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Mood Distribution</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{t('journal.moodDistribution')}</p>
                     <div className="flex flex-wrap gap-2">
                       {Object.entries(moodStats.moodCounts).map(([mood, count]) => (
                         <span key={mood} className="text-sm px-2 py-1 bg-blue-100 dark:bg-blue-900 rounded">
@@ -439,38 +410,38 @@ export default function JournalPage() {
             {isLoadingEntries ? (
               <div className="text-center py-12">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                <p className="mt-4 text-gray-600 dark:text-gray-400">Loading journal entries...</p>
+                <p className="mt-4 text-gray-600 dark:text-gray-400">{t('journal.loadingJournalEntries')}</p>
               </div>
             ) : filteredEntries.length === 0 && entries.length > 0 ? (
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-12 text-center">
                 <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                  No entries match your filters
+                  {t('journal.noEntriesMatchFilters')}
                 </h3>
                 <p className="text-gray-600 dark:text-gray-400 mb-6">
-                  You have {entries.length} {entries.length === 1 ? 'entry' : 'entries'} but none match the current filters
+                  {t('journal.entriesButNoneMatch', { count: entries.length })}
                 </p>
                 <button
                   onClick={() => setFilters({})}
                   className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
-                  Clear Filters
+                  {t('journal.clearFilters')}
                 </button>
               </div>
             ) : filteredEntries.length === 0 ? (
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-12 text-center">
                 <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                  No journal entries yet
+                  {t('journal.noEntriesFound')}
                 </h3>
                 <p className="text-gray-600 dark:text-gray-400 mb-6">
-                  Start your journaling journey by creating your first entry
+                  {t('journal.startJourney')}
                 </p>
                 <button
                   onClick={() => setShowAddModal(true)}
                   className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
-                  Create First Entry
+                  {t('journal.createEntry')}
                 </button>
               </div>
             ) : (
@@ -487,7 +458,7 @@ export default function JournalPage() {
                             {entry.type}
                           </span>
                           {entry.mood && (
-                            <span className="text-2xl" title={MOOD_OPTIONS.find((m) => m.value === entry.mood)?.label}>
+                            <span className="text-2xl" title={getMoodOptions().find((m) => m.value === entry.mood)?.label}>
                               {getMoodEmoji(entry.mood)}
                             </span>
                           )}
@@ -509,7 +480,7 @@ export default function JournalPage() {
                           <div className="mb-3">
                             <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
                               <Heart className="w-4 h-4 text-red-500" />
-                              Gratitude Items:
+                              {t('journal.gratitudeItems')}:
                             </p>
                             <ul className="list-disc list-inside space-y-1 ml-4">
                               {entry.gratitudeItems.map((item, idx) => (
@@ -567,7 +538,7 @@ export default function JournalPage() {
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">New Journal Entry</h2>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{t('journal.newEntry')}</h2>
                 <button
                   onClick={() => {
                     setShowAddModal(false)
@@ -606,23 +577,23 @@ export default function JournalPage() {
                       }}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     >
-                      <option value="daily">Daily</option>
-                      <option value="gratitude">Gratitude</option>
-                      <option value="reflection">Reflection</option>
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
+                      <option value="daily">{t('journal.daily')}</option>
+                      <option value="gratitude">{t('journal.gratitude')}</option>
+                      <option value="reflection">{t('journal.reflection')}</option>
+                      <option value="weekly">{t('journal.weekly')}</option>
+                      <option value="monthly">{t('journal.monthly')}</option>
                     </select>
                   </div>
                 </div>
 
                 {/* Journal Prompts */}
-                {JOURNAL_PROMPTS[newEntry.type] && (
+                {getJournalPrompts(newEntry.type).length > 0 && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Journal Prompts
+                      {t('journal.selectPrompt')}
                     </label>
                     <div className="flex flex-wrap gap-2">
-                      {JOURNAL_PROMPTS[newEntry.type].map((prompt, idx) => (
+                      {getJournalPrompts(newEntry.type).map((prompt, idx) => (
                         <button
                           key={idx}
                           onClick={() => applyPrompt(prompt)}
@@ -637,13 +608,13 @@ export default function JournalPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Title (optional)
+                    {t('journal.title')} ({t('common.optional')})
                   </label>
                   <input
                     type="text"
                     value={newEntry.title}
                     onChange={(e) => setNewEntry((prev) => ({ ...prev, title: e.target.value }))}
-                    placeholder="Entry title..."
+                    placeholder={t('journal.title')}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   />
                 </div>
@@ -651,7 +622,7 @@ export default function JournalPage() {
                 {newEntry.type === 'gratitude' ? (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Gratitude Items <span className="text-red-500">*</span>
+                      {t('journal.gratitudeItems')} <span className="text-red-500">*</span>
                     </label>
                     {validationError && newEntry.type === 'gratitude' && (
                       <p className="text-red-500 text-sm mb-2">{validationError}</p>
@@ -667,7 +638,7 @@ export default function JournalPage() {
                             updated[idx] = e.target.value
                             setNewEntry((prev) => ({ ...prev, gratitudeItems: updated }))
                           }}
-                          placeholder={`Gratitude item ${idx + 1}...`}
+                          placeholder={`${t('journal.gratitude')} ${idx + 1}...`}
                           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                         />
                       ))}
@@ -677,14 +648,14 @@ export default function JournalPage() {
                         }
                         className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
                       >
-                        + Add gratitude item
+                        + {t('journal.addGratitudeItem')}
                       </button>
                     </div>
                   </div>
                 ) : (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Content <span className="text-red-500">*</span>
+                      {t('journal.content')} <span className="text-red-500">*</span>
                     </label>
                     {validationError && (
                       <p className="text-red-500 text-sm mb-1">{validationError}</p>
@@ -692,7 +663,7 @@ export default function JournalPage() {
                     <textarea
                       value={newEntry.content}
                       onChange={(e) => setNewEntry((prev) => ({ ...prev, content: e.target.value }))}
-                      placeholder="Write your thoughts..."
+                      placeholder={t('journal.writeThoughts')}
                       rows={8}
                       className={`w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white ${
                         validationError 
@@ -706,7 +677,7 @@ export default function JournalPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Mood
+                      {t('journal.mood')}
                     </label>
                     <select
                       value={newEntry.mood || ''}
@@ -715,8 +686,8 @@ export default function JournalPage() {
                       }
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     >
-                      <option value="">Select mood...</option>
-                      {MOOD_OPTIONS.map((mood) => (
+                      <option value="">{t('journal.selectMood')}</option>
+                      {getMoodOptions().map((mood) => (
                         <option key={mood.value} value={mood.value}>
                           {mood.emoji} {mood.label}
                         </option>
@@ -725,7 +696,7 @@ export default function JournalPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Mood Rating (1-10)
+                      {t('journal.moodRating')} (1-10)
                     </label>
                     <input
                       type="number"
@@ -745,14 +716,14 @@ export default function JournalPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Link to Habit (optional)
+                    {t('focus.linkToHabit')} ({t('common.optional')})
                   </label>
                   <select
                     value={newEntry.linkedHabitId}
                     onChange={(e) => setNewEntry((prev) => ({ ...prev, linkedHabitId: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   >
-                    <option value="">No habit linked</option>
+                    <option value="">{t('journal.noHabitLinked')}</option>
                     {habits
                       .filter((h) => h.isActive)
                       .map((habit) => (
@@ -768,7 +739,7 @@ export default function JournalPage() {
                     onClick={handleAddEntry}
                     className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                   >
-                    Save Entry
+                    {t('journal.saveEntry')}
                   </button>
                   <button
                     onClick={() => {
@@ -776,7 +747,7 @@ export default function JournalPage() {
                     }}
                     className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
                   >
-                    Cancel
+                    {t('common.cancel')}
                   </button>
                 </div>
               </div>
@@ -789,7 +760,7 @@ export default function JournalPage() {
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
               <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Edit Journal Entry</h2>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{t('journal.editJournalEntry')}</h2>
                 <button
                   onClick={() => {
                     setShowEditModal(false)
@@ -803,7 +774,7 @@ export default function JournalPage() {
               <div className="p-6 space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Title (optional)
+                    {t('journal.title')} ({t('common.optional')})
                   </label>
                   <input
                     type="text"
@@ -816,7 +787,7 @@ export default function JournalPage() {
                 {currentEntry.type === 'gratitude' && currentEntry.gratitudeItems ? (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Gratitude Items
+                      {t('journal.gratitudeItems')}
                     </label>
                     <div className="space-y-2">
                       {currentEntry.gratitudeItems.map((item, idx) => (
@@ -907,7 +878,7 @@ export default function JournalPage() {
                     onClick={handleEditEntry}
                     className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                   >
-                    Save Changes
+                    {t('habits.saveChanges')}
                   </button>
                   <button
                     onClick={() => {
@@ -916,7 +887,7 @@ export default function JournalPage() {
                     }}
                     className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
                   >
-                    Cancel
+                    {t('common.cancel')}
                   </button>
                 </div>
               </div>

@@ -10,6 +10,7 @@ import { ACHIEVEMENT_DEFINITIONS } from '@/lib/achievements'
 import { Trophy, Lock, CheckCircle2 } from 'lucide-react'
 import { Achievement, User } from '@/types'
 import AchievementCelebration from '@/components/AchievementCelebration'
+import { useLanguage } from '@/components/common/LanguageProvider'
 
 const rarityColors = {
   common: 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-700',
@@ -18,18 +19,16 @@ const rarityColors = {
   legendary: 'bg-yellow-100 dark:bg-yellow-900 border-yellow-300 dark:border-yellow-700',
 }
 
-const rarityLabels = {
-  common: 'Common',
-  rare: 'Rare',
-  epic: 'Epic',
-  legendary: 'Legendary',
-}
-
 export default function AchievementsPage() {
   const { user, habits, checkAchievements, newAchievements, showAchievementCelebration } = useFirestoreStore()
+  const { t } = useLanguage()
   const [showCelebration, setShowCelebration] = useState(false)
   const [celebratingAchievement, setCelebratingAchievement] = useState<Achievement | null>(null)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+
+  const getRarityLabel = (rarity: keyof typeof rarityColors) => {
+    return t(`achievements.${rarity}`)
+  }
 
   useEffect(() => {
     if (user) {
@@ -80,16 +79,16 @@ export default function AchievementsPage() {
             <main className="flex-1 overflow-y-auto p-4 sm:p-6">
               <div className="max-w-7xl mx-auto">
                 <div className="mb-6">
-                  <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Achievements</h1>
+                  <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">{t('achievements.achievements')}</h1>
                   <p className="text-gray-600 dark:text-gray-400">
-                    {unlockedAchievements.length} of {allAchievements.length} achievements unlocked
+                    {unlockedAchievements.length} {t('achievements.of')} {allAchievements.length} {t('achievements.achievementsUnlocked')}
                   </p>
                 </div>
 
                 {/* Progress Overview */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Overall Progress</h2>
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{t('achievements.overallProgress')}</h2>
                     <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                       {Math.round((unlockedAchievements.length / allAchievements.length) * 100)}%
                     </span>
@@ -107,7 +106,7 @@ export default function AchievementsPage() {
                   <div className="mb-8">
                     <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                       <Trophy className="w-6 h-6 text-yellow-500 dark:text-yellow-400" />
-                      Unlocked ({unlockedAchievements.length})
+                      {t('achievements.unlocked')} ({unlockedAchievements.length})
                     </h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {unlockedAchievements.map((achievement) => (
@@ -124,7 +123,7 @@ export default function AchievementsPage() {
                                 achievement.rarity === 'rare' ? 'bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-blue-200' :
                                 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
                               }`}>
-                                {rarityLabels[achievement.rarity]}
+                                {getRarityLabel(achievement.rarity)}
                               </span>
                             </div>
                           </div>
@@ -133,7 +132,7 @@ export default function AchievementsPage() {
                           {achievement.unlockedAt && (
                             <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                               <CheckCircle2 className="w-4 h-4 text-green-500" />
-                              Unlocked {new Date(achievement.unlockedAt).toLocaleDateString()}
+                              {t('achievements.unlockedAt')} {new Date(achievement.unlockedAt).toLocaleDateString()}
                             </div>
                           )}
                         </div>
@@ -147,7 +146,7 @@ export default function AchievementsPage() {
                   <div>
                     <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                       <Lock className="w-6 h-6 text-gray-400 dark:text-gray-500" />
-                      Locked ({lockedAchievements.length})
+                      {t('achievements.locked')} ({lockedAchievements.length})
                     </h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {lockedAchievements.map((achievement) => {
@@ -161,7 +160,7 @@ export default function AchievementsPage() {
                               <div className="text-4xl grayscale opacity-50">{achievement.icon}</div>
                               <div className="text-right">
                                 <span className="text-xs font-semibold px-2 py-1 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
-                                  {rarityLabels[achievement.rarity]}
+                                  {getRarityLabel(achievement.rarity)}
                                 </span>
                               </div>
                             </div>
@@ -169,7 +168,7 @@ export default function AchievementsPage() {
                             <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">{achievement.description}</p>
                             <div className="space-y-2">
                               <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-                                <span>Progress</span>
+                                <span>{t('achievements.progress')}</span>
                                 <span>
                                   {achievement.progress} / {achievement.target}
                                 </span>

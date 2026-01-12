@@ -4,6 +4,7 @@ import { Home, Target, Trophy, Settings, Award, Wallet, X, MessageCircle, Dumbbe
 import Link from 'next/link'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
 import { usePathname } from 'next/navigation'
+import { useLanguage } from '@/components/common/LanguageProvider'
 
 interface SidebarProps {
   isOpen?: boolean
@@ -13,20 +14,21 @@ interface SidebarProps {
 export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const { user } = useFirestoreStore()
   const pathname = usePathname()
+  const { t } = useLanguage()
 
   const menuItems = [
-    { icon: Home, label: 'Dashboard', href: '/' },
-    { icon: Target, label: 'Habits', href: '/habits' },
-    { icon: Flag, label: 'Goals', href: '/goals' },
-    { icon: CheckSquare, label: 'Todos', href: '/todos' },
-    { icon: Trophy, label: 'Challenges', href: '/challenges' },
-    { icon: Dumbbell, label: 'Workouts', href: '/workouts' },
-    { icon: Wallet, label: 'Finance', href: '/finance' },
-    { icon: Timer, label: 'Focus', href: '/focus' },
-    { icon: BookOpen, label: 'Journal', href: '/journal' },
-    { icon: Award, label: 'Achievements', href: '/achievements' },
-    { icon: MessageCircle, label: 'Feedback', href: '/feedback' },
-    { icon: Settings, label: 'Settings', href: '/settings' },
+    { icon: Home, label: t('sidebar.dashboard'), href: '/' },
+    { icon: Target, label: t('sidebar.habits'), href: '/habits' },
+    { icon: Flag, label: t('sidebar.goals'), href: '/goals' },
+    { icon: CheckSquare, label: t('sidebar.todos'), href: '/todos' },
+    { icon: Trophy, label: t('sidebar.challenges'), href: '/challenges' },
+    { icon: Dumbbell, label: t('sidebar.workouts'), href: '/workouts' },
+    { icon: Wallet, label: t('sidebar.finance'), href: '/finance' },
+    { icon: Timer, label: t('sidebar.focus'), href: '/focus' },
+    { icon: BookOpen, label: t('sidebar.journal'), href: '/journal' },
+    { icon: Award, label: t('sidebar.achievements'), href: '/achievements' },
+    { icon: MessageCircle, label: t('sidebar.feedback'), href: '/feedback' },
+    { icon: Settings, label: t('sidebar.settings'), href: '/settings' },
   ]
 
   const handleLinkClick = (_e: React.MouseEvent) => {
@@ -87,7 +89,7 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
             <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
               LevelUp
             </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Level Up Life</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('sidebar.levelUpLife')}</p>
           </Link>
         </div>
 
@@ -121,7 +123,7 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
           <div className="p-4 border-t border-gray-200 dark:border-gray-700">
             <div className="bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg p-4 text-white">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium">Level {user.level}</span>
+                <span className="text-sm font-medium">{t('common.level')} {user.level}</span>
                 <span className="text-xs opacity-90">{user.xp} XP</span>
               </div>
               <div className="w-full bg-white/20 rounded-full h-2 mb-2">
@@ -133,7 +135,7 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
                 />
               </div>
               <div className="flex items-center gap-2 text-xs">
-                <span>🔥 {user.streak} day streak</span>
+                <span>🔥 {user.streak} {t('common.dayStreak')}</span>
               </div>
             </div>
           </div>

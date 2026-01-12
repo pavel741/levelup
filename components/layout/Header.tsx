@@ -5,6 +5,8 @@ import { useFirestoreStore } from '@/store/useFirestoreStore'
 import { logout } from '@/lib/auth'
 import { useRouter } from 'next/navigation'
 import NotificationsDropdown from '@/components/NotificationsDropdown'
+import LanguageSwitcher from '@/components/common/LanguageSwitcher'
+import { useLanguage } from '@/components/common/LanguageProvider'
 
 interface HeaderProps {
   onMenuToggle?: () => void
@@ -14,6 +16,7 @@ interface HeaderProps {
 export default function Header({ onMenuToggle, isMenuOpen }: HeaderProps) {
   const { user } = useFirestoreStore()
   const router = useRouter()
+  const { t } = useLanguage()
 
   const handleLogout = async () => {
     try {
@@ -42,7 +45,7 @@ export default function Header({ onMenuToggle, isMenuOpen }: HeaderProps) {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5" />
             <input
               type="text"
-              placeholder="Search habits, challenges..."
+              placeholder={t('header.searchPlaceholder')}
               className="w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
             />
           </div>
@@ -50,13 +53,14 @@ export default function Header({ onMenuToggle, isMenuOpen }: HeaderProps) {
 
         {/* Right side - User info and actions */}
         <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+          <LanguageSwitcher />
           <NotificationsDropdown />
 
           {/* User info - Hidden on mobile, visible on tablet+ */}
           <div className="hidden sm:flex items-center gap-3">
             <div className="text-right">
               <p className="text-sm font-medium text-gray-900 dark:text-white">{user?.name}</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Level {user?.level}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{t('common.level')} {user?.level}</p>
             </div>
             {user?.avatar ? (
               <img
@@ -89,7 +93,7 @@ export default function Header({ onMenuToggle, isMenuOpen }: HeaderProps) {
           <button
             onClick={handleLogout}
             className="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-            title="Logout"
+            title={t('header.logout')}
           >
             <LogOut className="w-5 h-5" />
           </button>

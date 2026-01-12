@@ -12,9 +12,11 @@ import { Habit } from '@/types'
 import { format } from 'date-fns'
 import { showWarning, showSuccess, showError } from '@/lib/utils'
 import { HABIT_TEMPLATES, HABIT_BUNDLES, createHabitFromTemplate, exportHabits, importHabits } from '@/lib/habitTemplates'
+import { useLanguage } from '@/components/common/LanguageProvider'
 
 export default function HabitsPage() {
   const { habits, addHabit, updateHabit, user } = useFirestoreStore()
+  const { t } = useLanguage()
   const [showAddModal, setShowAddModal] = useState(false)
   const [showTemplateModal, setShowTemplateModal] = useState(false)
   const [showBundleModal, setShowBundleModal] = useState(false)
@@ -113,7 +115,7 @@ export default function HabitsPage() {
       completionsPerDay: {},
     })
 
-    showSuccess(`Added "${template.name}" habit`)
+    showSuccess(t('habits.addedSuccessfully', { name: template.name }))
     setShowTemplateModal(false)
   }
 
@@ -135,7 +137,7 @@ export default function HabitsPage() {
       addedCount++
     })
 
-    showSuccess(`Added ${addedCount} habits from "${bundle.name}"`)
+    showSuccess(t('habits.addedBundle', { count: addedCount, name: bundle.name }))
     setShowBundleModal(false)
   }
 
@@ -151,7 +153,7 @@ export default function HabitsPage() {
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
-      showSuccess('Habits exported successfully')
+      showSuccess(t('habits.exportedSuccessfully'))
     } catch (error) {
       showError(error, { component: 'HabitsPage', action: 'exportHabits' })
     }
@@ -194,7 +196,7 @@ export default function HabitsPage() {
             })
           })
 
-          showSuccess(`Imported ${importedHabits.length} habit(s)`)
+          showSuccess(t('habits.importedSuccessfully', { count: importedHabits.length }))
         } catch (error) {
           showError(error, { component: 'HabitsPage', action: 'importHabits' })
         }
@@ -292,12 +294,12 @@ export default function HabitsPage() {
     selectedDateObj.setHours(0, 0, 0, 0)
     
     if (selectedDateObj.getTime() === todayDate.getTime()) {
-      return 'Today'
+      return t('common.today')
     }
     const yesterday = new Date(todayDate)
     yesterday.setDate(yesterday.getDate() - 1)
     if (selectedDateObj.getTime() === yesterday.getTime()) {
-      return 'Yesterday'
+      return t('common.yesterday')
     }
     return format(date, 'MMM d, yyyy')
   }
@@ -314,8 +316,8 @@ export default function HabitsPage() {
             <div className="max-w-7xl mx-auto">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                 <div className="flex-1">
-                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">My Habits</h1>
-                  <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">Track your daily habits and build consistency</p>
+                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">{t('habits.myHabits')}</h1>
+                  <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">{t('habits.trackHabits')}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
@@ -336,7 +338,7 @@ export default function HabitsPage() {
                     className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-2"
                   >
                     <BarChart3 className="w-4 h-4" />
-                    Statistics
+                    {t('habits.statistics')}
                   </a>
                   <div className="flex items-center gap-2">
                     <button
@@ -344,15 +346,15 @@ export default function HabitsPage() {
                       className="flex items-center justify-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium text-sm sm:text-base"
                     >
                       <Sparkles className="w-4 h-4" />
-                      <span className="hidden sm:inline">Templates</span>
+                      <span className="hidden sm:inline">{t('habits.templates')}</span>
                     </button>
                     <button
                       onClick={() => setShowAddModal(true)}
                       className="flex items-center justify-center gap-2 px-4 sm:px-6 py-2 sm:py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all font-medium shadow-lg text-sm sm:text-base"
                     >
                       <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
-                      <span className="hidden sm:inline">Add Habit</span>
-                      <span className="sm:hidden">Add</span>
+                      <span className="hidden sm:inline">{t('habits.addHabit')}</span>
+                      <span className="sm:hidden">{t('common.add')}</span>
                     </button>
                   </div>
                 </div>
@@ -362,7 +364,7 @@ export default function HabitsPage() {
                 <div className="mb-8">
                   <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                     <Target className="w-5 h-5" />
-                    To Complete {selectedDate === today ? 'Today' : `on ${getDateDisplay(selectedDate)}`}
+                    {t('habits.toComplete', { date: selectedDate === today ? t('common.today') : getDateDisplay(selectedDate) })}
                   </h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {incompleteForDate.map((habit) => (
@@ -376,7 +378,7 @@ export default function HabitsPage() {
                 <div className="mb-8">
                   <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                     <CheckCircle2 className="w-5 h-5 text-green-500" />
-                    Completed {selectedDate === today ? 'Today' : `on ${getDateDisplay(selectedDate)}`} ({completedForDate.length})
+                    {t('habits.completed', { date: selectedDate === today ? t('common.today') : getDateDisplay(selectedDate), count: completedForDate.length })}
                   </h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 opacity-90">
                     {completedForDate.map((habit) => (
@@ -389,20 +391,20 @@ export default function HabitsPage() {
               {activeHabits.length === 0 && (
                 <div className="text-center py-16 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
                   <Target className="w-16 h-16 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
-                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No habits yet</h3>
-                  <p className="text-gray-600 dark:text-gray-400 mb-6">Create your first habit to start building consistency!</p>
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">{t('habits.noHabitsYet')}</h3>
+                  <p className="text-gray-600 dark:text-gray-400 mb-6">{t('habits.createFirstHabit')}</p>
                   <button
                     onClick={() => setShowAddModal(true)}
                     className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
                   >
-                    Create Habit
+                    {t('habits.createHabit')}
                   </button>
                 </div>
               )}
 
               {archivedHabits.length > 0 && (
                 <div>
-                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Archived Habits</h2>
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">{t('habits.archivedHabits')}</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {archivedHabits.map((habit) => (
                       <HabitCard key={habit.id} habit={habit} onEdit={handleEditHabit} />
@@ -419,10 +421,10 @@ export default function HabitsPage() {
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 max-w-md w-full shadow-xl my-auto max-h-[90vh] flex flex-col">
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-4 flex-shrink-0">Create New Habit</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-4 flex-shrink-0">{t('habits.createNewHabit')}</h2>
             <div className="space-y-4 overflow-y-auto flex-1 min-h-0 pr-2 -mr-2">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Habit Name</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('habits.habitName')}</label>
                 <input
                   type="text"
                   value={newHabit.name}
@@ -432,7 +434,7 @@ export default function HabitsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('habits.description')}</label>
                 <input
                   type="text"
                   value={newHabit.description}
@@ -470,18 +472,18 @@ export default function HabitsPage() {
                     </button>
                   ))}
                 </div>
-                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">Click an icon above to select it, or type a custom emoji below</p>
+                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{t('habits.selectIcon')}</p>
                 <input
                   type="text"
                   value={newHabit.icon}
                   onChange={(e) => setNewHabit({ ...newHabit, icon: e.target.value })}
                   className="mt-2 w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                  placeholder="Or type a custom emoji"
+                  placeholder={t('habits.customEmoji')}
                   maxLength={2}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Frequency</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('habits.frequency')}</label>
                 <div className="grid grid-cols-3 gap-2 mb-3">
                   <button
                     type="button"
@@ -494,7 +496,7 @@ export default function HabitsPage() {
                         : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
                     }`}
                   >
-                    Daily
+                    {t('habits.daily')}
                   </button>
                   <button
                     type="button"
@@ -507,7 +509,7 @@ export default function HabitsPage() {
                         : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
                     }`}
                   >
-                    Weekly
+                    {t('habits.weekly')}
                   </button>
                   <button
                     type="button"
@@ -520,12 +522,12 @@ export default function HabitsPage() {
                         : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
                     }`}
                   >
-                    Custom
+                    {t('habits.custom')}
                   </button>
                 </div>
                 {(newHabit.frequency === 'weekly' || newHabit.frequency === 'custom') && (
                   <div>
-                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-2">Select Days</label>
+                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-2">{t('habits.selectDays')}</label>
                     <div className="grid grid-cols-7 gap-2">
                       {[
                         { day: 'Mon', value: 1, full: 'Monday' },
@@ -558,13 +560,13 @@ export default function HabitsPage() {
                       ))}
                     </div>
                     {newHabit.frequency === 'weekly' && newHabit.targetDays.length === 0 && (
-                      <p className="mt-2 text-xs text-red-500 dark:text-red-400">Please select at least one day</p>
+                      <p className="mt-2 text-xs text-red-500 dark:text-red-400">{t('habits.selectAtLeastOneDay')}</p>
                     )}
                   </div>
                 )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">XP Reward</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('habits.xpReward')}</label>
                 <input
                   type="number"
                   value={newHabit.xpReward === 0 ? '' : newHabit.xpReward}
@@ -646,7 +648,7 @@ export default function HabitsPage() {
                     onChange={(e) => setNewHabit({ ...newHabit, reminderEnabled: e.target.checked })}
                     className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                   />
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Enable Daily Reminder</span>
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('habits.enableDailyReminder')}</span>
                 </label>
                 {newHabit.reminderEnabled && (
                   <input
@@ -663,13 +665,13 @@ export default function HabitsPage() {
                 onClick={() => setShowAddModal(false)}
                 className="flex-1 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium text-sm sm:text-base"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 onClick={handleAddHabit}
                 className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm sm:text-base"
               >
-                Create
+                {t('common.create')}
               </button>
             </div>
           </div>
@@ -681,7 +683,7 @@ export default function HabitsPage() {
         <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Habit Templates</h2>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{t('habits.habitTemplates')}</h2>
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleExportHabits}
@@ -689,7 +691,7 @@ export default function HabitsPage() {
                   title="Export habits"
                 >
                   <Download className="w-4 h-4" />
-                  Export
+                  {t('habits.export')}
                 </button>
                 <button
                   onClick={handleImportHabits}
@@ -697,7 +699,7 @@ export default function HabitsPage() {
                   title="Import habits"
                 >
                   <Upload className="w-4 h-4" />
-                  Import
+                  {t('habits.import')}
                 </button>
                 <button
                   onClick={() => {
@@ -706,7 +708,7 @@ export default function HabitsPage() {
                   }}
                   className="px-3 py-1.5 text-sm bg-blue-100 dark:bg-blue-900/30 hover:bg-blue-200 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-lg transition-colors"
                 >
-                  View Bundles
+                  {t('habits.viewBundles')}
                 </button>
                 <button
                   onClick={() => setShowTemplateModal(false)}
@@ -779,8 +781,8 @@ export default function HabitsPage() {
                 onClick={() => setShowTemplateModal(false)}
                 className="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium transition-colors"
               >
-                Close
-              </button>
+                  {t('common.close')}
+                </button>
             </div>
           </div>
         </div>
@@ -791,7 +793,7 @@ export default function HabitsPage() {
         <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Habit Bundles</h2>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{t('habits.habitBundles')}</h2>
               <button
                 onClick={() => {
                   setShowBundleModal(false)
@@ -799,7 +801,7 @@ export default function HabitsPage() {
                 }}
                 className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors"
               >
-                View Templates
+                {t('habits.viewTemplates')}
               </button>
               <button
                 onClick={() => setShowBundleModal(false)}
@@ -810,7 +812,7 @@ export default function HabitsPage() {
             </div>
 
             <p className="text-gray-600 dark:text-gray-400 mb-6">
-              Add multiple related habits at once with these curated bundles.
+              {t('habits.addMultipleHabits')}
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -826,7 +828,7 @@ export default function HabitsPage() {
                       <h3 className="font-semibold text-gray-900 dark:text-white mb-1">{bundle.name}</h3>
                       <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">{bundle.description}</p>
                       <div className="text-xs text-gray-500 dark:text-gray-500">
-                        {bundle.habits.length} habits included
+                        {t('habits.habitsIncluded', { count: bundle.habits.length })}
                       </div>
                     </div>
                   </div>
@@ -839,8 +841,8 @@ export default function HabitsPage() {
                 onClick={() => setShowBundleModal(false)}
                 className="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg font-medium transition-colors"
               >
-                Close
-              </button>
+                  {t('common.close')}
+                </button>
             </div>
           </div>
         </div>
@@ -850,7 +852,7 @@ export default function HabitsPage() {
       {showEditModal && editingHabit && (
         <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 max-w-md w-full shadow-xl my-auto max-h-[90vh] flex flex-col">
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-4 flex-shrink-0">Edit Habit</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-4 flex-shrink-0">{t('habits.editHabit')}</h2>
             <div className="space-y-4 overflow-y-auto flex-1 min-h-0 pr-2 -mr-2">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Habit Name</label>
@@ -863,7 +865,7 @@ export default function HabitsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('habits.description')}</label>
                 <input
                   type="text"
                   value={newHabit.description}
@@ -901,18 +903,18 @@ export default function HabitsPage() {
                     </button>
                   ))}
                 </div>
-                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">Click an icon above to select it, or type a custom emoji below</p>
+                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{t('habits.selectIcon')}</p>
                 <input
                   type="text"
                   value={newHabit.icon}
                   onChange={(e) => setNewHabit({ ...newHabit, icon: e.target.value })}
                   className="mt-2 w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                  placeholder="Or type a custom emoji"
+                  placeholder={t('habits.customEmoji')}
                   maxLength={2}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Frequency</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('habits.frequency')}</label>
                 <div className="grid grid-cols-3 gap-2 mb-3">
                   <button
                     type="button"
@@ -925,7 +927,7 @@ export default function HabitsPage() {
                         : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
                     }`}
                   >
-                    Daily
+                    {t('habits.daily')}
                   </button>
                   <button
                     type="button"
@@ -938,7 +940,7 @@ export default function HabitsPage() {
                         : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
                     }`}
                   >
-                    Weekly
+                    {t('habits.weekly')}
                   </button>
                   <button
                     type="button"
@@ -951,12 +953,12 @@ export default function HabitsPage() {
                         : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
                     }`}
                   >
-                    Custom
+                    {t('habits.custom')}
                   </button>
                 </div>
                 {(newHabit.frequency === 'weekly' || newHabit.frequency === 'custom') && (
                   <div>
-                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-2">Select Days</label>
+                    <label className="block text-xs text-gray-600 dark:text-gray-400 mb-2">{t('habits.selectDays')}</label>
                     <div className="grid grid-cols-7 gap-2">
                       {[
                         { day: 'Mon', value: 1, full: 'Monday' },
@@ -989,13 +991,13 @@ export default function HabitsPage() {
                       ))}
                     </div>
                     {newHabit.frequency === 'weekly' && newHabit.targetDays.length === 0 && (
-                      <p className="mt-2 text-xs text-red-500 dark:text-red-400">Please select at least one day</p>
+                      <p className="mt-2 text-xs text-red-500 dark:text-red-400">{t('habits.selectAtLeastOneDay')}</p>
                     )}
                   </div>
                 )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">XP Reward</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('habits.xpReward')}</label>
                 <input
                   type="number"
                   value={newHabit.xpReward === 0 ? '' : newHabit.xpReward}
@@ -1077,7 +1079,7 @@ export default function HabitsPage() {
                     onChange={(e) => setNewHabit({ ...newHabit, reminderEnabled: e.target.checked })}
                     className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                   />
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Enable Daily Reminder</span>
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('habits.enableDailyReminder')}</span>
                 </label>
                 {newHabit.reminderEnabled && (
                   <input
@@ -1116,7 +1118,7 @@ export default function HabitsPage() {
                 onClick={handleUpdateHabit}
                 className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm sm:text-base"
               >
-                Save Changes
+                {t('habits.saveChanges')}
               </button>
             </div>
           </div>

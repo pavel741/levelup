@@ -11,9 +11,11 @@ import { VirtualList } from '@/components/ui/VirtualList'
 import { Plus, Circle, Filter, X } from 'lucide-react'
 import { Todo } from '@/types'
 import { format } from 'date-fns'
+import { useLanguage } from '@/components/common/LanguageProvider'
 
 export default function TodosPage() {
   const { user } = useFirestoreStore()
+  const { t } = useLanguage()
   const {
     todos,
     isLoadingTodos,
@@ -198,10 +200,10 @@ export default function TodosPage() {
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                 <div>
                   <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">
-                    Tasks & Todos
+                    {t('todos.tasksTodos')}
                   </h1>
                   <p className="text-gray-600 dark:text-gray-400">
-                    {activeTodos.length} active, {completedTodos.length} completed
+                    {t('todos.activeCompleted', { active: activeTodos.length, completed: completedTodos.length })}
                   </p>
                 </div>
                 <button
@@ -209,7 +211,7 @@ export default function TodosPage() {
                   className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
                 >
                   <Plus className="w-5 h-5" />
-                  Add Task
+                  {t('todos.addTask')}
                 </button>
               </div>
 
@@ -217,7 +219,7 @@ export default function TodosPage() {
               <div className="flex flex-wrap items-center gap-4 mb-6">
                 <div className="flex items-center gap-2">
                   <Filter className="w-4 h-4 text-gray-500" />
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Filter:</span>
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('todos.filter')}:</span>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {(['all', 'active', 'completed'] as const).map((f) => (
@@ -230,21 +232,21 @@ export default function TodosPage() {
                           : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
                       }`}
                     >
-                      {f === 'all' ? 'All' : f === 'active' ? 'Active' : 'Completed'}
+                      {f === 'all' ? t('common.all') : f === 'active' ? t('common.active') : t('common.completed')}
                     </button>
                   ))}
                 </div>
                 <div className="flex items-center gap-2 ml-auto">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Priority:</span>
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('todos.priority')}:</span>
                   <select
                     value={priorityFilter}
                     onChange={(e) => setPriorityFilter(e.target.value as any)}
                     className="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
                   >
-                    <option value="all">All</option>
-                    <option value="urgent">Urgent</option>
-                    <option value="important">Important</option>
-                    <option value="nice-to-have">Nice to Have</option>
+                    <option value="all">{t('common.all')}</option>
+                    <option value="urgent">{t('todos.urgent')}</option>
+                    <option value="important">{t('todos.important')}</option>
+                    <option value="nice-to-have">{t('todos.niceToHave')}</option>
                   </select>
                 </div>
               </div>
@@ -252,12 +254,12 @@ export default function TodosPage() {
               {/* Todos List */}
               {isLoadingTodos ? (
                 <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                  Loading todos...
+                  {t('todos.loadingTodos')}
                 </div>
               ) : filteredTodos.length === 0 ? (
                 <div className="text-center py-12 text-gray-500 dark:text-gray-400">
                   <Circle className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                  <p>No todos found. Create your first task to get started!</p>
+                  <p>{t('todos.noTodosFound')}</p>
                 </div>
               ) : filteredTodos.length > 50 ? (
                 // Use virtual scrolling for large lists
@@ -300,7 +302,7 @@ export default function TodosPage() {
           <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4 overflow-y-auto">
             <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-2xl w-full shadow-xl my-auto max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Add New Task</h2>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{t('todos.addNewTask')}</h2>
                 <button
                   onClick={() => setShowAddModal(false)}
                   className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
@@ -312,34 +314,34 @@ export default function TodosPage() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Title *
+                    {t('todos.title')} *
                   </label>
                   <input
                     type="text"
                     value={newTodo.title}
                     onChange={(e) => setNewTodo({ ...newTodo, title: e.target.value })}
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                    placeholder="Enter task title"
+                    placeholder={t('todos.enterTaskTitle')}
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Description
+                    {t('habits.description')}
                   </label>
                   <textarea
                     value={newTodo.description}
                     onChange={(e) => setNewTodo({ ...newTodo, description: e.target.value })}
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     rows={3}
-                    placeholder="Enter task description"
+                    placeholder={t('todos.enterTaskDescription')}
                   />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Priority *
+                      {t('todos.priority')} *
                     </label>
                     <select
                       value={newTodo.priority}
@@ -348,15 +350,15 @@ export default function TodosPage() {
                       }
                       className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     >
-                      <option value="urgent">Urgent</option>
-                      <option value="important">Important</option>
-                      <option value="nice-to-have">Nice to Have</option>
+                      <option value="urgent">{t('todos.urgent')}</option>
+                      <option value="important">{t('todos.important')}</option>
+                      <option value="nice-to-have">{t('todos.niceToHave')}</option>
                     </select>
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Due Date
+                      {t('todos.dueDate')}
                     </label>
                     <input
                       type="date"
@@ -476,13 +478,13 @@ export default function TodosPage() {
                     onClick={() => setShowAddModal(false)}
                     className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium"
                   >
-                    Cancel
+                    {t('common.cancel')}
                   </button>
                   <button
                     onClick={handleAddTodo}
                     className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
                   >
-                    Add Task
+                    {t('todos.addTaskButton')}
                   </button>
                 </div>
               </div>
@@ -495,7 +497,7 @@ export default function TodosPage() {
           <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4 overflow-y-auto">
             <div className="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-2xl w-full shadow-xl my-auto max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Edit Task</h2>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{t('todos.editTask')}</h2>
                 <button
                   onClick={() => {
                     setShowEditModal(false)
@@ -678,7 +680,7 @@ export default function TodosPage() {
                     onClick={handleUpdateTodo}
                     className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
                   >
-                    Update Task
+                    {t('todos.updateTask')}
                   </button>
                 </div>
               </div>

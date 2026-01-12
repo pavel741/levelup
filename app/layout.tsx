@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import { ThemeProvider } from '@/components/common/ThemeProvider'
+import { LanguageProvider } from '@/components/common/LanguageProvider'
 import ClientNotificationManager from '@/components/ClientNotificationManager'
 import ErrorDisplay from '@/components/common/ErrorDisplay'
 import ToastContainer from '@/components/common/Toast'
@@ -22,14 +23,16 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="font-sans antialiased">
-        <ThemeProvider>
-          <ErrorBoundary>
-            {children}
-            <ClientNotificationManager />
-            <ErrorDisplay />
-            <ToastContainer />
-          </ErrorBoundary>
-        </ThemeProvider>
+        <LanguageProvider>
+          <ThemeProvider>
+            <ErrorBoundary>
+              {children}
+              <ClientNotificationManager />
+              <ErrorDisplay />
+              <ToastContainer />
+            </ErrorBoundary>
+          </ThemeProvider>
+        </LanguageProvider>
       </body>
     </html>
   )

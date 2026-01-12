@@ -9,6 +9,7 @@ import Header from '@/components/layout/Header'
 import { Timer, Play, Pause, Square, Target, TrendingUp, Clock, X, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
 import type { FocusSession } from '@/types'
+import { useLanguage } from '@/components/common/LanguageProvider'
 
 type SessionType = 'pomodoro' | 'short-break' | 'long-break' | 'custom'
 
@@ -21,6 +22,7 @@ const SESSION_DURATIONS: Record<SessionType, number> = {
 
 export default function FocusPage() {
   const { user, habits, addXP } = useFirestoreStore()
+  const { t } = useLanguage()
   const {
     sessions,
     isLoadingSessions,
@@ -254,14 +256,14 @@ export default function FocusPage() {
       return
     }
     
-    if (window.confirm('Are you sure you want to delete this session? This action cannot be undone.')) {
+    if (window.confirm(t('focus.areYouSureDelete'))) {
       try {
         console.log('Deleting session:', sessionId)
         await deleteSession(user.id, sessionId)
         console.log('Session deleted successfully')
       } catch (error) {
         console.error('Failed to delete session:', error)
-        alert('Failed to delete session. Please try again.')
+        alert(t('focus.failedToDelete'))
       }
     }
   }
@@ -284,10 +286,10 @@ export default function FocusPage() {
                 <div className="mb-6">
                   <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
                     <Timer className="w-8 h-8 text-purple-600 dark:text-purple-400" />
-                    Focus Timer
+                    {t('focus.focusTimer')}
                   </h1>
                   <p className="text-gray-600 dark:text-gray-400">
-                    Stay focused and track your productivity sessions
+                    {t('focus.stayFocused')}
                   </p>
                 </div>
 
@@ -298,7 +300,7 @@ export default function FocusPage() {
                     {!currentSession && (
                       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
                         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                          Select Session Type
+                          {t('focus.focusSessions')}
                         </h2>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
                           {(['pomodoro', 'short-break', 'long-break', 'custom'] as SessionType[]).map((type) => (
@@ -312,10 +314,10 @@ export default function FocusPage() {
                               }`}
                             >
                               <div className="font-semibold capitalize mb-1">
-                                {type === 'short-break' ? 'Short Break' : type === 'long-break' ? 'Long Break' : type}
+                                {type === 'short-break' ? t('focus.shortBreak') : type === 'long-break' ? t('focus.longBreak') : type === 'pomodoro' ? t('focus.pomodoro') : t('focus.custom')}
                               </div>
                               <div className="text-sm text-gray-600 dark:text-gray-400">
-                                {type === 'custom' ? 'Custom' : formatDuration(SESSION_DURATIONS[type])}
+                                {type === 'custom' ? t('focus.custom') : formatDuration(SESSION_DURATIONS[type])}
                               </div>
                             </button>
                           ))}
@@ -324,7 +326,7 @@ export default function FocusPage() {
                         {sessionType === 'custom' && (
                           <div className="mb-4">
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                              Duration (minutes)
+                              {t('focus.customDuration')} ({t('focus.minutes')})
                             </label>
                             <input
                               type="number"
@@ -340,14 +342,14 @@ export default function FocusPage() {
                         {/* Link to Habit */}
                         <div className="mb-4">
                           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Link to Habit (Optional)
+                            {t('focus.linkToHabit')} ({t('common.optional')})
                           </label>
                           <select
                             value={linkedHabitId}
                             onChange={(e) => setLinkedHabitId(e.target.value)}
                             className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                           >
-                            <option value="">None</option>
+                            <option value="">{t('todos.none')}</option>
                             {habits
                               .filter((h) => h.isActive)
                               .map((habit) => (
@@ -363,7 +365,7 @@ export default function FocusPage() {
                           className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"
                         >
                           <Play className="w-5 h-5" />
-                          Start Session
+                          {t('focus.start')} {t('focus.focusSessions')}
                         </button>
                       </div>
                     )}
@@ -383,7 +385,7 @@ export default function FocusPage() {
                                 className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center gap-2"
                               >
                                 <Play className="w-5 h-5" />
-                                Start
+                                {t('focus.start')}
                               </button>
                             )}
 
@@ -393,7 +395,7 @@ export default function FocusPage() {
                                 className="bg-yellow-600 hover:bg-yellow-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center gap-2"
                               >
                                 <Pause className="w-5 h-5" />
-                                Pause
+                                {t('focus.pause')}
                               </button>
                             )}
 
@@ -403,7 +405,7 @@ export default function FocusPage() {
                                 className="bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center gap-2"
                               >
                                 <Play className="w-5 h-5" />
-                                Resume
+                                {t('focus.resume')}
                               </button>
                             )}
 
@@ -412,7 +414,7 @@ export default function FocusPage() {
                               className="bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center gap-2"
                             >
                               <Square className="w-5 h-5" />
-                              Stop
+                              {t('focus.stop')}
                             </button>
                           </div>
 
@@ -422,14 +424,14 @@ export default function FocusPage() {
                               className="text-sm text-gray-600 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 flex items-center gap-1"
                             >
                               <X className="w-4 h-4" />
-                              Add Distraction ({distractions})
+                              {t('focus.addDistraction')} ({distractions})
                             </button>
                           </div>
 
                           {distractionNotes.length > 0 && (
                             <div className="mt-4 text-left">
                               <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                                Distraction Notes:
+                                {t('focus.distractions')}:
                               </h3>
                               <ul className="space-y-1">
                                 {distractionNotes.map((note, idx) => (
@@ -449,19 +451,19 @@ export default function FocusPage() {
                       <div className="flex items-center justify-between mb-4">
                         <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                           <Clock className="w-5 h-5" />
-                          Recent Sessions
+                          {t('focus.recentSessions')}
                         </h2>
                         <button
                           onClick={() => setShowSessionHistory(!showSessionHistory)}
                           className="text-sm text-purple-600 dark:text-purple-400 hover:underline"
                         >
-                          {showSessionHistory ? 'Hide' : 'Show All'}
+                          {showSessionHistory ? t('common.close') : t('common.viewAll')}
                         </button>
                       </div>
                       <div className="space-y-2">
                         {isLoadingSessions && sessions.length === 0 && (
                           <div className="text-center text-gray-500 dark:text-gray-400 py-4">
-                            Loading sessions...
+                            {t('common.loading')}
                           </div>
                         )}
                         {(showSessionHistory ? sessions : recentSessions).map((session) => (
@@ -471,7 +473,7 @@ export default function FocusPage() {
                           >
                             <div className="flex-1">
                               <div className="font-medium text-gray-900 dark:text-white capitalize">
-                                {session.type === 'short-break' ? 'Short Break' : session.type === 'long-break' ? 'Long Break' : session.type}
+                                {session.type === 'short-break' ? t('focus.shortBreak') : session.type === 'long-break' ? t('focus.longBreak') : session.type === 'pomodoro' ? t('focus.pomodoro') : t('focus.custom')}
                               </div>
                               <div className="text-sm text-gray-600 dark:text-gray-400">
                                 {format(new Date(session.startedAt), 'MMM d, yyyy HH:mm')}
@@ -504,7 +506,7 @@ export default function FocusPage() {
                         ))}
                         {sessions.length === 0 && !isLoadingSessions && (
                           <div className="text-center text-gray-500 dark:text-gray-400 py-4">
-                            No sessions yet. Start your first focus session!
+                            {t('focus.noSessionsYet')}
                           </div>
                         )}
                       </div>
@@ -517,17 +519,17 @@ export default function FocusPage() {
                     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
                       <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                         <Target className="w-5 h-5" />
-                        Today's Progress
+                        {t('common.today')} {t('focus.stats')}
                       </h2>
                       <div className="space-y-3">
                         <div>
-                          <div className="text-sm text-gray-600 dark:text-gray-400">Sessions</div>
+                          <div className="text-sm text-gray-600 dark:text-gray-400">{t('focus.focusSessions')}</div>
                           <div className="text-2xl font-bold text-gray-900 dark:text-white">
                             {todaySessions.length}
                           </div>
                         </div>
                         <div>
-                          <div className="text-sm text-gray-600 dark:text-gray-400">Focus Time</div>
+                          <div className="text-sm text-gray-600 dark:text-gray-400">{t('focus.totalTime')}</div>
                           <div className="text-2xl font-bold text-gray-900 dark:text-white">
                             {formatDuration(
                               todaySessions.reduce((acc, s) => acc + s.completedDuration, 0)
@@ -542,29 +544,29 @@ export default function FocusPage() {
                       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
                         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
                           <TrendingUp className="w-5 h-5" />
-                          Overall Stats
+                          {t('focus.stats')}
                         </h2>
                         <div className="space-y-3">
                           <div>
-                            <div className="text-sm text-gray-600 dark:text-gray-400">Total Sessions</div>
+                            <div className="text-sm text-gray-600 dark:text-gray-400">{t('focus.totalSessions')}</div>
                             <div className="text-2xl font-bold text-gray-900 dark:text-white">
                               {stats.totalSessions}
                             </div>
                           </div>
                           <div>
-                            <div className="text-sm text-gray-600 dark:text-gray-400">Total Focus Time</div>
+                            <div className="text-sm text-gray-600 dark:text-gray-400">{t('focus.totalTime')}</div>
                             <div className="text-2xl font-bold text-gray-900 dark:text-white">
                               {formatDuration(stats.totalFocusTime)}
                             </div>
                           </div>
                           <div>
-                            <div className="text-sm text-gray-600 dark:text-gray-400">Avg Session</div>
+                            <div className="text-sm text-gray-600 dark:text-gray-400">{t('focus.averageSession')}</div>
                             <div className="text-2xl font-bold text-gray-900 dark:text-white">
                               {formatDuration(Math.round(stats.averageSessionDuration))}
                             </div>
                           </div>
                           <div>
-                            <div className="text-sm text-gray-600 dark:text-gray-400">Distractions</div>
+                            <div className="text-sm text-gray-600 dark:text-gray-400">{t('focus.distractions')}</div>
                             <div className="text-2xl font-bold text-gray-900 dark:text-white">
                               {stats.totalDistractions}
                             </div>
@@ -584,12 +586,12 @@ export default function FocusPage() {
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 max-w-md w-full mx-4">
               <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                Add Distraction Note
+                {t('focus.addDistraction')}
               </h3>
               <textarea
                 value={newDistractionNote}
                 onChange={(e) => setNewDistractionNote(e.target.value)}
-                placeholder="What distracted you?"
+                placeholder={t('focus.distractionNote')}
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white mb-4"
                 rows={3}
               />
@@ -598,7 +600,7 @@ export default function FocusPage() {
                   onClick={saveDistractionNote}
                   className="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
                 >
-                  Save
+                  {t('common.save')}
                 </button>
                 <button
                   onClick={() => {
@@ -607,7 +609,7 @@ export default function FocusPage() {
                   }}
                   className="flex-1 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-semibold py-2 px-4 rounded-lg transition-colors"
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
               </div>
             </div>

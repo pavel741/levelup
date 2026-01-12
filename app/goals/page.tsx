@@ -13,9 +13,11 @@ import { Plus, Target, Filter, X, Sparkles } from 'lucide-react'
 import { Goal } from '@/types'
 import { format } from 'date-fns'
 import { GOAL_TEMPLATES, createGoalFromTemplate } from '@/lib/goalTemplates'
+import { useLanguage } from '@/components/common/LanguageProvider'
 
 export default function GoalsPage() {
   const { user } = useFirestoreStore()
+  const { t } = useLanguage()
   const {
     goals,
     isLoadingGoals,
@@ -278,14 +280,14 @@ export default function GoalsPage() {
                     <div className="flex items-center gap-3 mb-2">
                       <Target className="w-8 h-8 text-blue-600 dark:text-blue-400" />
                       <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                        Goals & Objectives
+                        {t('goals.goalsObjectives')}
                       </h1>
                     </div>
                     <p className="text-gray-600 dark:text-gray-400">
-                      Set SMART goals and track your progress
+                      {t('goals.setSmartGoals')}
                     </p>
                     <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">
-                      {activeGoals.length} active, {completedGoals.length} completed
+                      {t('goals.activeCompleted', { active: activeGoals.length, completed: completedGoals.length })}
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -294,14 +296,14 @@ export default function GoalsPage() {
                       className="px-4 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg font-medium hover:bg-gray-100 dark:hover:bg-gray-700 transition-all flex items-center gap-2 border border-gray-300 dark:border-gray-600"
                     >
                       <Sparkles className="w-5 h-5" />
-                      Templates
+                      {t('habits.templates')}
                     </button>
                     <button
                       onClick={() => setShowAddModal(true)}
                       className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-medium hover:from-blue-700 hover:to-purple-700 transition-all flex items-center gap-2 shadow-lg"
                     >
                       <Plus className="w-5 h-5" />
-                      New Goal
+                      {t('goals.newGoal')}
                     </button>
                   </div>
                 </div>
@@ -310,7 +312,7 @@ export default function GoalsPage() {
                 <div className="mb-6 flex flex-wrap items-center gap-4">
                   <div className="flex items-center gap-2">
                     <Filter className="w-4 h-4 text-gray-500" />
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Status:</span>
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('goals.status')}:</span>
                     {(['all', 'active', 'paused', 'completed', 'cancelled'] as const).map((status) => (
                       <button
                         key={status}
@@ -322,12 +324,12 @@ export default function GoalsPage() {
                             : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                         }`}
                       >
-                        {status.charAt(0).toUpperCase() + status.slice(1)}
+                        {status === 'all' ? t('common.all') : status === 'active' ? t('common.active') : status === 'paused' ? t('goals.paused') : status === 'completed' ? t('common.completed') : t('goals.cancelled')}
                       </button>
                     ))}
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Category:</span>
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('goals.category')}:</span>
                     <select
                       value={categoryFilter}
                       onChange={(e) => setCategoryFilter(e.target.value)}
@@ -346,12 +348,12 @@ export default function GoalsPage() {
                 {/* Goals List */}
                 {isLoadingGoals ? (
                   <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                    Loading goals...
+                    {t('goals.loadingGoals')}
                   </div>
                 ) : filteredGoals.length === 0 ? (
                   <div className="text-center py-12 text-gray-500 dark:text-gray-400">
                     <Target className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                    <p>No goals found. Create your first goal to get started!</p>
+                    <p>{t('goals.noGoalsFound')}</p>
                   </div>
                 ) : filteredGoals.length > 50 ? (
                   <VirtualList

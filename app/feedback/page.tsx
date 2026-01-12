@@ -6,9 +6,11 @@ import Sidebar from '@/components/layout/Sidebar'
 import Header from '@/components/layout/Header'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
 import { MessageCircle, Send } from 'lucide-react'
+import { useLanguage } from '@/components/common/LanguageProvider'
 
 export default function FeedbackPage() {
   const { user } = useFirestoreStore()
+  const { t } = useLanguage()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [category, setCategory] = useState('Idea')
   const [message, setMessage] = useState('')
@@ -24,7 +26,7 @@ export default function FeedbackPage() {
     setErrorMessage(null)
 
     if (!message.trim() || message.trim().length < 5) {
-      setErrorMessage('Please share at least a short sentence so we know what to improve.')
+      setErrorMessage(t('feedback.shareAtLeast'))
       return
     }
 
@@ -45,15 +47,15 @@ export default function FeedbackPage() {
 
       const data = await res.json()
       if (!res.ok) {
-        setErrorMessage(data.error || 'Something went wrong. Please try again.')
+        setErrorMessage(data.error || t('feedback.somethingWentWrong'))
         return
       }
 
-      setSuccessMessage('Thanks for your suggestion! It\'s been sent and we really appreciate it.')
+      setSuccessMessage(t('feedback.thanksForSuggestion'))
       setMessage('')
     } catch (err) {
       console.error('Error submitting feedback:', err)
-      setErrorMessage('Network error. Please try again.')
+      setErrorMessage(t('feedback.networkError'))
     } finally {
       setIsSubmitting(false)
     }
@@ -71,10 +73,10 @@ export default function FeedbackPage() {
                 <div className="mb-6">
                   <div className="flex items-center gap-3 mb-2">
                     <MessageCircle className="w-7 h-7 text-blue-600 dark:text-blue-400" />
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Feedback & Suggestions</h1>
+                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{t('feedback.feedbackSuggestions')}</h1>
                   </div>
                   <p className="text-gray-600 dark:text-gray-400">
-                    Tell us what would make LevelUp better for you. We read every message personally.
+                    {t('feedback.tellUsBetter')}
                   </p>
                 </div>
 
@@ -83,29 +85,29 @@ export default function FeedbackPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Your name (optional)
+                          {t('feedback.yourName')}
                         </label>
                         <input
                           type="text"
                           value={name}
                           onChange={(e) => setName(e.target.value)}
                           className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                          placeholder="John Doe"
+                          placeholder={t('common.name')}
                         />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Email (optional)
+                          {t('feedback.emailOptional')}
                         </label>
                         <input
                           type="email"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                          placeholder="you@example.com"
+                          placeholder={t('common.email')}
                         />
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          We&apos;ll only use this if we need to ask a follow-up question.
+                          {t('feedback.emailNote')}
                         </p>
                       </div>
                     </div>
@@ -113,33 +115,33 @@ export default function FeedbackPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Category
+                          {t('feedback.category')}
                         </label>
                         <select
                           value={category}
                           onChange={(e) => setCategory(e.target.value)}
                           className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
                         >
-                          <option value="Idea">New idea</option>
-                          <option value="Improvement">Improvement</option>
-                          <option value="Bug">Bug</option>
-                          <option value="Other">Other</option>
+                          <option value="Idea">{t('feedback.newIdea')}</option>
+                          <option value="Improvement">{t('feedback.improvement')}</option>
+                          <option value="Bug">{t('feedback.bug')}</option>
+                          <option value="Other">{t('feedback.other')}</option>
                         </select>
                       </div>
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Your suggestion
+                        {t('feedback.yourSuggestion')}
                       </label>
                       <textarea
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
                         className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 min-h-[140px] text-sm"
-                        placeholder="Tell us what you’d love to see improved or added..."
+                        placeholder={t('feedback.suggestionPlaceholder')}
                       />
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        Be as detailed as you like – specific examples really help us.
+                        {t('feedback.suggestionNote')}
                       </p>
                     </div>
 
@@ -157,7 +159,7 @@ export default function FeedbackPage() {
                         className="inline-flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm disabled:opacity-60 disabled:cursor-not-allowed"
                       >
                         <Send className="w-4 h-4" />
-                        {isSubmitting ? 'Sending...' : 'Send feedback'}
+                        {isSubmitting ? t('common.sending') : t('feedback.sendFeedback')}
                       </button>
                     </div>
                   </form>

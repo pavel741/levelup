@@ -8,10 +8,12 @@ import { TrendingUp, Target, Trophy, Flame, Award } from 'lucide-react'
 import HabitCard from '@/components/HabitCard'
 import ChallengeCard from '@/components/common/ChallengeCard'
 import StatsCard from '@/components/common/StatsCard'
+import { useLanguage } from '@/components/common/LanguageProvider'
 
 export default function Dashboard() {
   const router = useRouter()
   const { user, habits, activeChallenges, dailyStats } = useFirestoreStore()
+  const { t } = useLanguage()
   
   // Memoize expensive computations
   const today = useMemo(() => format(new Date(), 'yyyy-MM-dd'), [])
@@ -35,10 +37,10 @@ export default function Dashboard() {
       {/* Welcome Section */}
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-4 sm:p-6 md:p-8 text-white dark:from-blue-700 dark:to-purple-700">
         <h1 className="text-2xl sm:text-3xl font-bold mb-2">
-          Welcome back, {user?.name}! 👋
+          {t('dashboard.welcomeBack', { name: user?.name || '' })}
         </h1>
         <p className="text-blue-100 dark:text-blue-200 text-base sm:text-lg">
-          Ready to level up today? You're on a {user?.streak} day streak! 🔥
+          {t('dashboard.readyToLevelUp', { streak: user?.streak || 0 })}
         </p>
       </div>
 
@@ -46,30 +48,30 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard
           icon={Target}
-          title="Habits Completed"
+          title={t('dashboard.habitsCompleted')}
           value={`${completedToday}/${activeHabits.length}`}
-          subtitle="Today"
+          subtitle={t('common.today')}
           color="blue"
         />
         <StatsCard
           icon={TrendingUp}
-          title="XP Earned"
+          title={t('dashboard.xpEarned')}
           value={todayStats.xpEarned.toString()}
-          subtitle="Today"
+          subtitle={t('common.today')}
           color="purple"
         />
         <StatsCard
           icon={Flame}
-          title="Current Streak"
-          value={`${user?.streak} days`}
-          subtitle="Keep it up!"
+          title={t('dashboard.currentStreak')}
+          value={`${user?.streak} ${t('dashboard.days')}`}
+          subtitle={t('dashboard.keepItUp')}
           color="orange"
         />
         <StatsCard
           icon={Award}
-          title="Level"
+          title={t('common.level')}
           value={user?.level.toString() || '1'}
-          subtitle={`${user?.xp} total XP`}
+          subtitle={`${user?.xp} ${t('dashboard.totalXP')}`}
           color="green"
         />
       </div>
@@ -77,12 +79,12 @@ export default function Dashboard() {
       {/* Habits Section */}
       <div>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-4">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Your Habits</h2>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">{t('dashboard.yourHabits')}</h2>
           <button 
             onClick={() => router.push('/habits')}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm sm:text-base self-start sm:self-auto"
           >
-            + Add Habit
+            {t('dashboard.addHabit')}
           </button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -93,7 +95,7 @@ export default function Dashboard() {
           ) : (
             <div className="col-span-full text-center py-12 text-gray-500">
               <Target className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-              <p>No habits yet. Create your first habit to get started!</p>
+              <p>{t('dashboard.noHabitsYet')}</p>
             </div>
           )}
         </div>
@@ -102,12 +104,12 @@ export default function Dashboard() {
       {/* Challenges Section */}
       <div>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-4">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Active Challenges</h2>
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">{t('dashboard.activeChallenges')}</h2>
           <button 
             onClick={() => router.push('/challenges')}
             className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium text-sm sm:text-base self-start sm:self-auto"
           >
-            View All
+            {t('common.viewAll')}
           </button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -118,7 +120,7 @@ export default function Dashboard() {
           ) : (
             <div className="col-span-full text-center py-12 text-gray-500">
               <Trophy className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-              <p>No active challenges. Join one to earn bonus XP!</p>
+              <p>{t('dashboard.noActiveChallenges')}</p>
             </div>
           )}
         </div>
