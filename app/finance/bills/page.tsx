@@ -9,7 +9,7 @@ import Header from '@/components/layout/Header'
 import { Bell, Plus, Edit2, Trash2, CheckCircle2, AlertCircle, Calendar, Clock, X, ArrowLeft, XCircle } from 'lucide-react'
 import type { FinanceRecurringTransaction } from '@/types/finance'
 import { formatCurrency, parseTransactionDate } from '@/lib/utils'
-import { format, addDays, differenceInDays, isPast, isToday } from 'date-fns'
+import { format, addDays, differenceInDays, isPast, isToday, isSameMonth } from 'date-fns'
 import { useRouter } from 'next/navigation'
 
 export default function BillsPage() {
@@ -41,14 +41,54 @@ export default function BillsPage() {
     if (!user?.id) return
 
     const unsubscribe = subscribeToRecurringTransactions(user.id, async (billsList) => {
-      // Auto-reset bills to unpaid when their due date has passed
-      // This handles the case when a new billing period starts
+      // Auto-reset bills to unpaid when a new billing period starts
+      // This handles the case when a new month/week/year starts
       const billsToUpdate: Array<{ id: string; updates: Partial<FinanceRecurringTransaction> }> = []
+      const now = new Date()
       
       for (const bill of billsList) {
-        if (bill.isPaid && bill.dueDate) {
+        if (bill.isPaid && bill.lastPaidDate) {
+          const lastPaidDate = parseTransactionDate(bill.lastPaidDate)
+          const interval = bill.interval || 'monthly'
+          let shouldReset = false
+          
+          // Check if we're in a new billing period based on interval
+          if (interval === 'monthly') {
+            // For monthly bills: reset if last payment was in a different month
+            if (!isSameMonth(lastPaidDate, now)) {
+              shouldReset = true
+            }
+          } else if (interval === 'weekly') {
+            // For weekly bills: reset if last payment was more than 7 days ago
+            const daysSincePayment = differenceInDays(now, lastPaidDate)
+            if (daysSincePayment >= 7) {
+              shouldReset = true
+            }
+          } else if (interval === 'yearly') {
+            // For yearly bills: reset if last payment was more than 365 days ago
+            const daysSincePayment = differenceInDays(now, lastPaidDate)
+            if (daysSincePayment >= 365) {
+              shouldReset = true
+            }
+          }
+          
+          // Also check if due date has passed (fallback for bills without lastPaidDate)
+          if (!shouldReset && bill.dueDate) {
+            const dueDate = parseTransactionDate(bill.dueDate)
+            if (isPast(dueDate) && !isToday(dueDate)) {
+              shouldReset = true
+            }
+          }
+          
+          if (shouldReset) {
+            billsToUpdate.push({
+              id: bill.id,
+              updates: { isPaid: false }
+            })
+          }
+        } else if (bill.isPaid && bill.dueDate && !bill.lastPaidDate) {
+          // Fallback: if bill is paid but has no lastPaidDate, check due date
           const dueDate = parseTransactionDate(bill.dueDate)
-          // If due date has passed, automatically reset to unpaid for new billing period
           if (isPast(dueDate) && !isToday(dueDate)) {
             billsToUpdate.push({
               id: bill.id,
