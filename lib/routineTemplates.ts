@@ -3002,9 +3002,20 @@ export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'u
             ],
             restTime: 60,
             notes: 'Tricep isolation - overhead or lying'
+          },
+          {
+            exerciseId: 'push-ups',
+            order: 8,
+            sets: [
+              { setType: 'working', targetReps: 15, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 60 }
+            ],
+            restTime: 60,
+            notes: 'Chest finisher - push to failure on last set if possible'
           }
         ],
-        estimatedDuration: 75
+        estimatedDuration: 80
       },
       {
         id: 'ppl-pull-day',
@@ -3046,15 +3057,15 @@ export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'u
             notes: 'Each arm - focus on stretch and squeeze'
           },
           {
-            exerciseId: 'pull-ups',
+            exerciseId: 'bent-over-lateral-raise',
             order: 3,
             sets: [
-              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 90 },
-              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 90 },
-              { setType: 'working', targetReps: 6, targetWeight: undefined, restAfter: 90 }
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 60 }
             ],
-            restTime: 90,
-            notes: 'Width builder - add weight if needed'
+            restTime: 60,
+            notes: 'Rear delts and upper back - helps with back width appearance'
           },
           {
             exerciseId: 'barbell-shrugs',
