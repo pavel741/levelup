@@ -13,12 +13,13 @@ import { showError } from '@/lib/utils'
 
 interface ActiveWorkoutViewProps {
   routine?: Routine
+  selectedSessionId?: string | null
   onComplete?: (logId: string) => void
   onCancel?: () => void
   key?: string // Add key to force re-mount when routine changes
 }
 
-export default function ActiveWorkoutView({ routine, onComplete, onCancel }: ActiveWorkoutViewProps) {
+export default function ActiveWorkoutView({ routine, selectedSessionId, onComplete, onCancel }: ActiveWorkoutViewProps) {
   const { user } = useFirestoreStore()
   const [workout, setWorkout] = useState<ActiveWorkout | null>(null)
   const [isPaused, setIsPaused] = useState(false)
@@ -45,7 +46,7 @@ export default function ActiveWorkoutView({ routine, onComplete, onCancel }: Act
   }, [user?.id])
 
   // Function to initialize workout with previous weights
-  const initializeWorkoutWithWeights = (routineToUse: Routine | undefined, logs: WorkoutLog[]) => {
+  const initializeWorkoutWithWeights = (routineToUse: Routine | undefined, logs: WorkoutLog[], sessionId?: string | null) => {
     if (!routineToUse) {
       // Freeform workout (no routine)
       setWorkout({
@@ -58,7 +59,16 @@ export default function ActiveWorkoutView({ routine, onComplete, onCancel }: Act
       return
     }
 
-    const session = routineToUse.sessions?.[0] // Start with first session
+    // Find the selected session, or default to first session
+    let session = null
+    if (sessionId && routineToUse.sessions) {
+      session = routineToUse.sessions.find(s => s.id === sessionId)
+    }
+    // Fallback to first session if selected session not found or not provided
+    if (!session && routineToUse.sessions && routineToUse.sessions.length > 0) {
+      session = routineToUse.sessions[0]
+    }
+
     if (!session || session.exercises.length === 0) {
       // Empty routine - create empty workout
       setWorkout({
@@ -106,13 +116,13 @@ export default function ActiveWorkoutView({ routine, onComplete, onCancel }: Act
     })
   }
 
-  // Reset workout when routine changes (new session started)
+  // Reset workout when routine or session changes (new session started)
   useEffect(() => {
     if (routine) {
-      // Reset workout state when a new routine is provided
+      // Reset workout state when a new routine or session is provided
       setWorkout(null)
     }
-  }, [routine?.id]) // Reset when routine ID changes
+  }, [routine?.id, selectedSessionId]) // Reset when routine ID or session ID changes
 
   // Initialize workout from routine - wait for logs to load if available
   useEffect(() => {
@@ -121,15 +131,15 @@ export default function ActiveWorkoutView({ routine, onComplete, onCancel }: Act
       if (user?.id) {
         getWorkoutLogs(user.id).then(logs => {
           setPreviousLogs(logs)
-          initializeWorkoutWithWeights(routine, logs)
+          initializeWorkoutWithWeights(routine, logs, selectedSessionId)
         })
       } else {
-        initializeWorkoutWithWeights(routine, [])
+        initializeWorkoutWithWeights(routine, [], selectedSessionId)
       }
     } else if (!routine && !workout) {
-      initializeWorkoutWithWeights(undefined, [])
+      initializeWorkoutWithWeights(undefined, [], null)
     }
-  }, [routine, workout, user?.id])
+  }, [routine, workout, user?.id, selectedSessionId])
 
   // Update weights when previous logs are loaded (if workout already exists)
   useEffect(() => {

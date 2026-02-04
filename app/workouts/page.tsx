@@ -33,6 +33,7 @@ const RoutineAnalyzer = nextDynamic(() => import('@/components/RoutineAnalyzer')
 })
 import RoutineCard from '@/components/workouts/RoutineCard'
 import TemplateModal from '@/components/workouts/TemplateModal'
+import SessionSelectModal from '@/components/workouts/SessionSelectModal'
 import ViewTabs, { type WorkoutView } from '@/components/workouts/ViewTabs'
 import EmptyState from '@/components/workouts/EmptyState'
 import { saveRoutine, deleteRoutine, deleteWorkoutLog, getWorkoutLogs } from '@/lib/workoutApi'
@@ -53,6 +54,9 @@ export default function WorkoutsPage() {
   const [workoutLogs, setWorkoutLogs] = useState<WorkoutLog[]>([])
   const [selectedTemplate, setSelectedTemplate] = useState<Partial<Routine> | null>(null)
   const [activeRoutine, setActiveRoutine] = useState<Routine | null>(null)
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
+  const [showSessionSelectModal, setShowSessionSelectModal] = useState(false)
+  const [routineToStart, setRoutineToStart] = useState<Routine | null>(null)
   const [editingRoutine, setEditingRoutine] = useState<Routine | null>(null)
   const [isLoadingRoutines, setIsLoadingRoutines] = useState(true)
   const [isLoadingLogs, setIsLoadingLogs] = useState(false)
@@ -139,8 +143,33 @@ export default function WorkoutsPage() {
   }, [])
 
   const handleStartRoutine = useCallback((routine: Routine) => {
-    setActiveRoutine(routine)
-    setCurrentView('active')
+    // Check if routine has multiple sessions
+    const sessions = routine.sessions || []
+    if (sessions.length > 1) {
+      // Show session selection modal
+      setRoutineToStart(routine)
+      setShowSessionSelectModal(true)
+    } else {
+      // Single session or no sessions - start directly
+      setActiveRoutine(routine)
+      setSelectedSessionId(sessions.length === 1 ? sessions[0].id : null)
+      setCurrentView('active')
+    }
+  }, [])
+
+  const handleSelectSession = useCallback((sessionId: string) => {
+    if (routineToStart) {
+      setActiveRoutine(routineToStart)
+      setSelectedSessionId(sessionId)
+      setShowSessionSelectModal(false)
+      setRoutineToStart(null)
+      setCurrentView('active')
+    }
+  }, [routineToStart])
+
+  const handleCloseSessionModal = useCallback(() => {
+    setShowSessionSelectModal(false)
+    setRoutineToStart(null)
   }, [])
 
   const handleEditRoutine = useCallback((routine: Routine) => {
@@ -202,12 +231,14 @@ export default function WorkoutsPage() {
 
   const handleWorkoutComplete = useCallback(() => {
     setActiveRoutine(null)
+    setSelectedSessionId(null)
     setCurrentView('history')
   }, [])
 
   const handleWorkoutCancel = useCallback(() => {
     if (confirm('Cancel this workout? Progress will be lost.')) {
       setActiveRoutine(null)
+      setSelectedSessionId(null)
     }
   }, [])
 
@@ -298,12 +329,20 @@ export default function WorkoutsPage() {
                     onSelectTemplate={handleSelectTemplate}
                   />
 
+                  <SessionSelectModal
+                    isOpen={showSessionSelectModal}
+                    routine={routineToStart}
+                    onClose={handleCloseSessionModal}
+                    onSelectSession={handleSelectSession}
+                  />
+
                   {currentView === 'active' && (
                     <>
                       {activeRoutine ? (
                         <ActiveWorkoutView
-                          key={activeRoutine.id}
+                          key={`${activeRoutine.id}-${selectedSessionId || 'default'}`}
                           routine={activeRoutine}
+                          selectedSessionId={selectedSessionId}
                           onComplete={handleWorkoutComplete}
                           onCancel={handleWorkoutCancel}
                         />
