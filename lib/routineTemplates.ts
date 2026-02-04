@@ -2899,6 +2899,290 @@ export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'u
     estimatedDuration: 80,
     difficulty: 'medium',
     tags: ['skinny-to-strong', 'muscle-building', 'bulking', 'beginner-friendly', '4-day', 'barbell', 'dumbbell', 'bodyweight', 'compound-movements', 'progressive-overload']
+  },
+
+  // Fast Muscle Builder: Push-Pull-Legs (3-6 Day) - Optimized for Barbell, Bench, Dumbbells
+  {
+    name: 'Fast Muscle Builder: PPL Split',
+    description: 'Proven 3-6 day Push-Pull-Legs routine optimized for rapid muscle growth using barbell, bench, and dumbbells. Focuses on compound movements and progressive overload. Train 3 days/week (PPL) or 6 days/week (PPLPPL) for maximum results.',
+    goal: 'bulking',
+    exercises: [],
+    sessions: [
+      {
+        id: 'ppl-push-day',
+        name: 'Push Day: Chest, Shoulders, Triceps',
+        order: 0,
+        exercises: [
+          {
+            exerciseId: 'bench-press',
+            order: 0,
+            sets: [
+              { setType: 'warmup', targetReps: 10, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 120 },
+              { setType: 'working', targetReps: 6, targetWeight: undefined, restAfter: 120 },
+              { setType: 'working', targetReps: 5, targetWeight: undefined, restAfter: 120 },
+              { setType: 'working', targetReps: 5, targetWeight: undefined, restAfter: 120 }
+            ],
+            restTime: 120,
+            notes: 'Main compound movement - focus on form and progressive overload'
+          },
+          {
+            exerciseId: 'dumbbell-flyes',
+            order: 1,
+            sets: [
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 90 }
+            ],
+            restTime: 90,
+            notes: 'Chest isolation - flat bench, focus on stretch and squeeze'
+          },
+          {
+            exerciseId: 'dumbbell-press',
+            order: 2,
+            sets: [
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 90 }
+            ],
+            restTime: 90,
+            notes: 'Greater range of motion - focus on stretch'
+          },
+          {
+            exerciseId: 'overhead-press',
+            order: 3,
+            sets: [
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 6, targetWeight: undefined, restAfter: 90 }
+            ],
+            restTime: 90,
+            notes: 'Shoulder strength - barbell or dumbbells'
+          },
+          {
+            exerciseId: 'dumbbell-press-shoulders',
+            order: 4,
+            sets: [
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 60 }
+            ],
+            restTime: 60,
+            notes: 'Shoulder hypertrophy - seated or standing'
+          },
+          {
+            exerciseId: 'lateral-raises',
+            order: 5,
+            sets: [
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 60 }
+            ],
+            restTime: 60,
+            notes: 'Side delts - controlled movement'
+          },
+          {
+            exerciseId: 'close-grip-bench-press',
+            order: 6,
+            sets: [
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 6, targetWeight: undefined, restAfter: 90 }
+            ],
+            restTime: 90,
+            notes: 'Tricep compound movement'
+          },
+          {
+            exerciseId: 'tricep-extensions',
+            order: 7,
+            sets: [
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 60 }
+            ],
+            restTime: 60,
+            notes: 'Tricep isolation - overhead or lying'
+          }
+        ],
+        estimatedDuration: 75
+      },
+      {
+        id: 'ppl-pull-day',
+        name: 'Pull Day: Back, Biceps',
+        order: 1,
+        exercises: [
+          {
+            exerciseId: 'deadlift',
+            order: 0,
+            sets: [
+              { setType: 'warmup', targetReps: 8, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 5, targetWeight: undefined, restAfter: 180 },
+              { setType: 'working', targetReps: 5, targetWeight: undefined, restAfter: 180 },
+              { setType: 'working', targetReps: 5, targetWeight: undefined, restAfter: 180 }
+            ],
+            restTime: 180,
+            notes: 'King of back exercises - full body strength'
+          },
+          {
+            exerciseId: 'barbell-row',
+            order: 1,
+            sets: [
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 120 },
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 120 },
+              { setType: 'working', targetReps: 6, targetWeight: undefined, restAfter: 120 }
+            ],
+            restTime: 120,
+            notes: 'Thickness builder - pull to lower chest/upper abs'
+          },
+          {
+            exerciseId: 'one-arm-dumbbell-row',
+            order: 2,
+            sets: [
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 90 }
+            ],
+            restTime: 90,
+            notes: 'Each arm - focus on stretch and squeeze'
+          },
+          {
+            exerciseId: 'pull-ups',
+            order: 3,
+            sets: [
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 6, targetWeight: undefined, restAfter: 90 }
+            ],
+            restTime: 90,
+            notes: 'Width builder - add weight if needed'
+          },
+          {
+            exerciseId: 'barbell-shrugs',
+            order: 4,
+            sets: [
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 60 }
+            ],
+            restTime: 60,
+            notes: 'Trap development - hold at top'
+          },
+          {
+            exerciseId: 'barbell-curl',
+            order: 5,
+            sets: [
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 60 }
+            ],
+            restTime: 60,
+            notes: 'Bicep mass builder'
+          },
+          {
+            exerciseId: 'hammer-curls',
+            order: 6,
+            sets: [
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 60 }
+            ],
+            restTime: 60,
+            notes: 'Brachialis and forearms'
+          }
+        ],
+        estimatedDuration: 80
+      },
+      {
+        id: 'ppl-legs-day',
+        name: 'Legs Day: Quads, Hamstrings, Glutes, Calves',
+        order: 2,
+        exercises: [
+          {
+            exerciseId: 'barbell-squat',
+            order: 0,
+            sets: [
+              { setType: 'warmup', targetReps: 10, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 180 },
+              { setType: 'working', targetReps: 6, targetWeight: undefined, restAfter: 180 },
+              { setType: 'working', targetReps: 5, targetWeight: undefined, restAfter: 180 },
+              { setType: 'working', targetReps: 5, targetWeight: undefined, restAfter: 180 }
+            ],
+            restTime: 180,
+            notes: 'King of leg exercises - go deep, drive through heels'
+          },
+          {
+            exerciseId: 'romanian-deadlift',
+            order: 1,
+            sets: [
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 120 },
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 120 },
+              { setType: 'working', targetReps: 6, targetWeight: undefined, restAfter: 120 }
+            ],
+            restTime: 120,
+            notes: 'Hamstring and glute focus - barbell or dumbbells'
+          },
+          {
+            exerciseId: 'barbell-hip-thrust',
+            order: 2,
+            sets: [
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 90 }
+            ],
+            restTime: 90,
+            notes: 'Glute activation - squeeze at top'
+          },
+          {
+            exerciseId: 'dumbbell-lunges',
+            order: 3,
+            sets: [
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 90 }
+            ],
+            restTime: 90,
+            notes: 'Each leg - unilateral strength and balance'
+          },
+          {
+            exerciseId: 'leg-curls',
+            order: 4,
+            sets: [
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 60 }
+            ],
+            restTime: 60,
+            notes: 'Hamstring isolation - use dumbbell between feet if no machine'
+          },
+          {
+            exerciseId: 'calf-raises',
+            order: 5,
+            sets: [
+              { setType: 'working', targetReps: 15, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 15, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 60 }
+            ],
+            restTime: 60,
+            notes: 'Calf development - barbell or dumbbells'
+          },
+          {
+            exerciseId: 'leg-press',
+            order: 6,
+            sets: [
+              { setType: 'working', targetReps: 15, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 90 }
+            ],
+            restTime: 90,
+            notes: 'Quad pump - optional if machine available'
+          }
+        ],
+        estimatedDuration: 85
+      }
+    ],
+    estimatedDuration: 80,
+    difficulty: 'medium',
+    tags: ['push-pull-legs', 'muscle-building', 'bulking', 'fast-growth', 'barbell', 'bench', 'dumbbell', 'compound-movements', 'progressive-overload', '3-day', '6-day']
   }
 ]
 
