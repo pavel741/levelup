@@ -2904,7 +2904,7 @@ export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'u
   // Fast Muscle Builder: Push-Pull-Legs (3-6 Day) - Optimized for Barbell, Bench, Dumbbells
   {
     name: 'Fast Muscle Builder: PPL Split',
-    description: 'Proven 3-6 day Push-Pull-Legs routine optimized for rapid muscle growth using barbell, bench, and dumbbells. Focuses on compound movements and progressive overload. Train 3 days/week (PPL) or 6 days/week (PPLPPL) for maximum results.',
+    description: 'Proven 3-6 day Push-Pull-Legs routine optimized for rapid muscle growth using barbell, bench, and dumbbells. Focuses on compound movements and progressive overload. Each day includes core/abs finishers for complete development. Train 3 days/week (PPL) or 6 days/week (PPLPPL) for maximum results.',
     goal: 'bulking',
     exercises: [],
     sessions: [
@@ -3013,9 +3013,39 @@ export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'u
             ],
             restTime: 60,
             notes: 'Chest finisher - push to failure on last set if possible'
+          },
+          {
+            exerciseId: 'plank',
+            order: 9,
+            sets: [
+              { setType: 'working', targetDuration: 60, restAfter: 45 },
+              { setType: 'working', targetDuration: 45, restAfter: 45 }
+            ],
+            restTime: 45,
+            notes: 'Core finisher - full body stability, keep body in straight line'
+          },
+          {
+            exerciseId: 'crunches',
+            order: 10,
+            sets: [
+              { setType: 'working', targetReps: 20, targetWeight: undefined, restAfter: 30 },
+              { setType: 'working', targetReps: 15, targetWeight: undefined, restAfter: 30 }
+            ],
+            restTime: 30,
+            notes: 'Upper abs - controlled movement, avoid pulling on neck'
+          },
+          {
+            exerciseId: 'bicycle-crunches',
+            order: 11,
+            sets: [
+              { setType: 'working', targetReps: 20, targetWeight: undefined, restAfter: 30 },
+              { setType: 'working', targetReps: 15, targetWeight: undefined, restAfter: 30 }
+            ],
+            restTime: 30,
+            notes: 'Rotational core - alternate sides, focus on rotation'
           }
         ],
-        estimatedDuration: 80
+        estimatedDuration: 90
       },
       {
         id: 'ppl-pull-day',
@@ -3099,9 +3129,39 @@ export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'u
             ],
             restTime: 60,
             notes: 'Brachialis and forearms'
+          },
+          {
+            exerciseId: 'leg-raises',
+            order: 7,
+            sets: [
+              { setType: 'working', targetReps: 15, targetWeight: undefined, restAfter: 45 },
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 45 }
+            ],
+            restTime: 45,
+            notes: 'Lower abs - keep lower back pressed down'
+          },
+          {
+            exerciseId: 'side-plank',
+            order: 8,
+            sets: [
+              { setType: 'working', targetDuration: 45, restAfter: 30 },
+              { setType: 'working', targetDuration: 30, restAfter: 30 }
+            ],
+            restTime: 30,
+            notes: 'Each side - lateral core stability'
+          },
+          {
+            exerciseId: 'flutter-kicks',
+            order: 9,
+            sets: [
+              { setType: 'working', targetReps: 25, targetWeight: undefined, restAfter: 45 },
+              { setType: 'working', targetReps: 20, targetWeight: undefined, restAfter: 45 }
+            ],
+            restTime: 45,
+            notes: 'Lower abs and hip flexors - maintain steady pace'
           }
         ],
-        estimatedDuration: 80
+        estimatedDuration: 90
       },
       {
         id: 'ppl-legs-day',
@@ -3186,14 +3246,34 @@ export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'u
             ],
             restTime: 90,
             notes: 'Quad pump - optional if machine available'
+          },
+          {
+            exerciseId: 'v-ups',
+            order: 7,
+            sets: [
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 45 },
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 45 }
+            ],
+            restTime: 45,
+            notes: 'Advanced core - full body contraction'
+          },
+          {
+            exerciseId: 'hollow-body-hold',
+            order: 8,
+            sets: [
+              { setType: 'working', targetDuration: 30, restAfter: 45 },
+              { setType: 'working', targetDuration: 20, restAfter: 45 }
+            ],
+            restTime: 45,
+            notes: 'Isometric core strength - hold position with control'
           }
         ],
-        estimatedDuration: 85
+        estimatedDuration: 95
       }
     ],
     estimatedDuration: 80,
     difficulty: 'medium',
-    tags: ['push-pull-legs', 'muscle-building', 'bulking', 'fast-growth', 'barbell', 'bench', 'dumbbell', 'compound-movements', 'progressive-overload', '3-day', '6-day']
+    tags: ['push-pull-legs', 'muscle-building', 'bulking', 'fast-growth', 'barbell', 'bench', 'dumbbell', 'compound-movements', 'progressive-overload', '3-day', '6-day', 'core', 'abs']
   }
 ]
 
