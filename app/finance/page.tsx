@@ -34,7 +34,7 @@ import isPast from 'date-fns/isPast'
 import isToday from 'date-fns/isToday'
 import isSameMonth from 'date-fns/isSameMonth'
 import type { FinanceTransaction, FinanceCategories, FinanceSettings } from '@/types/finance'
-import { getPeriodDates, parseTransactionDate } from '@/lib/financeDateUtils'
+import { getPeriodDatesFromSettings, parseTransactionDate } from '@/lib/utils'
 import { CSVImportService } from '@/lib/csvImport'
 import { ESTONIAN_BANK_PROFILES, detectBankProfile } from '@/lib/bankProfiles'
 import { getSuggestedCategory } from '@/lib/transactionCategorizer'
@@ -700,32 +700,11 @@ export default function FinancePage() {
       }
     }
     
-    // Use period settings if available, otherwise default to calendar month
-    let startDate: Date
-    let endDate: Date
-    
-    if (financeSettings?.usePaydayPeriod || financeSettings?.periodStartDay !== undefined) {
-      const paydayCutoffHour = financeSettings.paydayCutoffHour ?? 13 // Default 1pm for end date
-      const paydayStartCutoffHour = financeSettings.paydayStartCutoffHour ?? 14 // Default 2pm for start date
-      const periodDates = getPeriodDates(
-        selectedMonth,
-        financeSettings.usePaydayPeriod || false,
-        financeSettings.periodStartDay ?? 1,
-        financeSettings.periodEndDay ?? null,
-        paydayCutoffHour,
-        paydayStartCutoffHour
-      )
-      startDate = periodDates.startDate
-      endDate = periodDates.endDate
-    } else {
-      // Default to calendar month
-      const [year, month] = selectedMonth.split('-').map(Number)
-      startDate = new Date(year, month - 1, 1)
-      endDate = new Date(year, month, 0, 23, 59, 59)
-    }
+    // Use period settings (supports all payday modes)
+    const { startDate, endDate, hasTimeBoundaries } = getPeriodDatesFromSettings(selectedMonth, financeSettings)
 
     // Pre-calculate date boundaries once for performance
-    const usePaydayPeriod = financeSettings?.usePaydayPeriod || false
+    const usePaydayPeriod = hasTimeBoundaries
     const startDateOnly = new Date(startDate)
     startDateOnly.setHours(0, 0, 0, 0)
     const endDateOnly = new Date(endDate)
@@ -1960,9 +1939,15 @@ export default function FinancePage() {
                           {summaryView === 'monthly' && monthlySummary.startDate && monthlySummary.endDate && (
                             <div className="text-xs text-gray-500 dark:text-gray-400 px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">
                               Period: {formatDisplayDate(monthlySummary.startDate)} - {formatDisplayDate(monthlySummary.endDate)}
-                              {financeSettings?.usePaydayPeriod && (
+                              {financeSettings?.paydayMode === 'dayOfMonth' && (
+                                <span className="ml-2 text-blue-600 dark:text-blue-400">📅 Paid on {financeSettings.paydayDayOfMonth ?? 25}th</span>
+                              )}
+                              {financeSettings?.paydayMode === 'lastDay' && (
+                                <span className="ml-2 text-blue-600 dark:text-blue-400">📅 Paid on last day</span>
+                              )}
+                              {(financeSettings?.paydayMode === 'lastWorkingDay' || financeSettings?.usePaydayPeriod) && (
                                 <span className="ml-2 text-blue-600 dark:text-blue-400" title={`Payday period: starts at ${financeSettings.paydayStartCutoffHour ?? 14}:00 on last working day of previous month, ends at ${financeSettings.paydayCutoffHour ?? 13}:00 on last working day of current month`}>
-                                  📅 Payday ({financeSettings.paydayStartCutoffHour ?? 14}:00 - {financeSettings.paydayCutoffHour ?? 13}:00)
+                                  📅 Last working day ({financeSettings.paydayStartCutoffHour ?? 14}:00 - {financeSettings.paydayCutoffHour ?? 13}:00)
                                 </span>
                               )}
                             </div>

@@ -70,11 +70,10 @@ export default function FinanceSettingsPage() {
   const [isSavingReconciliation, setIsSavingReconciliation] = useState(false)
   
   // Period settings
-  const [usePaydayPeriod, setUsePaydayPeriod] = useState(false)
-  const [periodStartDay, setPeriodStartDay] = useState(1)
-  const [periodEndDay, setPeriodEndDay] = useState<number | null>(null)
-  const [paydayCutoffHour, setPaydayCutoffHour] = useState(13) // Default 1pm for end date
-  const [paydayStartCutoffHour, setPaydayStartCutoffHour] = useState(14) // Default 2pm for start date
+  const [paydayMode, setPaydayMode] = useState<'calendarMonth' | 'dayOfMonth' | 'lastDay' | 'lastWorkingDay'>('calendarMonth')
+  const [paydayDayOfMonth, setPaydayDayOfMonth] = useState(25)
+  const [paydayCutoffHour, setPaydayCutoffHour] = useState(13)
+  const [paydayStartCutoffHour, setPaydayStartCutoffHour] = useState(14)
   const [capDateRangesToData, setCapDateRangesToData] = useState(true)
   const [isSavingPeriod] = useState(false)
 
@@ -111,12 +110,19 @@ export default function FinanceSettingsPage() {
         // Load app settings
         if (settings) {
           setCurrency(settings.currency || 'EUR')
-          setUsePaydayPeriod(settings.usePaydayPeriod || false)
-          setPeriodStartDay(settings.periodStartDay ?? 1)
-          setPeriodEndDay(settings.periodEndDay ?? null)
-          setPaydayCutoffHour(settings.paydayCutoffHour ?? 13) // Default 1pm for end date
-          setPaydayStartCutoffHour(settings.paydayStartCutoffHour ?? 14) // Default 2pm for start date
           setCapDateRangesToData(settings.capDateRangesToData !== false) // Default to true
+          // Payday mode (migrate from legacy usePaydayPeriod/periodStartDay)
+          if (settings.paydayMode) {
+            setPaydayMode(settings.paydayMode)
+            setPaydayDayOfMonth(settings.paydayDayOfMonth ?? 25)
+          } else if (settings.usePaydayPeriod) {
+            setPaydayMode('lastWorkingDay')
+          } else if (settings.periodStartDay !== undefined && settings.periodStartDay > 0) {
+            setPaydayMode('dayOfMonth')
+            setPaydayDayOfMonth(settings.periodStartDay)
+          }
+          setPaydayCutoffHour(settings.paydayCutoffHour ?? 13)
+          setPaydayStartCutoffHour(settings.paydayStartCutoffHour ?? 14)
         }
         
         if (lastRec) {
@@ -257,11 +263,10 @@ export default function FinanceSettingsPage() {
     try {
       const settings: FinanceSettings = {
         currency,
-        usePaydayPeriod,
-        periodStartDay,
-        periodEndDay,
-        paydayCutoffHour: usePaydayPeriod ? paydayCutoffHour : undefined,
-        paydayStartCutoffHour: usePaydayPeriod ? paydayStartCutoffHour : undefined,
+        paydayMode,
+        paydayDayOfMonth: paydayMode === 'dayOfMonth' ? paydayDayOfMonth : undefined,
+        paydayCutoffHour: paydayMode === 'lastWorkingDay' ? paydayCutoffHour : undefined,
+        paydayStartCutoffHour: paydayMode === 'lastWorkingDay' ? paydayStartCutoffHour : undefined,
         capDateRangesToData,
       }
       await saveFinanceSettings(user.id, settings)
@@ -560,100 +565,110 @@ export default function FinanceSettingsPage() {
 
                 {/* Period Settings */}
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6">
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Period Settings</h2>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Budget Period</h2>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-                    Configure how monthly periods are calculated for your budget and analytics.
+                    When do you get paid? This defines how your monthly budget periods are calculated.
                   </p>
                   
-                  <div className="mb-4">
-                    <label className="flex items-center gap-2 cursor-pointer">
+                  <div className="space-y-3 mb-4">
+                    <label className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-600 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors">
                       <input
-                        type="checkbox"
-                        checked={usePaydayPeriod}
-                        onChange={(e) => setUsePaydayPeriod(e.target.checked)}
-                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                        type="radio"
+                        name="paydayMode"
+                        checked={paydayMode === 'calendarMonth'}
+                        onChange={() => setPaydayMode('calendarMonth')}
+                        className="w-4 h-4 text-blue-600"
                       />
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">
-                        Use Payday Period (Last Working Day)
-                      </span>
-                    </label>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-6">
-                      Use payday-to-payday periods instead of custom period. Transactions on the last working day are included only if before the cutoff time.
-                    </p>
-                  </div>
-                  
-                  {usePaydayPeriod && (
-                    <div className="mb-4 space-y-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Period Start Cutoff Time (hour, 24-hour format)
-                        </label>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">Calendar month (1st–31st)</span>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Standard month boundaries</p>
+                      </div>
+                    </label>
+
+                    <label className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-600 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors">
+                      <input
+                        type="radio"
+                        name="paydayMode"
+                        checked={paydayMode === 'dayOfMonth'}
+                        onChange={() => setPaydayMode('dayOfMonth')}
+                        className="w-4 h-4 text-blue-600"
+                      />
+                      <div className="flex-1">
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">I get paid on the </span>
+                        <select
+                          value={paydayDayOfMonth}
+                          onChange={(e) => setPaydayDayOfMonth(parseInt(e.target.value) || 25)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="mx-1 px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm"
+                        >
+                          {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                            <option key={d} value={d}>
+                              {d}{d === 1 ? 'st' : d === 2 ? 'nd' : d === 3 ? 'rd' : 'th'}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white"> of each month</span>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Period runs from payday to day before next payday</p>
+                      </div>
+                    </label>
+
+                    <label className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-600 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors">
+                      <input
+                        type="radio"
+                        name="paydayMode"
+                        checked={paydayMode === 'lastDay'}
+                        onChange={() => setPaydayMode('lastDay')}
+                        className="w-4 h-4 text-blue-600"
+                      />
+                      <div>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">I get paid on the last day of the month</span>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Period: last day of prev month → last day of current month</p>
+                      </div>
+                    </label>
+
+                    <label className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-600 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors">
+                      <input
+                        type="radio"
+                        name="paydayMode"
+                        checked={paydayMode === 'lastWorkingDay'}
+                        onChange={() => setPaydayMode('lastWorkingDay')}
+                        className="w-4 h-4 text-blue-600"
+                      />
+                      <div>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">I get paid on the last working day</span>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Uses cutoff times for same-day transactions</p>
+                      </div>
+                    </label>
+                  </div>
+
+                  {paydayMode === 'lastWorkingDay' && (
+                    <div className="mb-4 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Period start cutoff (24h)</label>
                         <input
                           type="number"
                           min="0"
                           max="23"
                           value={paydayStartCutoffHour}
                           onChange={(e) => setPaydayStartCutoffHour(parseInt(e.target.value) || 14)}
-                          className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-                          placeholder="14"
+                          className="w-24 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                         />
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          On the last working day of the previous month, transactions at/after {paydayStartCutoffHour}:00 belong to this period.
-                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Transactions at/after this hour on last working day of prev month → this period</p>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Period End Cutoff Time (hour, 24-hour format)
-                        </label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Period end cutoff (24h)</label>
                         <input
                           type="number"
                           min="0"
                           max="23"
                           value={paydayCutoffHour}
                           onChange={(e) => setPaydayCutoffHour(parseInt(e.target.value) || 13)}
-                          className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-                          placeholder="13"
+                          className="w-24 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                         />
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          On the last working day of the current month, transactions before {paydayCutoffHour}:00 belong to this period. Transactions at/after {paydayCutoffHour}:00 belong to the next period.
-                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Transactions before this hour on last working day of current month → this period</p>
                       </div>
                     </div>
                   )}
-                  
-                  <div className={`space-y-4 mb-4 ${usePaydayPeriod ? 'opacity-50 pointer-events-none' : ''}`}>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Start Day
-                        </label>
-                        <input
-                          type="number"
-                          min="1"
-                          max="31"
-                          value={periodStartDay}
-                          onChange={(e) => setPeriodStartDay(parseInt(e.target.value) || 1)}
-                          disabled={usePaydayPeriod}
-                          className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white disabled:opacity-50"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          End Day (leave empty for end of month)
-                        </label>
-                        <input
-                          type="number"
-                          min="1"
-                          max="31"
-                          value={periodEndDay || ''}
-                          onChange={(e) => setPeriodEndDay(e.target.value ? parseInt(e.target.value) : null)}
-                          disabled={usePaydayPeriod}
-                          placeholder="End of month"
-                          className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white disabled:opacity-50"
-                        />
-                      </div>
-                    </div>
-                  </div>
                   
                   {/* Cap Date Ranges to Data Setting */}
                   <div className="mb-4">

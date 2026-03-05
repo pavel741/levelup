@@ -145,8 +145,94 @@ function getLastWorkingDayOfMonth(year: number, month: number): Date {
   return currentDate
 }
 
+/** Payday mode for budget period calculation */
+export type PaydayMode = 'calendarMonth' | 'dayOfMonth' | 'lastDay' | 'lastWorkingDay'
+
+/** Finance settings shape used for period calculation */
+export interface PeriodSettings {
+  paydayMode?: PaydayMode
+  paydayDayOfMonth?: number // 1-31 for dayOfMonth mode
+  usePaydayPeriod?: boolean // Legacy: true = lastWorkingDay
+  periodStartDay?: number // Legacy: for dayOfMonth
+  periodEndDay?: number | null
+  paydayCutoffHour?: number
+  paydayStartCutoffHour?: number
+}
+
 /**
- * Get period dates based on settings
+ * Get period dates from finance settings (preferred - supports all payday modes)
+ */
+export function getPeriodDatesFromSettings(
+  selectedMonth: string,
+  settings: PeriodSettings | null | undefined
+): { startDate: Date; endDate: Date; hasTimeBoundaries: boolean } {
+  if (!settings) {
+    const [year, month] = selectedMonth.split('-').map(Number)
+    const startDate = startOfMonth(new Date(year, month - 1))
+    const endDate = endOfMonth(new Date(year, month - 1))
+    endDate.setHours(23, 59, 59)
+    return { startDate, endDate, hasTimeBoundaries: false }
+  }
+
+  // Resolve payday mode (support new paydayMode + legacy usePaydayPeriod/periodStartDay)
+  let mode: PaydayMode = settings.paydayMode || 'calendarMonth'
+  if (!settings.paydayMode) {
+    if (settings.usePaydayPeriod) mode = 'lastWorkingDay'
+    else if (settings.periodStartDay !== undefined && settings.periodStartDay > 0)
+      mode = 'dayOfMonth'
+  }
+
+  const paydayDay = settings.paydayDayOfMonth ?? settings.periodStartDay ?? 25
+  const paydayCutoffHour = settings.paydayCutoffHour ?? 13
+  const paydayStartCutoffHour = settings.paydayStartCutoffHour ?? 14
+  const [year, month] = selectedMonth.split('-').map(Number)
+  const prevMonth = month === 1 ? 12 : month - 1
+  const prevYear = month === 1 ? year - 1 : year
+
+  if (mode === 'lastWorkingDay') {
+    const prevLastWorkingDay = getLastWorkingDayOfMonth(prevYear, prevMonth)
+    const startDate = new Date(prevLastWorkingDay)
+    startDate.setHours(paydayStartCutoffHour, 0, 0, 0)
+    const endDate = getLastWorkingDayOfMonth(year, month)
+    endDate.setHours(paydayCutoffHour, 0, 0, 0)
+    return { startDate, endDate, hasTimeBoundaries: true }
+  }
+
+  if (mode === 'dayOfMonth') {
+    const day = Math.min(31, Math.max(1, paydayDay))
+    const prevLastDay = new Date(prevYear, prevMonth, 0).getDate()
+    const startDay = Math.min(day, prevLastDay)
+    const startDate = new Date(prevYear, prevMonth - 1, startDay)
+    startDate.setHours(0, 0, 0, 0)
+    let endDate: Date
+    if (day === 1) {
+      endDate = new Date(year, month - 1, 0, 23, 59, 59)
+    } else {
+      const currLastDay = new Date(year, month, 0).getDate()
+      const endDay = Math.min(day - 1, currLastDay)
+      endDate = new Date(year, month - 1, endDay, 23, 59, 59)
+    }
+    return { startDate, endDate, hasTimeBoundaries: false }
+  }
+
+  if (mode === 'lastDay') {
+    const prevLastDay = endOfMonth(new Date(prevYear, prevMonth - 1))
+    const startDate = new Date(prevLastDay)
+    startDate.setHours(0, 0, 0, 0)
+    const endDate = endOfMonth(new Date(year, month - 1))
+    endDate.setHours(23, 59, 59)
+    return { startDate, endDate, hasTimeBoundaries: false }
+  }
+
+  // calendarMonth (default)
+  const startDate = startOfMonth(new Date(year, month - 1))
+  const endDate = endOfMonth(new Date(year, month - 1))
+  endDate.setHours(23, 59, 59)
+  return { startDate, endDate, hasTimeBoundaries: false }
+}
+
+/**
+ * Get period dates based on settings (legacy signature - kept for backward compatibility)
  */
 export function getPeriodDates(
   selectedMonth: string,
@@ -156,59 +242,17 @@ export function getPeriodDates(
   paydayCutoffHour: number = 13,
   paydayStartCutoffHour: number = 14
 ): { startDate: Date; endDate: Date; cutoffHour?: number; startCutoffHour?: number } {
-  const [year, month] = selectedMonth.split('-').map(Number)
-
-  if (usePaydayPeriod) {
-    const prevMonth = month === 1 ? 12 : month - 1
-    const prevYear = month === 1 ? year - 1 : year
-    const prevLastWorkingDay = getLastWorkingDayOfMonth(prevYear, prevMonth)
-    const startDate = new Date(prevLastWorkingDay)
-    startDate.setHours(paydayStartCutoffHour, 0, 0, 0)
-
-    const endDate = getLastWorkingDayOfMonth(year, month)
-    endDate.setHours(paydayCutoffHour, 0, 0, 0)
-
-    return { startDate, endDate, cutoffHour: paydayCutoffHour, startCutoffHour: paydayStartCutoffHour }
-  } else if (periodStartDay) {
-    // For custom periods, the period spans from periodStartDay of previous month
-    // to (periodStartDay - 1) of current month
-    // Example: If periodStartDay is 15 and viewing January:
-    //   - Start: Dec 15 (previous month)
-    //   - End: Jan 14 (current month, day before periodStartDay)
-    
-    // Calculate previous month
-    const prevMonth = month === 1 ? 12 : month - 1
-    const prevYear = month === 1 ? year - 1 : year
-    
-    // Start date is periodStartDay of previous month
-    const startDate = new Date(prevYear, prevMonth - 1, periodStartDay)
-    
-    // End date calculation
-    let endDate: Date
-    if (periodEndDay !== null && periodEndDay !== undefined) {
-      // Use specified end day of current month
-      endDate = new Date(year, month - 1, periodEndDay, 23, 59, 59)
-    } else {
-      // Calculate end day: period ends the day before periodStartDay of current month
-      // Handle edge case where periodStartDay is 1
-      if (periodStartDay === 1) {
-        // If period starts on 1st, it ends on last day of previous month
-        // But wait, that doesn't make sense. Let me reconsider...
-        // Actually, if periodStartDay is 1, the period should be:
-        //   - Start: 1st of previous month
-        //   - End: Last day of previous month (which is day 0 of current month)
-        endDate = new Date(year, month - 1, 0, 23, 59, 59)
-      } else {
-        // Period ends on (periodStartDay - 1) of current month
-        endDate = new Date(year, month - 1, periodStartDay - 1, 23, 59, 59)
-      }
-    }
-    return { startDate, endDate }
-  } else {
-    const startDate = startOfMonth(new Date(year, month - 1))
-    const endDate = endOfMonth(new Date(year, month - 1))
-    endDate.setHours(23, 59, 59)
-    return { startDate, endDate }
+  const result = getPeriodDatesFromSettings(selectedMonth, {
+    usePaydayPeriod,
+    periodStartDay,
+    periodEndDay,
+    paydayCutoffHour,
+    paydayStartCutoffHour,
+  })
+  return {
+    ...result,
+    cutoffHour: paydayCutoffHour,
+    startCutoffHour: paydayStartCutoffHour,
   }
 }
 
