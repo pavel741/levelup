@@ -8,6 +8,7 @@ import { useFirestoreStore } from '@/store/useFirestoreStore'
 import { Dumbbell, Sparkles, Play } from 'lucide-react'
 // Lazy load heavy components for better performance
 import nextDynamic from 'next/dynamic'
+import { useLanguage } from '@/components/common/LanguageProvider'
 import { CardSkeleton, ListSkeleton } from '@/components/ui/Skeleton'
 
 const ExerciseLibrary = nextDynamic(() => import('@/components/ExerciseLibrary'), {
@@ -45,6 +46,7 @@ export const dynamic = 'force-dynamic'
 
 export default function WorkoutsPage() {
   const { user } = useFirestoreStore()
+  const { t } = useLanguage()
   const { subscribeRoutines, loadWorkoutLogs, addRoutine, refreshRoutines } = useWorkoutStore()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [currentView, setCurrentView] = useState<WorkoutView>('routines')
@@ -225,7 +227,7 @@ export default function WorkoutsPage() {
       // Re-fetch logs to restore state if deletion failed
       const logs = await getWorkoutLogs(user.id)
       setWorkoutLogs(logs)
-      showError('Failed to delete workout.', { component: 'WorkoutsPage', action: 'deleteWorkoutLog' })
+      showError(t('errors.failedToDeleteWorkout'), { component: 'WorkoutsPage', action: 'deleteWorkoutLog' })
     }
   }, [user?.id])
 
@@ -236,7 +238,7 @@ export default function WorkoutsPage() {
   }, [])
 
   const handleWorkoutCancel = useCallback(() => {
-    if (confirm('Cancel this workout? Progress will be lost.')) {
+    if (confirm(t('errors.cancelWorkoutConfirm'))) {
       setActiveRoutine(null)
       setSelectedSessionId(null)
     }

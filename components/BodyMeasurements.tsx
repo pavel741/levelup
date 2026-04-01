@@ -6,12 +6,14 @@ import type { BodyMeasurement } from '@/types/bodyMeasurements'
 import { format } from 'date-fns'
 import { Plus, Edit2, Trash2, X } from 'lucide-react'
 import { showError, showSuccess } from '@/lib/utils'
+import { useLanguage } from '@/components/common/LanguageProvider'
 
 interface BodyMeasurementsProps {
   userId: string
 }
 
 export default function BodyMeasurements({ userId }: BodyMeasurementsProps) {
+  const { t } = useLanguage()
   const [measurements, setMeasurements] = useState<BodyMeasurement[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
@@ -80,7 +82,7 @@ export default function BodyMeasurements({ userId }: BodyMeasurementsProps) {
       }
 
       await addBodyMeasurement(userId, measurement)
-      showSuccess('Body measurement added')
+      showSuccess(t('errors.bodyMeasurementAdded'))
       loadMeasurements()
       resetForm()
       setShowAddModal(false)
@@ -141,7 +143,7 @@ export default function BodyMeasurements({ userId }: BodyMeasurementsProps) {
       }
 
       await updateBodyMeasurement(userId, editingMeasurement.id, updates)
-      showSuccess('Body measurement updated')
+      showSuccess(t('errors.bodyMeasurementUpdated'))
       loadMeasurements()
       resetForm()
       setShowEditModal(false)
@@ -153,11 +155,11 @@ export default function BodyMeasurements({ userId }: BodyMeasurementsProps) {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this measurement?')) return
+    if (!confirm(t('errors.deleteMeasurementConfirm'))) return
 
     try {
       await deleteBodyMeasurement(userId, id)
-      showSuccess('Body measurement deleted')
+      showSuccess(t('errors.bodyMeasurementDeleted'))
       loadMeasurements()
     } catch (error) {
       console.error('Error deleting body measurement:', error)
@@ -383,7 +385,7 @@ export default function BodyMeasurements({ userId }: BodyMeasurementsProps) {
             setShowAddModal(false)
             resetForm()
           }}
-          title="Add Body Measurement"
+          title={t('workouts.addBodyMeasurement')}
         />
       )}
 
@@ -398,7 +400,7 @@ export default function BodyMeasurements({ userId }: BodyMeasurementsProps) {
             setEditingMeasurement(null)
             resetForm()
           }}
-          title="Edit Body Measurement"
+          title={t('workouts.editBodyMeasurement')}
         />
       )}
     </div>

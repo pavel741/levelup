@@ -3,6 +3,7 @@
 import { memo } from 'react'
 import { Play, X } from 'lucide-react'
 import type { Routine } from '@/types/workout'
+import { useLanguage } from '@/components/common/LanguageProvider'
 
 interface RoutineCardProps {
   routine: Routine
@@ -12,8 +13,9 @@ interface RoutineCardProps {
 }
 
 function RoutineCardComponent({ routine, onStart, onEdit, onDelete }: RoutineCardProps) {
+  const { t } = useLanguage()
   const handleDelete = async () => {
-    if (confirm('Delete this routine?')) {
+    if (confirm(t('errors.deleteRoutineConfirm'))) {
       await onDelete(routine.id)
     }
   }

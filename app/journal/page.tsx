@@ -123,7 +123,7 @@ export default function JournalPage() {
       if (!hasContent) {
         setValidationError(
           newEntry.type === 'gratitude' 
-            ? t('journal.addGratitudeItem')
+            ? t('journal.addGratitudeItemRequired')
             : t('journal.enterContent')
         )
         setTimeout(() => setValidationError(''), 3000)
@@ -176,7 +176,7 @@ export default function JournalPage() {
       console.log('Form reset and modal closed')
     } catch (error) {
       console.error('Failed to add journal entry:', error)
-      alert('Failed to add journal entry: ' + (error instanceof Error ? error.message : 'Unknown error'))
+      alert(t('errors.failedToAddJournalWithError') + ': ' + (error instanceof Error ? error.message : 'Unknown error'))
     }
   }
 

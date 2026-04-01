@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { X, Save, Trash2 } from 'lucide-react'
 import type { PlannedMeal } from '@/types/nutrition'
 import { showWarning } from '@/lib/utils'
+import { useLanguage } from '@/components/common/LanguageProvider'
 
 interface MealEditorProps {
   dayDate: Date
@@ -13,6 +14,7 @@ interface MealEditorProps {
 }
 
 export default function MealEditor({ dayDate, existingMeals, onSave, onClose }: MealEditorProps) {
+  const { t } = useLanguage()
   const [meals, setMeals] = useState<PlannedMeal[]>(existingMeals || [])
   
   // Update meals when existingMeals prop changes (e.g., after saving and reopening)
@@ -33,7 +35,7 @@ export default function MealEditor({ dayDate, existingMeals, onSave, onClose }: 
 
   const handleAddMeal = () => {
     if (!mealName.trim()) {
-      showWarning('Please enter a meal name')
+      showWarning(t('errors.pleaseEnterMealName'))
       return
     }
 
@@ -87,7 +89,7 @@ export default function MealEditor({ dayDate, existingMeals, onSave, onClose }: 
   }
 
   const handleDeleteMeal = (index: number) => {
-    if (confirm('Delete this meal?')) {
+    if (confirm(t('errors.deleteMealConfirm'))) {
       setMeals(meals.filter((_, i) => i !== index))
     }
   }

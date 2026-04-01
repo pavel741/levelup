@@ -7,6 +7,7 @@ import type { MealPlan, MealPlanDay, PlannedMeal, NutritionInfo } from '@/types/
 import { formatDisplayDate } from '@/lib/utils'
 import { addDays, eachDayOfInterval, startOfWeek, endOfWeek, format, isSameDay, parseISO } from 'date-fns'
 import { showError, showSuccess } from '@/lib/utils'
+import { useLanguage } from '@/components/common/LanguageProvider'
 import { getAllMealPlanTemplates, generateMealPlanFromTemplate } from '@/lib/mealPlanTemplates'
 import MealEditor from './MealEditor'
 
@@ -15,6 +16,7 @@ interface MealPlannerProps {
 }
 
 export default function MealPlanner({ userId }: MealPlannerProps) {
+  const { t } = useLanguage()
   const [mealPlans, setMealPlans] = useState<MealPlan[]>([])
   const [selectedPlan, setSelectedPlan] = useState<MealPlan | null>(null)
   const [showNewPlanModal, setShowNewPlanModal] = useState(false)
@@ -53,7 +55,7 @@ export default function MealPlanner({ userId }: MealPlannerProps) {
 
   const handleCreatePlan = async () => {
     if (!newPlanName.trim() || !userId) {
-      showError('Please enter a plan name', { component: 'MealPlanner', action: 'validatePlanName' })
+      showError(t('errors.pleaseEnterPlanName'), { component: 'MealPlanner', action: 'validatePlanName' })
       return
     }
 
@@ -110,7 +112,7 @@ export default function MealPlanner({ userId }: MealPlannerProps) {
       setSelectedTemplate(null)
       setSelectedPlan(createdPlan)
       
-      showSuccess('Meal plan created successfully!')
+      showSuccess(t('errors.mealPlanCreated'))
     } catch (error: unknown) {
       console.error('Error saving meal plan:', error)
       showError(error, { 
@@ -132,7 +134,7 @@ export default function MealPlanner({ userId }: MealPlannerProps) {
   }
 
   const handleDeletePlan = async (planId: string) => {
-    if (!confirm('Are you sure you want to delete this meal plan?')) return
+    if (!confirm(t('errors.deleteMealPlanConfirm'))) return
     
     try {
       // Optimistically update local state immediately
@@ -237,7 +239,7 @@ export default function MealPlanner({ userId }: MealPlannerProps) {
       }
       
       setEditingDay(null)
-      showSuccess('Meals saved successfully!')
+      showSuccess(t('errors.mealsSaved'))
     } catch (error: unknown) {
       console.error('Error updating meal plan:', error)
       showError(error, { component: 'MealPlanner', action: 'updateMealPlan' })

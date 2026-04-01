@@ -7,6 +7,7 @@ import { CheckCircle2, Circle, Trash2, X, Edit2, AlertCircle, TrendingUp } from 
 import { Habit } from '@/types'
 import { validateMissedReason } from '@/lib/missedHabitValidation'
 import { showWarning } from '@/lib/utils'
+import { useLanguage } from '@/components/common/LanguageProvider'
 
 interface HabitCardProps {
   habit: Habit
@@ -56,6 +57,7 @@ function checkIfHabitStarted(startDate: Date | string | undefined, todayStr: str
 
 function HabitCardComponent({ habit, onEdit, selectedDate }: HabitCardProps) {
   const { completeHabit, uncompleteHabit, deleteHabit, markHabitMissed, updateMissedReasonValidity, user } = useFirestoreStore()
+  const { t } = useLanguage()
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showMissedModal, setShowMissedModal] = useState(false)
   const [missedReason, setMissedReason] = useState('')
@@ -108,7 +110,7 @@ function HabitCardComponent({ habit, onEdit, selectedDate }: HabitCardProps) {
 
   const handleMarkMissed = async () => {
     if (!missedReason.trim()) {
-      showWarning('Please provide a reason for missing this habit')
+      showWarning(t('errors.provideReasonForMissing'))
       return
     }
 
@@ -118,19 +120,19 @@ function HabitCardComponent({ habit, onEdit, selectedDate }: HabitCardProps) {
     
     // Can't mark future dates as missed
     if (selectedDate > todayDate) {
-      showWarning('Cannot mark future dates as missed')
+      showWarning(t('errors.cannotMarkFutureMissed'))
       return
     }
 
     // Check if date is already completed
     if (habit.completedDates.includes(missedDate)) {
-      showWarning('This date is already marked as completed. Uncomplete it first if you want to mark it as missed.')
+      showWarning(t('errors.alreadyCompletedUncompleteFirst'))
       return
     }
 
     // Check if date is already marked as missed
     if (habit.missedDates?.some((m) => m.date === missedDate)) {
-      showWarning('This date is already marked as missed')
+      showWarning(t('errors.alreadyMarkedMissed'))
       return
     }
 
@@ -141,7 +143,7 @@ function HabitCardComponent({ habit, onEdit, selectedDate }: HabitCardProps) {
         : new Date(habit.startDate)
       const startDateStr = format(startDate, 'yyyy-MM-dd')
       if (missedDate < startDateStr) {
-        showWarning(`Cannot mark dates before the habit start date (${format(startDate, 'MMM d, yyyy')})`)
+        showWarning(t('errors.cannotMarkBeforeStart', { date: format(startDate, 'MMM d, yyyy') }))
         return
       }
     }
@@ -273,7 +275,7 @@ function HabitCardComponent({ habit, onEdit, selectedDate }: HabitCardProps) {
               <button
                 onClick={() => onEdit(habit)}
                 className="p-2 rounded-lg text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-                title="Edit habit"
+                title={t('habitsUi.editHabit')}
               >
                 <Edit2 className="w-5 h-5" />
               </button>
@@ -281,7 +283,7 @@ function HabitCardComponent({ habit, onEdit, selectedDate }: HabitCardProps) {
             <button
               onClick={() => setShowDeleteConfirm(true)}
               className="p-2 rounded-lg text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-              title="Delete habit"
+              title={t('habitsUi.deleteHabit')}
             >
               <Trash2 className="w-5 h-5" />
             </button>
@@ -373,7 +375,7 @@ function HabitCardComponent({ habit, onEdit, selectedDate }: HabitCardProps) {
                                   ? 'bg-green-600 text-white'
                                   : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50'
                               }`}
-                              title="Mark as valid reason"
+                              title={t('habitsUi.markValidReason')}
                             >
                               ✓ Valid
                             </button>
@@ -384,7 +386,7 @@ function HabitCardComponent({ habit, onEdit, selectedDate }: HabitCardProps) {
                                   ? 'bg-red-600 text-white'
                                   : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/50'
                               }`}
-                              title="Mark as invalid reason"
+                              title={t('habitsUi.markInvalidReason')}
                             >
                               ✗ Invalid
                             </button>

@@ -13,6 +13,7 @@ import {
   completeTodo as completeTodoApi,
 } from '@/lib/todosApi'
 import { showError } from '@/lib/utils'
+import { getT } from '@/lib/i18n'
 import { createSmartPoll } from '@/lib/utils/smart-polling'
 
 interface TodosState {
@@ -51,7 +52,7 @@ export const useTodosStore = create<TodosState>((set, get) => ({
       set({ todos, isLoadingTodos: false })
     } catch (error) {
       console.error('Error loading todos:', error)
-      showError('Failed to load todos')
+      showError(getT('errors.failedToLoadTodos'))
       set({ isLoadingTodos: false })
     }
   },
@@ -104,7 +105,7 @@ export const useTodosStore = create<TodosState>((set, get) => ({
       await get().loadTodos(userId)
     } catch (error) {
       console.error('Error adding todo:', error)
-      showError('Failed to add todo')
+      showError(getT('errors.failedToAddTodo'))
       throw error
     }
   },
@@ -116,7 +117,7 @@ export const useTodosStore = create<TodosState>((set, get) => ({
       await get().loadTodos(userId)
     } catch (error) {
       console.error('Error updating todo:', error)
-      showError('Failed to update todo')
+      showError(getT('errors.failedToUpdateTodo'))
       throw error
     }
   },
@@ -128,7 +129,7 @@ export const useTodosStore = create<TodosState>((set, get) => ({
       await get().loadTodos(userId)
     } catch (error) {
       console.error('Error deleting todo:', error)
-      showError('Failed to delete todo')
+      showError(getT('errors.failedToDeleteTodo'))
       throw error
     }
   },
@@ -140,7 +141,7 @@ export const useTodosStore = create<TodosState>((set, get) => ({
       await get().loadTodos(userId)
     } catch (error) {
       console.error('Error completing todo:', error)
-      showError('Failed to complete todo')
+      showError(getT('errors.failedToCompleteTodo'))
       throw error
     }
   },

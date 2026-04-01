@@ -39,6 +39,7 @@ import { CSVImportService } from '@/lib/csvImport'
 import { ESTONIAN_BANK_PROFILES, detectBankProfile } from '@/lib/bankProfiles'
 import { getSuggestedCategory } from '@/lib/transactionCategorizer'
 import { formatCurrency, formatDate, formatDisplayDate, showError, showSuccess } from '@/lib/utils'
+import { useLanguage } from '@/components/common/LanguageProvider'
 import { CardSkeleton, TransactionListSkeleton } from '@/components/ui/Skeleton'
 import { VirtualList } from '@/components/ui/VirtualList'
 import { findBillMatches, calculateNextDueDate, DEFAULT_MATCHING_SETTINGS, type BillMatch } from '@/lib/billMatching'
@@ -55,6 +56,7 @@ export const dynamic = 'force-dynamic'
 
 export default function FinancePage() {
   const { user } = useFirestoreStore()
+  const { t } = useLanguage()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [transactions, setTransactions] = useState<FinanceTransaction[]>([])
   const [allTransactionsForSummary, setAllTransactionsForSummary] = useState<FinanceTransaction[]>([])
@@ -882,7 +884,7 @@ export default function FinancePage() {
               interval: formRecurringInterval,
               nextDate: new Date(formDate),
             })
-            showSuccess('Transaction updated and added as recurring')
+            showSuccess(t('finance.transactionUpdatedRecurring'))
           } catch (error) {
             console.error('Error creating recurring transaction:', error)
             showError(error, { component: 'FinancePage', action: 'addRecurringTransaction' })
@@ -917,7 +919,7 @@ export default function FinancePage() {
               interval: formRecurringInterval,
               nextDate: new Date(formDate),
             })
-            showSuccess('Transaction added and set as recurring')
+            showSuccess(t('finance.transactionAddedRecurring'))
           } catch (error) {
             console.error('Error creating recurring transaction:', error)
             showError(error, { component: 'FinancePage', action: 'addRecurringTransaction' })
@@ -960,7 +962,7 @@ export default function FinancePage() {
 
   // Handle delete transaction
   const handleDelete = async (id: string) => {
-    if (!user?.id || !confirm('Are you sure you want to delete this transaction?')) return
+    if (!user?.id || !confirm(t('finance.deleteTransactionConfirm'))) return
 
     setIsDeletingTransaction(id)
     
@@ -1008,7 +1010,7 @@ export default function FinancePage() {
         recentlyDeletedIdsRef.current.delete(id)
       }, 30000)
       
-      showSuccess('Transaction deleted')
+      showSuccess(t('finance.transactionDeleted'))
     } catch (error) {
       console.error('Error deleting transaction:', error)
       // Remove from recently deleted set on error
@@ -1907,7 +1909,7 @@ export default function FinancePage() {
                             : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                         }`}
                       >
-                        All Time
+                        {t('finance.allTime')}
                       </button>
                     </div>
                   </div>
@@ -1921,7 +1923,7 @@ export default function FinancePage() {
                             type="button"
                             onClick={() => navigateMonth(-1)}
                             className="w-10 h-10 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg flex items-center justify-center text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                            title="Previous period"
+                            title={t('finance.previousPeriod')}
                           >
                             ‹
                           </button>
@@ -1956,7 +1958,7 @@ export default function FinancePage() {
                             type="button"
                             onClick={() => navigateMonth(1)}
                             className="w-10 h-10 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg flex items-center justify-center text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                            title="Next period"
+                            title={t('finance.nextPeriod')}
                           >
                             ›
                           </button>
@@ -1965,7 +1967,7 @@ export default function FinancePage() {
                             onClick={setCurrentMonth}
                             className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                           >
-                            Current Period
+                            {t('finance.currentPeriod')}
                           </button>
                         </div>
                       </div>
@@ -1973,7 +1975,7 @@ export default function FinancePage() {
                         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 transition-all hover:shadow-xl">
                           <div className="flex items-center justify-between mb-2">
                             <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
-                              Monthly Balance
+                              {t('finance.monthlyBalance')}
                     </h3>
                             <DollarSign className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                           </div>
@@ -1984,7 +1986,7 @@ export default function FinancePage() {
                         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 transition-all hover:shadow-xl">
                           <div className="flex items-center justify-between mb-2">
                             <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
-                              Monthly Income
+                              {t('finance.monthlyIncome')}
                             </h3>
                             <TrendingUp className="w-5 h-5 text-green-600 dark:text-green-400" />
                           </div>
@@ -1995,7 +1997,7 @@ export default function FinancePage() {
                         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 transition-all hover:shadow-xl">
                           <div className="flex items-center justify-between mb-2">
                             <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
-                              Monthly Expenses
+                              {t('finance.monthlyExpenses')}
                             </h3>
                             <TrendingDown className="w-5 h-5 text-red-600 dark:text-red-400" />
                           </div>
@@ -2013,7 +2015,7 @@ export default function FinancePage() {
                       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 transition-all hover:shadow-xl">
                         <div className="flex items-center justify-between mb-2">
                           <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
-                            Total Balance
+                            {t('finance.totalBalance')}
                           </h3>
                           <DollarSign className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                         </div>
@@ -2024,7 +2026,7 @@ export default function FinancePage() {
                       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 transition-all hover:shadow-xl">
                         <div className="flex items-center justify-between mb-2">
                           <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
-                            Total Income
+                            {t('finance.totalIncome')}
                           </h3>
                           <TrendingUp className="w-5 h-5 text-green-600 dark:text-green-400" />
                         </div>
@@ -2035,7 +2037,7 @@ export default function FinancePage() {
                       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 transition-all hover:shadow-xl">
                         <div className="flex items-center justify-between mb-2">
                           <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
-                            Total Expenses
+                            {t('finance.totalExpenses')}
                     </h3>
                           <TrendingDown className="w-5 h-5 text-red-600 dark:text-red-400" />
                         </div>
@@ -2289,7 +2291,7 @@ export default function FinancePage() {
                                 setTimeout(() => setShowCategoryDropdown(false), 200)
                               }}
                               required
-                              placeholder="Select or type a category name"
+                              placeholder={t('finance.selectOrTypeCategory')}
                               className="w-full px-4 py-2 pr-10 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                             />
                             <button
@@ -2824,7 +2826,7 @@ export default function FinancePage() {
                                 : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                             }`}
                           >
-                            {filter === 'all' ? 'All' : filter.charAt(0).toUpperCase() + filter.slice(1)}
+                            {filter === 'all' ? t('common.all') : filter === 'income' ? t('finance.income') : t('finance.expense')}
                           </button>
                         ))}
                       </div>
@@ -2832,13 +2834,13 @@ export default function FinancePage() {
                       {/* Transaction List */}
                       <div className="space-y-2 sm:space-y-3 max-h-[600px] overflow-y-auto">
                         {isLoading ? (
-                          <div className="text-center py-10 text-gray-500 dark:text-gray-400">Loading...</div>
+                          <div className="text-center py-10 text-gray-500 dark:text-gray-400">{t('finance.loading')}</div>
                         ) : filteredTransactions.length === 0 ? (
                           <div className="text-center py-10">
                             <div className="text-4xl mb-3">📊</div>
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Start tracking your expenses</h3>
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">{t('finance.startTracking')}</h3>
                             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                              Add your first transaction to start managing your finances.
+                              {t('finance.addFirstTransaction')}
                             </p>
                           </div>
                         ) : (
@@ -2855,17 +2857,17 @@ export default function FinancePage() {
                                     disabled={currentPage === 1}
                                     className="px-3 py-1 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700"
                                   >
-                                    Previous
+                                    {t('finance.previous')}
                                   </button>
                                   <span className="text-sm text-gray-700 dark:text-gray-300">
-                                    Page {currentPage} of {totalPages}
+                                    {t('finance.pageOf', { current: currentPage, total: totalPages })}
                                   </span>
                                   <button
                                     onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                                     disabled={currentPage === totalPages}
                                     className="px-3 py-1 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700"
                                   >
-                                    Next
+                                    {t('finance.next')}
                                   </button>
                                 </div>
                               </div>

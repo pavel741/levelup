@@ -13,6 +13,7 @@ import {
   getFocusStats,
 } from '@/lib/focusApi'
 import { showError } from '@/lib/utils'
+import { getT } from '@/lib/i18n'
 
 interface FocusState {
   // Focus sessions
@@ -94,7 +95,7 @@ export const useFocusStore = create<FocusState>((set, get) => ({
       return sessionId
     } catch (error) {
       console.error('Failed to add focus session:', error)
-      showError('Failed to add focus session', { component: 'FocusStore', action: 'addSession' })
+      showError(getT('errors.failedToAddFocus'), { component: 'FocusStore', action: 'addSession' })
       throw error
     }
   },
@@ -105,7 +106,7 @@ export const useFocusStore = create<FocusState>((set, get) => ({
       // Subscription will update the state
     } catch (error) {
       console.error('Failed to update focus session:', error)
-      showError('Failed to update focus session', { component: 'FocusStore', action: 'updateSession' })
+      showError(getT('errors.failedToUpdateFocus'), { component: 'FocusStore', action: 'updateSession' })
       throw error
     }
   },
@@ -145,7 +146,7 @@ export const useFocusStore = create<FocusState>((set, get) => ({
     } catch (error) {
       // On error, restore previous state
       console.error('Failed to delete focus session:', error)
-      showError('Failed to delete focus session', { component: 'FocusStore', action: 'deleteSession' })
+      showError(getT('errors.failedToDeleteFocus'), { component: 'FocusStore', action: 'deleteSession' })
       // Restore previous sessions
       set({ sessions: previousSessions })
       throw error

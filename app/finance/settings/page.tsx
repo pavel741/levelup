@@ -22,6 +22,7 @@ import {
   saveLastReconciliation,
 } from '@/lib/financeApi'
 import { showWarning } from '@/lib/utils'
+import { useLanguage } from '@/components/common/LanguageProvider'
 import type {
   FinanceCategories,
   FinanceBudgetGoals,
@@ -37,6 +38,7 @@ export const dynamic = 'force-dynamic'
 
 export default function FinanceSettingsPage() {
   const { user } = useFirestoreStore()
+  const { t } = useLanguage()
   const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
@@ -158,7 +160,7 @@ export default function FinanceSettingsPage() {
       await saveCategories(user.id, categories)
     } catch (e: any) {
       console.error('Error saving finance categories:', e)
-      showWarning('Failed to save categories')
+      showWarning(t('financeSettings.failedToSaveCategories'))
     } finally {
       setIsSavingCategories(false)
     }
@@ -173,7 +175,7 @@ export default function FinanceSettingsPage() {
       : []
     
     if (typeCategories.includes(categoryName)) {
-      showWarning('Category already exists')
+      showWarning(t('financeSettings.categoryAlreadyExists'))
       return
     }
     
@@ -231,7 +233,7 @@ export default function FinanceSettingsPage() {
   }
 
   const handleInitializeDefaults = () => {
-    if (confirm('This will replace all your current categories with default ones. Continue?')) {
+    if (confirm(t('financeSettings.replaceCategoriesConfirm'))) {
       const defaultCategories: FinanceCategories = {
         income: ['Salary', 'Freelance', 'Investment', 'Rental Income', 'Business', 'Gift', 'Other'],
         expense: ['Food & Dining', 'Groceries', 'Transport', 'Shopping', 'Bills & Utilities', 'Entertainment', 'Health & Fitness', 'Education', 'Travel', 'Subscriptions', 'Home & Garden', 'Personal Care', 'Insurance', 'Taxes', 'Other'],

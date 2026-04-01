@@ -12,9 +12,11 @@ import { Target, Plus, Edit2, Trash2, TrendingUp, Calendar, X, Wallet, ArrowRigh
 import type { SavingsGoal, FinanceTransaction } from '@/types/finance'
 import { formatCurrency } from '@/lib/utils'
 import { format, startOfMonth, endOfMonth } from 'date-fns'
+import { useLanguage } from '@/components/common/LanguageProvider'
 
 export default function SavingsGoalsPage() {
   const { user } = useFirestoreStore()
+  const { t } = useLanguage()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [goals, setGoals] = useState<SavingsGoal[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -173,7 +175,7 @@ export default function SavingsGoalsPage() {
   }
 
   const handleDeleteGoal = async (goalId: string) => {
-    if (!user?.id || !confirm('Are you sure you want to delete this savings goal?')) return
+    if (!user?.id || !confirm(t('financeSavings.deleteGoalConfirm'))) return
 
     try {
       await deleteSavingsGoal(user.id, goalId)
@@ -220,7 +222,7 @@ export default function SavingsGoalsPage() {
         })
         
         if (activeGoals.length === 0) {
-          alert('No active goals with remaining balance needed')
+          alert(t('financeSavings.noActiveGoals'))
           setIsAllocating(false)
           return
         }
@@ -241,14 +243,14 @@ export default function SavingsGoalsPage() {
       } else {
         // Allocate to specific goal
         if (!selectedGoalId) {
-          alert('Please select a goal')
+          alert(t('financeSavings.pleaseSelectGoal'))
           setIsAllocating(false)
           return
         }
         
         const goal = goals.find(g => g.id === selectedGoalId)
         if (!goal) {
-          alert('Goal not found')
+          alert(t('financeSavings.goalNotFound'))
           setIsAllocating(false)
           return
         }
@@ -276,7 +278,7 @@ export default function SavingsGoalsPage() {
       setTransactions(txs)
     } catch (error) {
       console.error('Failed to allocate balance:', error)
-      alert('Failed to allocate balance. Please try again.')
+      alert(t('financeSavings.failedToAllocate'))
     } finally {
       setIsAllocating(false)
     }

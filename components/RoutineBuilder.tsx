@@ -7,6 +7,7 @@ import ExerciseLibrary from './ExerciseLibrary'
 import ExerciseInstructions from './ExerciseInstructions'
 import type { Routine, RoutineExercise, RoutineSession, SetConfiguration, Exercise } from '@/types/workout'
 import { showWarning } from '@/lib/utils'
+import { useLanguage } from '@/components/common/LanguageProvider'
 
 interface RoutineBuilderProps {
   onSave?: (routine: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => void
@@ -15,6 +16,7 @@ interface RoutineBuilderProps {
 }
 
 export default function RoutineBuilder({ onSave, onCancel, initialRoutine }: RoutineBuilderProps) {
+  const { t } = useLanguage()
   const [showExerciseLibrary, setShowExerciseLibrary] = useState(false)
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
   const [routineName, setRoutineName] = useState(initialRoutine?.name || '')
@@ -94,7 +96,7 @@ export default function RoutineBuilder({ onSave, onCancel, initialRoutine }: Rou
 
   const handleRemoveSession = (sessionId: string) => {
     if (sessions.length === 1) {
-      showWarning('You must have at least one workout day')
+      showWarning(t('errors.mustHaveWorkoutDay'))
       return
     }
     setSessions(sessions.filter(s => s.id !== sessionId))
@@ -284,13 +286,13 @@ export default function RoutineBuilder({ onSave, onCancel, initialRoutine }: Rou
 
   const handleSave = () => {
     if (!routineName.trim()) {
-      showWarning('Please enter a routine name')
+      showWarning(t('errors.pleaseEnterRoutineName'))
       return
     }
 
     const totalExercises = sessions.reduce((sum, s) => sum + s.exercises.length, 0)
     if (totalExercises === 0) {
-      showWarning('Please add at least one exercise to your routine')
+      showWarning(t('errors.pleaseAddExercise'))
       return
     }
 

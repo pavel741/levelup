@@ -1,10 +1,11 @@
 'use client'
 
-import { Home, Target, Trophy, Settings, Award, Wallet, X, MessageCircle, Dumbbell, Timer, CheckSquare, Flag, BookOpen } from 'lucide-react'
+import { Home, Target, Trophy, Settings, Award, Wallet, X, MessageCircle, Dumbbell, Timer, CheckSquare, Flag, BookOpen, Wine } from 'lucide-react'
 import Link from 'next/link'
 import { useFirestoreStore } from '@/store/useFirestoreStore'
 import { usePathname } from 'next/navigation'
 import { useLanguage } from '@/components/common/LanguageProvider'
+import { isAlcoholCutbackAdmin } from '@/lib/alcoholAdmin'
 
 interface SidebarProps {
   isOpen?: boolean
@@ -26,6 +27,9 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
     { icon: Wallet, label: t('sidebar.finance'), href: '/finance' },
     { icon: Timer, label: t('sidebar.focus'), href: '/focus' },
     { icon: BookOpen, label: t('sidebar.journal'), href: '/journal' },
+    ...(isAlcoholCutbackAdmin(user?.id)
+      ? [{ icon: Wine, label: t('sidebar.alcoholCutback'), href: '/alcohol' as const }]
+      : []),
     { icon: Award, label: t('sidebar.achievements'), href: '/achievements' },
     { icon: MessageCircle, label: t('sidebar.feedback'), href: '/feedback' },
     { icon: Settings, label: t('sidebar.settings'), href: '/settings' },

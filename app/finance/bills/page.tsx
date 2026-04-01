@@ -11,9 +11,11 @@ import type { FinanceRecurringTransaction } from '@/types/finance'
 import { formatCurrency, parseTransactionDate } from '@/lib/utils'
 import { format, addDays, differenceInDays, isPast, isToday, isSameMonth } from 'date-fns'
 import { useRouter } from 'next/navigation'
+import { useLanguage } from '@/components/common/LanguageProvider'
 
 export default function BillsPage() {
   const { user } = useFirestoreStore()
+  const { t } = useLanguage()
   const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [bills, setBills] = useState<FinanceRecurringTransaction[]>([])
@@ -220,13 +222,13 @@ export default function BillsPage() {
 
     // Always require amount to be entered manually (no default)
     if (!paymentAmount || paymentAmount.trim() === '') {
-      alert('Please enter the payment amount')
+      alert(t('financeBills.pleaseEnterAmount'))
       return
     }
 
     const amount = parseFloat(paymentAmount)
     if (isNaN(amount) || amount <= 0) {
-      alert('Please enter a valid payment amount')
+      alert(t('financeBills.pleaseEnterValidAmount'))
       return
     }
 
@@ -325,7 +327,7 @@ export default function BillsPage() {
   }
 
   const handleDeleteBill = async (billId: string) => {
-    if (!user?.id || !confirm('Are you sure you want to delete this bill?')) return
+    if (!user?.id || !confirm(t('financeBills.deleteBillConfirm'))) return
 
     // Store previous state for rollback
     const previousBills = bills
@@ -407,7 +409,7 @@ export default function BillsPage() {
                   setShowPaymentModal(true)
                 }}
                 className="p-2 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition-colors"
-                title="Mark as paid"
+                title={t('financeBills.markAsPaid')}
               >
                 <CheckCircle2 className="w-5 h-5" />
               </button>
@@ -415,7 +417,7 @@ export default function BillsPage() {
               <button
                 onClick={() => handleMarkUnpaid(bill)}
                 className="p-2 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-lg transition-colors"
-                title="Mark as unpaid"
+                title={t('financeBills.markAsUnpaid')}
               >
                 <XCircle className="w-5 h-5" />
               </button>

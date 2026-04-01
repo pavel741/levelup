@@ -57,7 +57,7 @@ export default function HabitsPage() {
     
     // Validate that weekly/custom habits have at least one day selected
     if ((newHabit.frequency === 'weekly' || newHabit.frequency === 'custom') && (!newHabit.targetDays || newHabit.targetDays.length === 0)) {
-      showWarning('Please select at least one day for weekly or custom habits')
+      showWarning(t('habits.pleaseSelectDay'))
       return
     }
 
@@ -234,7 +234,7 @@ export default function HabitsPage() {
     
     // Validate that weekly/custom habits have at least one day selected
     if ((newHabit.frequency === 'weekly' || newHabit.frequency === 'custom') && (!newHabit.targetDays || newHabit.targetDays.length === 0)) {
-      showWarning('Please select at least one day for weekly or custom habits')
+      showWarning(t('habits.pleaseSelectDay'))
       return
     }
 
@@ -688,7 +688,7 @@ export default function HabitsPage() {
                 <button
                   onClick={handleExportHabits}
                   className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors flex items-center gap-2"
-                  title="Export habits"
+                  title={t('habitsUi.exportHabits')}
                 >
                   <Download className="w-4 h-4" />
                   {t('habits.export')}
@@ -696,7 +696,7 @@ export default function HabitsPage() {
                 <button
                   onClick={handleImportHabits}
                   className="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition-colors flex items-center gap-2"
-                  title="Import habits"
+                  title={t('habitsUi.importHabits')}
                 >
                   <Upload className="w-4 h-4" />
                   {t('habits.import')}

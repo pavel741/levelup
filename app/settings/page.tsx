@@ -11,9 +11,11 @@ import { User, Bell, Shield, Moon, CheckCircle2, RotateCcw, AlertTriangle } from
 import { useTheme } from '@/components/common/ThemeProvider'
 import { requestNotificationPermission } from '@/lib/notifications'
 import { showError, showSuccess } from '@/lib/utils'
+import { useLanguage } from '@/components/common/LanguageProvider'
 
 export default function SettingsPage() {
   const { user, updateUserPreference, resetProgress } = useFirestoreStore()
+  const { t } = useLanguage()
   const { theme, toggleTheme } = useTheme()
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default')
   const [emailSummaryEnabled, setEmailSummaryEnabled] = useState(user?.emailSummaryEnabled || false)
@@ -88,7 +90,7 @@ export default function SettingsPage() {
     try {
       await resetProgress()
       setShowResetConfirm(false)
-      showSuccess('Progress has been reset successfully!')
+      showSuccess(t('settings.resetProgressSuccess'))
     } catch (error) {
       console.error('Error resetting progress:', error)
       showError(error, { component: 'SettingsPage', action: 'resetProgress' })
@@ -107,8 +109,8 @@ export default function SettingsPage() {
           <main className="flex-1 overflow-y-auto p-4 sm:p-6">
             <div className="max-w-4xl mx-auto">
               <div className="mb-6">
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Settings</h1>
-                <p className="text-gray-600 dark:text-gray-400">Manage your account and preferences</p>
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">{t('settings.settings')}</h1>
+                <p className="text-gray-600 dark:text-gray-400">{t('settings.manageAccount')}</p>
               </div>
 
               {/* Profile Settings */}
@@ -116,7 +118,7 @@ export default function SettingsPage() {
                 <div className="p-6 border-b border-gray-200 dark:border-gray-700">
                   <div className="flex items-center gap-3">
                     <User className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Profile</h2>
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{t('settings.profile')}</h2>
                   </div>
                 </div>
                 <div className="p-6 space-y-6">
@@ -139,13 +141,13 @@ export default function SettingsPage() {
 
                     <div className="flex-1">
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Profile picture URL
+                        {t('settings.profilePictureUrl')}
                       </label>
                       <input
                         type="url"
                         value={avatarUrl}
                         onChange={(e) => setAvatarUrl(e.target.value)}
-                        placeholder="https://example.com/your-avatar.jpg"
+                        placeholder={t('settings.profilePicturePlaceholder')}
                         className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
                       />
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">

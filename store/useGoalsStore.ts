@@ -13,6 +13,7 @@ import {
   updateGoalProgress as updateGoalProgressApi,
 } from '@/lib/goalsApi'
 import { showError } from '@/lib/utils'
+import { getT } from '@/lib/i18n'
 import { createSmartPoll } from '@/lib/utils/smart-polling'
 
 interface GoalsState {
@@ -54,7 +55,7 @@ export const useGoalsStore = create<GoalsState>((set, get) => ({
       set({ goals, isLoadingGoals: false })
     } catch (error) {
       console.error('Error loading goals:', error)
-      showError('Failed to load goals')
+      showError(getT('errors.failedToLoadGoals'))
       set({ isLoadingGoals: false })
     }
   },
@@ -108,7 +109,7 @@ export const useGoalsStore = create<GoalsState>((set, get) => ({
       }))
     } catch (error) {
       console.error('Error adding goal:', error)
-      showError('Failed to add goal')
+      showError(getT('errors.failedToAddGoal'))
       throw error
     }
   },
@@ -121,7 +122,7 @@ export const useGoalsStore = create<GoalsState>((set, get) => ({
       }))
     } catch (error) {
       console.error('Error updating goal:', error)
-      showError('Failed to update goal')
+      showError(getT('errors.failedToUpdateGoal'))
       throw error
     }
   },
@@ -134,7 +135,7 @@ export const useGoalsStore = create<GoalsState>((set, get) => ({
       }))
     } catch (error) {
       console.error('Error deleting goal:', error)
-      showError('Failed to delete goal')
+      showError(getT('errors.failedToDeleteGoal'))
       throw error
     }
   },
@@ -159,7 +160,7 @@ export const useGoalsStore = create<GoalsState>((set, get) => ({
       })
     } catch (error) {
       console.error('Error updating goal progress:', error)
-      showError('Failed to update goal progress')
+      showError(getT('errors.failedToUpdateGoalProgress'))
       throw error
     }
   },

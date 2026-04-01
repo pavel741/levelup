@@ -14,6 +14,7 @@ import {
   deleteJournalEntry as deleteJournalEntryApi,
 } from '@/lib/journalApi'
 import { showError } from '@/lib/utils'
+import { getT } from '@/lib/i18n'
 import { createSmartPoll } from '@/lib/utils/smart-polling'
 
 interface JournalState {
@@ -85,7 +86,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
       set({ entries, isLoadingEntries: false })
     } catch (error) {
       console.error('Error loading journal entries:', error)
-      showError('Failed to load journal entries')
+      showError(getT('errors.failedToLoadJournal'))
       set({ isLoadingEntries: false })
     }
   },
@@ -155,7 +156,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
       return entry
     } catch (error) {
       console.error('Error loading journal entry by date:', error)
-      showError('Failed to load journal entry')
+      showError(getT('errors.failedToLoadJournalEntry'))
       return null
     }
   },
@@ -166,7 +167,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
       set({ moodStats: stats })
     } catch (error) {
       console.error('Error loading mood statistics:', error)
-      showError('Failed to load mood statistics')
+      showError(getT('errors.failedToLoadMoodStats'))
     }
   },
 
@@ -232,7 +233,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
     } catch (error) {
       // On error, restore previous state
       console.error('Error adding journal entry:', error)
-      showError('Failed to add journal entry')
+      showError(getT('errors.failedToAddJournal'))
       // Restore previous entries
       set({ entries: previousEntries })
       throw error
@@ -303,7 +304,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
     } catch (error) {
       // On error, restore previous state
       console.error('Error updating journal entry:', error)
-      showError('Failed to update journal entry')
+      showError(getT('errors.failedToUpdateJournal'))
       // Restore previous entries and current entry
       set({ entries: previousEntries, currentEntry: previousCurrentEntry })
       throw error
@@ -363,7 +364,7 @@ export const useJournalStore = create<JournalState>((set, get) => ({
     } catch (error) {
       // On error, restore previous state
       console.error('Error deleting journal entry:', error)
-      showError('Failed to delete journal entry')
+      showError(getT('errors.failedToDeleteJournal'))
       // Restore previous entries
       set({ entries: previousEntries })
       throw error
