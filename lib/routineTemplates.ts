@@ -2558,7 +2558,7 @@ export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'u
   // Optimal Routine for Skinny Build (65kg, 176cm) - Muscle Building Focus
   {
     name: 'Skinny to Strong: Complete Muscle Builder',
-    description: 'Optimized 4-day routine for building muscle mass. Perfect for skinny individuals (65kg, 176cm) looking to gain size and strength. Designed for home workouts with bench, barbell, and dumbbells only - no pull-up bar needed! Focuses on compound movements with progressive overload structure.',
+    description: 'Optimized 4-day routine for building muscle mass. Perfect for skinny individuals (65kg, 176cm) looking to gain size and strength. Designed for home workouts with bench, barbell, and dumbbells only - no pull-up bar needed! Days 1–3 hit upper, lower, and shoulders; day 4 is a dedicated arm day (biceps, triceps, forearms). Focuses on compound movements with progressive overload structure.',
     goal: 'bulking',
     exercises: [],
     sessions: [
@@ -2821,84 +2821,117 @@ export const ROUTINE_TEMPLATES: Omit<Routine, 'id' | 'userId' | 'createdAt' | 'u
         estimatedDuration: 85
       },
       {
-        id: 'skinny-lower-2',
-        name: 'Lower Body Day 2: Power & Hypertrophy',
+        id: 'skinny-arm-day',
+        name: 'Arm Day: Biceps, Triceps & Forearms',
         order: 3,
         exercises: [
           {
-            exerciseId: 'deadlift',
+            exerciseId: 'close-grip-bench-press',
             order: 0,
             sets: [
-              { setType: 'warmup', targetReps: 8, targetWeight: undefined, restAfter: 90 },
-              { setType: 'working', targetReps: 5, targetWeight: undefined, restAfter: 180 },
-              { setType: 'working', targetReps: 5, targetWeight: undefined, restAfter: 180 },
-              { setType: 'working', targetReps: 5, targetWeight: undefined, restAfter: 180 }
+              { setType: 'warmup', targetReps: 10, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 6, targetWeight: undefined, restAfter: 90 }
             ],
-            restTime: 180,
-            notes: 'Full body strength - focus on form'
+            restTime: 90,
+            notes: 'Heavy tricep compound — elbows tucked, narrow grip on barbell'
           },
           {
-            exerciseId: 'front-squat',
+            exerciseId: 'barbell-curl',
             order: 1,
             sets: [
-              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 120 },
-              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 120 },
-              { setType: 'working', targetReps: 6, targetWeight: undefined, restAfter: 120 }
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 90 },
+              { setType: 'working', targetReps: 6, targetWeight: undefined, restAfter: 90 }
             ],
-            restTime: 120,
-            notes: 'Quad and core focus - upright torso'
+            restTime: 90,
+            notes: 'Main bicep mass movement — no swinging'
           },
           {
-            exerciseId: 'bulgarian-split-squat',
+            exerciseId: 'skull-crushers',
             order: 2,
             sets: [
-              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 90 },
-              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 90 },
-              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 90 }
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 75 },
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 75 },
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 75 }
             ],
-            restTime: 90,
-            notes: 'Each leg - can add dumbbells'
+            restTime: 75,
+            notes: 'Lying on bench — long-head triceps; control the eccentric'
           },
           {
-            exerciseId: 'goblet-squat',
+            exerciseId: 'hammer-curls',
             order: 3,
             sets: [
-              { setType: 'working', targetReps: 15, targetWeight: undefined, restAfter: 90 },
-              { setType: 'working', targetReps: 15, targetWeight: undefined, restAfter: 90 },
-              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 90 }
-            ],
-            restTime: 90,
-            notes: 'Form and pump - hold dumbbell at chest'
-          },
-          {
-            exerciseId: 'glute-bridge',
-            order: 4,
-            sets: [
-              { setType: 'working', targetReps: 15, targetWeight: undefined, restAfter: 60 },
-              { setType: 'working', targetReps: 15, targetWeight: undefined, restAfter: 60 },
-              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 60 }
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 60 }
             ],
             restTime: 60,
-            notes: 'Glute activation - can add weight'
+            notes: 'Neutral grip — brachialis and forearms as well as biceps'
           },
           {
-            exerciseId: 'russian-twists',
+            exerciseId: 'overhead-tricep-extension',
+            order: 4,
+            sets: [
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 60 }
+            ],
+            restTime: 60,
+            notes: 'Single or double dumbbell — stretch long head of triceps'
+          },
+          {
+            exerciseId: 'concentration-curls',
             order: 5,
             sets: [
-              { setType: 'working', targetReps: 20, targetWeight: undefined, restAfter: 45 },
-              { setType: 'working', targetReps: 20, targetWeight: undefined, restAfter: 45 },
-              { setType: 'working', targetReps: 15, targetWeight: undefined, restAfter: 45 }
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 8, targetWeight: undefined, restAfter: 60 }
+            ],
+            restTime: 60,
+            notes: 'Elbow on inner thigh — peak bicep contraction each rep'
+          },
+          {
+            exerciseId: 'tricep-kickbacks',
+            order: 6,
+            sets: [
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 60 },
+              { setType: 'working', targetReps: 10, targetWeight: undefined, restAfter: 60 }
+            ],
+            restTime: 60,
+            notes: 'Hinge forward — full extension, squeeze triceps'
+          },
+          {
+            exerciseId: 'reverse-curls',
+            order: 7,
+            sets: [
+              { setType: 'working', targetReps: 15, targetWeight: undefined, restAfter: 45 },
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 45 },
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 45 }
             ],
             restTime: 45,
-            notes: 'Core rotation - can hold weight'
+            notes: 'Overhand grip — brachioradialis and forearm extensors'
+          },
+          {
+            exerciseId: 'wrist-curls',
+            order: 8,
+            sets: [
+              { setType: 'working', targetReps: 15, targetWeight: undefined, restAfter: 45 },
+              { setType: 'working', targetReps: 15, targetWeight: undefined, restAfter: 45 },
+              { setType: 'working', targetReps: 12, targetWeight: undefined, restAfter: 45 }
+            ],
+            restTime: 45,
+            notes: 'Forearms on thighs — flexors; full range at wrist'
           }
         ],
-        estimatedDuration: 85
+        estimatedDuration: 75
       }
     ],
-    estimatedDuration: 80,
+    estimatedDuration: 315,
     difficulty: 'medium',
-    tags: ['skinny-to-strong', 'muscle-building', 'bulking', 'beginner-friendly', '4-day', 'barbell', 'dumbbell', 'bodyweight', 'compound-movements', 'progressive-overload']
+    tags: ['skinny-to-strong', 'muscle-building', 'bulking', 'beginner-friendly', '4-day', 'arms', 'barbell', 'dumbbell', 'bodyweight', 'compound-movements', 'progressive-overload']
   },
 
   // Fast Muscle Builder: Push-Pull-Legs (3-6 Day) - Optimized for Barbell, Bench, Dumbbells
